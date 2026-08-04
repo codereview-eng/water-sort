@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>数独网页 × Telegram Mini App 运行兼容性审计</title>
+  <style>
+    :root{
+      --canvas:#101612;
+      --surface:#17201a;
+      --elevated:#1e2a22;
+      --edge:#2e3d33;
+      --edge-strong:#546b5c;
+      --ink:#edf3ee;
+      --ink-2:#becbc1;
+      --ink-3:#91a296;
+      --accent:#87d1a5;
+      --accent-2:#c7aa69;
+      --good:#75cfa0;
+      --warn:#e0b66a;
+      --bad:#ed887f;
+      --info:#82b8dc;
+      --shadow:0 20px 60px rgba(0,0,0,.25);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 85% 0,rgba(135,209,165,.09),transparent 30rem),
+        linear-gradient(180deg,#0e1410,var(--canvas));
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+      line-height:1.65;
+    }
+    a{color:var(--accent);text-underline-offset:3px}
+    code,.mono{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace}
+    code{padding:.12rem .34rem;border:1px solid var(--edge);border-radius:5px;background:#111914;color:#d8e5db}
+    .wrap{width:min(1160px,calc(100% - 32px));margin:auto}
+    header{padding:58px 0 30px}
+    .eyebrow{margin:0 0 12px;color:var(--accent);font-size:12px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}
+    h1,h2,h3{font-family:Georgia,"Times New Roman","Songti SC",serif;line-height:1.18}
+    h1{max-width:930px;margin:0;font-size:clamp(34px,6vw,68px);font-weight:650;letter-spacing:-.035em}
+    .deck{max-width:850px;margin:22px 0 0;color:var(--ink-2);font-size:18px}
+    .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .meta span,.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--edge);border-radius:999px;background:rgba(23,32,26,.8);padding:6px 11px;color:var(--ink-3);font-size:12px}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+    main{padding-bottom:72px}
+    section{margin-top:22px;border:1px solid var(--edge);border-radius:16px;background:rgba(23,32,26,.9);box-shadow:var(--shadow);overflow:hidden}
+    .section-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;padding:24px 26px 18px;border-bottom:1px solid var(--edge)}
+    .section-head h2{margin:0;font-size:26px}
+    .section-head p{max-width:560px;margin:0;color:var(--ink-3);font-size:13px;text-align:right}
+    .section-body{padding:24px 26px}
+    .verdict-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:16px}
+    .verdict{
+      min-height:240px;padding:25px;border:1px solid var(--edge);border-radius:13px;
+      background:linear-gradient(145deg,rgba(135,209,165,.08),rgba(255,255,255,.01));
+    }
+    .verdict h2{margin:0 0 14px;font-size:31px}
+    .verdict strong{color:var(--accent)}
+    .verdict p{margin:0;color:var(--ink-2);font-size:16px}
+    .decision-list{display:grid;gap:10px}
+    .decision{
+      display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;
+      padding:15px;border:1px solid var(--edge);border-radius:11px;background:var(--elevated)
+    }
+    .decision b{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+    .decision p{margin:0;color:var(--ink-2);font-size:14px}
+    .yes{color:var(--good)} .conditional{color:var(--warn)} .no{color:var(--bad)}
+    .scorecards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+    .score{padding:17px;border:1px solid var(--edge);border-radius:12px;background:var(--surface)}
+    .score .n{display:block;font:700 30px/1 ui-monospace,SFMono-Regular,Consolas,monospace}
+    .score .label{display:block;margin-top:8px;color:var(--ink-3);font-size:12px}
+    .score.good .n{color:var(--good)} .score.warn .n{color:var(--warn)} .score.bad .n{color:var(--bad)}
+    .finding{display:grid;grid-template-columns:88px 1fr;gap:18px;padding:20px 0;border-top:1px solid var(--edge)}
+    .finding:first-child{border-top:0;padding-top:0}
+    .severity{height:max-content;border-radius:7px;padding:6px 8px;text-align:center;font:750 11px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.08em}
+    .sev-high{background:rgba(237,136,127,.13);border:1px solid rgba(237,136,127,.45);color:var(--bad)}
+    .sev-med{background:rgba(224,182,106,.13);border:1px solid rgba(224,182,106,.45);color:var(--warn)}
+    .sev-low{background:rgba(130,184,220,.11);border:1px solid rgba(130,184,220,.4);color:var(--info)}
+    .finding h3{margin:0 0 7px;font-size:19px}
+    .finding p{margin:0 0 9px;color:var(--ink-2)}
+    .evidence{display:flex;flex-wrap:wrap;gap:8px}
+    .evidence code{font-size:11px;color:var(--ink-3)}
+    .impact{margin-top:10px!important;padding-left:13px;border-left:2px solid var(--edge-strong);font-size:13px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:13px 12px;border-bottom:1px solid var(--edge);text-align:left;vertical-align:top}
+    th{color:var(--ink-3);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+    td{color:var(--ink-2);font-size:13px}
+    tr:last-child td{border-bottom:0}
+    .status{white-space:nowrap;font-weight:750}
+    .architecture{display:grid;grid-template-columns:1fr 48px 1fr 48px 1fr;gap:8px;align-items:center}
+    .node{min-height:130px;padding:17px;border:1px solid var(--edge);border-radius:12px;background:var(--elevated)}
+    .node b{display:block;margin-bottom:8px;color:var(--accent)}
+    .node p{margin:0;color:var(--ink-3);font-size:13px}
+    .arrow{text-align:center;color:var(--accent-2);font-size:25px}
+    .callout{margin-top:16px;padding:15px 17px;border-left:3px solid var(--warn);background:rgba(224,182,106,.07);color:var(--ink-2);font-size:13px}
+    .checklist{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .phase{padding:19px;border:1px solid var(--edge);border-radius:12px;background:var(--elevated)}
+    .phase .step{display:inline-grid;place-items:center;width:30px;height:30px;border:1px solid var(--accent);border-radius:50%;color:var(--accent);font-weight:800}
+    .phase h3{display:inline;margin-left:10px;font-size:18px}
+    .phase ul{margin:13px 0 0;padding-left:19px;color:var(--ink-2);font-size:13px}
+    .phase li+li{margin-top:7px}
+    .passed{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .pass{padding:16px;border:1px solid var(--edge);border-radius:11px;background:var(--elevated)}
+    .pass b{display:block;color:var(--good);font-size:14px}
+    .pass p{margin:7px 0 0;color:var(--ink-3);font-size:12px}
+    pre{overflow:auto;margin:0;padding:18px;border:1px solid var(--edge);border-radius:11px;background:#0d130f;color:#d5e2d8;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+    footer{padding:18px 0 40px;color:var(--ink-3);font-size:12px}
+    @media(max-width:820px){
+      .verdict-grid,.checklist{grid-template-columns:1fr}
+      .scorecards,.passed{grid-template-columns:1fr 1fr}
+      .architecture{grid-template-columns:1fr}
+      .arrow{transform:rotate(90deg)}
+      .section-head{align-items:start;flex-direction:column}
+      .section-head p{text-align:left}
+    }
+    @media(max-width:520px){
+      .scorecards,.passed{grid-template-columns:1fr}
+      .finding{grid-template-columns:1fr}
+      .severity{width:max-content}
+      .decision{grid-template-columns:1fr}
+      .wrap{width:min(100% - 20px,1160px)}
+    }
+  </style>
+</head>
+<body>
+  <header class="wrap">
+    <p class="eyebrow">Compatibility & Release Readiness Audit</p>
+    <h1>数独网页 × Telegram Mini App<br>运行兼容性审计</h1>
+    <p class="deck">目标不是判断“代码看起来像能跑”，而是区分：普通浏览器能否启动、Telegram 桥是否完整、当前仓库能否按手册直接发布，以及哪些缺口会影响身份可信性、排行榜完整性与首屏可用性。</p>
+    <div class="meta">
+      <span><i class="dot"></i>审计日期：2026-07-31</span>
+      <span>范围：<code>sudoku.html</code></span>
+      <span><code>manual-launch.html</code></span>
+      <span><code>sudoku-ui.test.js</code></span>
+      <span>只读审计，未修改产品代码</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="verdict-grid">
+      <div class="verdict">
+        <p class="eyebrow">Executive verdict</p>
+        <h2>浏览器：<strong>有条件可运行</strong><br>Telegram：<span class="conditional">未达到生产直发</span></h2>
+        <p>页面采用原生 HTML/CSS/JavaScript，核心游戏、存储、国际化和网络失败降级逻辑齐全，适合现代浏览器静态托管。但当前发布说明遗漏本地 SDK 文件，广告 SDK 会同步阻塞首屏；Telegram 身份只在客户端解析且排行榜允许公共整包写入，因此不能把现状定义为“安全、可直接上线的 Mini App”。</p>
+      </div>
+      <div class="decision-list">
+        <div class="decision"><b class="yes">普通浏览器</b><p>通过 HTTP/HTTPS 静态托管，核心游戏路径具备运行基础。外部广告、国家识别、排行榜失败时大多有降级。</p></div>
+        <div class="decision"><b class="conditional">本地双击</b><p>不建议作为正式运行方式。页面包含跨域请求和外部脚本，<code>file://</code> 行为因浏览器策略而异。</p></div>
+        <div class="decision"><b class="conditional">Telegram</b><p>SDK、<code>ready/expand</code>、主题、触觉、CloudStorage 与分享桥已接入；仍缺真实 HTTPS/BotFather/客户端验收和可信后端。</p></div>
+        <div class="decision"><b class="no">生产排行榜</b><p>当前公共 JSON Blob 读改写不能抵抗伪造身份、并发覆盖或恶意篡改，应视为演示实现。</p></div>
+      </div>
+    </div>
+
+    <div class="scorecards">
+      <div class="score good"><span class="n">79/79</span><span class="label">Node 测试通过</span></div>
+      <div class="score warn"><span class="n">2</span><span class="label">发布前高优先级阻断</span></div>
+      <div class="score warn"><span class="n">3</span><span class="label">中优先级兼容/流程缺口</span></div>
+      <div class="score bad"><span class="n">0</span><span class="label">真实 Telegram 客户端验收证据</span></div>
+    </div>
+
+    <section>
+      <div class="section-head">
+        <h2>发布阻断与主要风险</h2>
+        <p>按用户影响和可被利用程度排序。高优先级项未处理前，不建议把排行榜、账号身份或奖励资产当作可信生产数据。</p>
+      </div>
+      <div class="section-body">
+        <article class="finding">
+          <div class="severity sev-high">HIGH 01</div>
+          <div>
+            <h3>Telegram 身份可由客户端 Hash 伪造，未做服务端校验</h3>
+            <p>页面直接读取 SDK 的 <code>initDataUnsafe.user</code>，SDK 不可用时又从 URL Hash 解出用户信息。两条路径都只用于客户端显示，没有把原始 <code>initData</code> 发到服务端按 Telegram 签名验证。</p>
+            <div class="evidence">
+              <code>sudoku.html:520</code><code>sudoku.html:527</code><code>sudoku.html:533</code><code>tgid.js:16</code>
+            </div>
+            <p class="impact"><b>影响：</b>攻击者可构造 Hash 冒充任意 Telegram 用户。官方文档明确要求：可信数据应使用 <code>initData</code> 在服务端验证，不能信任 <code>initDataUnsafe</code>。最小修复是增加后端验证端点、校验签名与 <code>auth_date</code>，再签发短会话。</p>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="severity sev-high">HIGH 02</div>
+          <div>
+            <h3>共享排行榜是公共整包读改写，存在篡改与覆盖风险</h3>
+            <p>浏览器先读取公共 JSON Blob，修改自己的条目后再把整个对象 PUT 回去。该模式没有授权、原子更新、版本冲突控制或服务端单调递增校验。</p>
+            <div class="evidence">
+              <code>sudoku.html:1000</code><code>sudoku.html:1188</code><code>sudoku.html:1193</code><code>sudoku.html:1199</code>
+            </div>
+            <p class="impact"><b>影响：</b>任何能调用该地址的人都可能改分、删榜或覆盖并发提交。最小修复是改为后端 <code>POST /score</code>：验证 Telegram 会话、只接受合法关卡结果、仅提升个人最高分，并由服务端生成榜单快照。</p>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="severity sev-med">MED 03</div>
+          <div>
+            <h3>广告 SDK 在 Head 中同步加载，弱网时可能阻塞首屏</h3>
+            <p><code>libtl.com/sdk.js</code> 没有 <code>async</code> 或 <code>defer</code>，位于正文之前。虽然业务函数提供 1.2 秒演示模式，但只有脚本加载完成或失败后，浏览器才会继续解析到该降级逻辑。</p>
+            <div class="evidence"><code>sudoku.html:12</code><code>sudoku.html:777</code><code>sudoku.html:781</code></div>
+            <p class="impact"><b>影响：</b>广告域名慢、被拦截或 DNS 异常时，用户可能长时间看到空白页。审计中的 Chrome CLI 也在此类网络任务下未能及时结束，但该现象只作为风险信号，不作为页面必然失败的证明。建议异步动态加载，并设置超时后直接进入演示/无广告路径。</p>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="severity sev-med">MED 04</div>
+          <div>
+            <h3>“单文件上传”手册与实际依赖不一致</h3>
+            <p>手册要求只上传并重命名 <code>sudoku.html</code>，页面却先加载同目录的 <code>tg-web-app.js</code>。漏传时会回退 Telegram 官方 CDN，但这会丢失仓库原本为受限网络准备的同源 SDK 保障。</p>
+            <div class="evidence"><code>manual-launch.html:57</code><code>manual-launch.html:59</code><code>sudoku.html:7</code><code>sudoku.html:10</code></div>
+            <p class="impact"><b>影响：</b>按手册逐字操作不能得到与仓库一致的运行环境。应明确发布清单至少包含 <code>index.html</code> 与 <code>tg-web-app.js</code>，或把 SDK 真正内联进单文件。</p>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="severity sev-med">MED 05</div>
+          <div>
+            <h3>仓库没有可复现部署入口，手册分支名也与当前仓库不符</h3>
+            <p>根目录未发现 package、README、Pages workflow、Vercel/Netlify/Cloudflare 配置；当前 Git 分支为 <code>master</code>，手册却写固定选择 <code>main</code>。</p>
+            <div class="evidence"><code>manual-launch.html:60</code><code>git branch: master</code><code>根目录：无部署配置</code></div>
+            <p class="impact"><b>影响：</b>新人按步骤发布时容易选错分支，也无法从仓库本身复现部署和回滚。至少应增加 README、明确完整文件清单与实际分支；更稳妥的是提供自动部署工作流。</p>
+          </div>
+        </article>
+
+        <article class="finding">
+          <div class="severity sev-low">LOW 06</div>
+          <div>
+            <h3>现有 UI 测试不是浏览器或 Telegram 端到端测试</h3>
+            <p>UI 测试从 HTML 正则截取函数，在 Node <code>vm</code> 中执行，并用文本匹配验证 DOM 代码存在。它能防止部分逻辑回归，但不会执行完整 HTML、资源加载、真实事件、存储、CORS 或 Telegram SDK 生命周期。</p>
+            <div class="evidence"><code>sudoku-ui.test.js:6</code><code>sudoku-ui.test.js:9</code><code>sudoku-ui.test.js:31</code><code>sudoku-ui.test.js:67</code></div>
+            <p class="impact"><b>影响：</b>79 项测试全绿仍不能证明“浏览器可打开”或“Telegram 可启动”。应补最小 Playwright/WebDriver smoke 与真实 Telegram 客户端验收。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>已满足的兼容条件</h2>
+        <p>这些是可以保留的基础，不需要为了审计结论推倒重做。</p>
+      </div>
+      <div class="section-body passed">
+        <div class="pass"><b>✓ 原生静态应用</b><p>无构建期依赖；核心引擎、样式和界面都在 HTML 内，适合静态托管。</p></div>
+        <div class="pass"><b>✓ 浏览器降级身份</b><p>非 Telegram 环境生成浏览器持久 ID 与可编辑玩家名，不会固定共用同一身份。</p></div>
+        <div class="pass"><b>✓ SDK 初始化</b><p>调用 <code>ready()</code>、<code>expand()</code>，并在可用时禁用纵向滑动。</p></div>
+        <div class="pass"><b>✓ Telegram 能力桥</b><p>已接主题变化、背景色、触觉反馈、CloudStorage 和 Telegram 分享。</p></div>
+        <div class="pass"><b>✓ 网络失败降级</b><p>国家识别失败回退 <code>other</code>；排行榜失败回退假榜；广告函数缺失走演示模式。</p></div>
+        <div class="pass"><b>✓ 移动端布局基础</b><p>有移动 viewport、触摸按钮、键盘输入与可切换深浅主题。</p></div>
+        <div class="pass"><b>✓ 逻辑测试稳定</b><p>2026-07-31 执行 <code>node --test *.test.js</code>：79 通过、0 失败。</p></div>
+        <div class="pass"><b>✓ HTTPS 上架说明</b><p>手册认识到 Telegram Mini App 需要公开 HTTPS URL，并给出 BotFather 流程。</p></div>
+        <div class="pass"><b>✓ SDK 本地副本</b><p>仓库包含 <code>tg-web-app.js</code>，并有官方 CDN 后备路径。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>运行环境判定矩阵</h2>
+        <p>“可运行”与“可生产使用”分开判断，避免把演示成功误当作发布完成。</p>
+      </div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th>场景</th><th>判定</th><th>核心能力</th><th>剩余条件</th></tr></thead>
+          <tbody>
+            <tr><td>现代 Chrome / Edge，HTTP(S) 静态托管</td><td class="status yes">有条件通过</td><td>核心游戏、localStorage、键盘/触摸、网络失败降级</td><td>将广告 SDK 改为非阻塞；做一次真实浏览器 smoke</td></tr>
+            <tr><td>现代 Safari / Firefox，HTTP(S) 静态托管</td><td class="status conditional">高概率可用，未实测</td><td>所用 API 大多为现代标准能力</td><td>补跨浏览器 E2E；关注媒体查询监听与存储策略差异</td></tr>
+            <tr><td>直接双击 <code>file://</code></td><td class="status conditional">不作为支持口径</td><td>本地脚本和核心逻辑可能工作</td><td>跨域 fetch、外部脚本、存储源策略不可控；改用本地静态服务器</td></tr>
+            <tr><td>Telegram 测试环境</td><td class="status conditional">集成基础已具备</td><td>SDK、身份展示、主题、触觉、CloudStorage、分享</td><td>真实 HTTPS URL、BotFather 配置、移动端 Telegram 验收</td></tr>
+            <tr><td>Telegram 生产环境</td><td class="status no">暂不建议</td><td>前端体验基本完整</td><td>服务端验证 initData；替换公共排行榜写入；监控外部脚本失败</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>可信生产架构：最小改造</h2>
+        <p>保留现有单页游戏，只把身份与排行榜的信任边界移到服务端。</p>
+      </div>
+      <div class="section-body">
+        <div class="architecture">
+          <div class="node"><b>浏览器 / Telegram WebView</b><p>加载静态游戏。普通浏览器使用本地匿名身份；Telegram 客户端提交原始 <code>initData</code>，不提交自称的用户 ID。</p></div>
+          <div class="arrow">→</div>
+          <div class="node"><b>轻量验证 API</b><p>验证 Telegram 签名与时间；签发会话；接收成绩并做范围、递增和频率校验。</p></div>
+          <div class="arrow">→</div>
+          <div class="node"><b>排行榜存储</b><p>按用户原子更新最高关卡，由服务端查询和生成榜单。客户端没有整包覆盖权限。</p></div>
+        </div>
+        <div class="callout">
+          <b>普通浏览器无需强制登录。</b>可以继续保留本地玩家名和匿名 ID；只需把它与“可信 Telegram 排行榜”分区，或者明确标记为未认证成绩。
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>最小实施顺序</h2>
+        <p>先处理会阻塞首屏和污染生产数据的事项，再补自动化与发布便利性。</p>
+      </div>
+      <div class="section-body checklist">
+        <div class="phase">
+          <span class="step">1</span><h3>解除首屏阻塞</h3>
+          <ul><li>把 Monetag SDK 改成 <code>async</code> 或页面启动后动态加载。</li><li>设置明确超时；失败时直接维持演示/无广告模式。</li><li>验收：屏蔽 <code>libtl.com</code> 后首页仍在 2 秒内可交互。</li></ul>
+        </div>
+        <div class="phase">
+          <span class="step">2</span><h3>建立可信身份</h3>
+          <ul><li>把 <code>TG.initData</code> 发给后端验证。</li><li>校验签名、<code>auth_date</code> 与重放窗口。</li><li>前端 Hash 解析只作为展示降级，不再作为授权依据。</li></ul>
+        </div>
+        <div class="phase">
+          <span class="step">3</span><h3>替换公共排行榜写入</h3>
+          <ul><li>客户端只提交本次成绩，不再 GET 后整包 PUT。</li><li>后端原子更新个人最高成绩并限流。</li><li>验收：并发提交不会丢记录，伪造用户无法改榜。</li></ul>
+        </div>
+        <div class="phase">
+          <span class="step">4</span><h3>对齐发布说明</h3>
+          <ul><li>说明必须上传 <code>tg-web-app.js</code>，或真正内联。</li><li>把固定 <code>main</code> 改为“选择实际发布分支”，当前仓库为 <code>master</code>。</li><li>增加 README 与可复现部署配置。</li></ul>
+        </div>
+        <div class="phase">
+          <span class="step">5</span><h3>补自动化 Smoke</h3>
+          <ul><li>浏览器：首屏、开局、输入、返回、语言、持久化。</li><li>故障注入：SDK、广告、排行榜、IP 服务全部失败。</li><li>Telegram mock：<code>ready/expand</code>、主题、CloudStorage、分享。</li></ul>
+        </div>
+        <div class="phase">
+          <span class="step">6</span><h3>完成真实客户端验收</h3>
+          <ul><li>部署公开 HTTPS URL 并配置 BotFather。</li><li>至少覆盖 Android、iOS、Desktop 三端 Telegram。</li><li>记录冷启动、返回手势、主题切换、断网与分享结果。</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>建议的发布验收口径</h2>
+        <p>全部满足后，才把状态从“有条件可运行”提升为“可直接发布”。</p>
+      </div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th>门槛</th><th>通过标准</th><th>证据形式</th></tr></thead>
+          <tbody>
+            <tr><td>普通浏览器</td><td>Chrome、Safari、Firefox 首屏与开局无未捕获异常；第三方域名全阻断仍可玩</td><td>E2E 运行记录 + 控制台零异常</td></tr>
+            <tr><td>页面性能</td><td>广告域名无响应时不阻塞 HTML 解析；首页 2 秒内可交互</td><td>网络故障注入结果</td></tr>
+            <tr><td>Telegram 启动</td><td>真实 BotFather 深链在 Android/iOS/Desktop 打开，<code>ready</code> 后页面稳定</td><td>三端测试清单或录像</td></tr>
+            <tr><td>身份安全</td><td>伪造 Hash、篡改 initData、过期 auth_date 均被服务端拒绝</td><td>后端安全测试</td></tr>
+            <tr><td>排行榜完整性</td><td>未认证请求不能写；并发提交不覆盖；成绩只能合法递增</td><td>API 集成与并发测试</td></tr>
+            <tr><td>发布可复现</td><td>新环境按 README 一次完成部署，文件清单、分支、URL 和回滚步骤明确</td><td>干净环境发布记录</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>本次证据与限制</h2>
+        <p>审计坚持把“观察到的事实”和“仍待外部验证的事项”分开。</p>
+      </div>
+      <div class="section-body">
+        <h3>已执行</h3>
+        <pre>node --test *.test.js
+
+tests: 79
+pass: 79
+fail: 0
+duration: 463 ms</pre>
+        <div class="callout">
+          <b>运行时限制：</b>本机未安装 Playwright/Puppeteer。三次 Chrome 无头编排尝试都因持续进程或网络任务触发外层命令时限，未返回可靠 DOM 快照；因此报告没有把它包装成“浏览器已实测通过”。这不等于页面失败，只意味着仍缺一份可信的浏览器 E2E 证据。
+        </div>
+        <h3>官方规范核对</h3>
+        <p>Telegram 官方 Mini Apps 文档要求把 <code>Telegram.WebApp.initData</code> 发送到服务端校验；<code>initDataUnsafe</code> 只适合展示，不应作为可信授权数据。参考：
+          <a href="https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app" rel="noreferrer">Validating data received via the Mini App</a>。
+        </p>
+        <h3>审计边界</h3>
+        <p>没有可用的现网部署 URL、BotFather 配置回执、后端仓库、广告后台或真实 Telegram 会话，因此没有验证现有深链、广告 Zone、JSON Blob 数据和三端 Telegram 客户端的实时状态。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p>结论口径：当前版本适合作为现代浏览器与 Telegram 的功能演示；处理身份验证、排行榜写入和首屏第三方脚本后，再进入生产发布验收。</p>
+  </footer>
+</body>
+</html>

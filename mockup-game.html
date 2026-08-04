@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>数独 · Sudoku — 界面效果图</title>
+<style>
+:root{
+  --canvas:#141A16; --surface:#1B231D; --elevated:#232E26;
+  --ink:#E7EDE8; --ink-2:#B2C0B6; --ink-3:#8CA093; --ink-4:#57685D;
+  --accent:#7FC29B; --podium:#D4B36A;
+  --ok:#58B98C; --warn:#D2A05C; --bad:#DE7A70;
+  --edge:#25312A; --edge-strong:#5F7568;
+  --cell-same:#20362A; --cell-sel:#2B4636; --cell-peer:#1E2921;
+  --chip-bad:#301F1D;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme=dark]){
+    --canvas:#F1F4F0; --surface:#FFFFFF; --elevated:#E7EDE8;
+    --ink:#1E2922; --ink-2:#43554A; --ink-3:#5F7568; --ink-4:#9AABA0;
+    --accent:#2E7D57; --podium:#8A6D2B;
+    --ok:#247A54; --warn:#8A6414; --bad:#B44438;
+    --edge:#DCE3DD; --edge-strong:#8CA093;
+    --cell-same:#D8EAE0; --cell-sel:#C2E0D0; --cell-peer:#E9F0EA;
+    --chip-bad:#F6E3E0;
+  }
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; height:100%}
+body{
+  background:var(--canvas); color:var(--ink);
+  font-family:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+  display:flex; flex-direction:column; align-items:center;
+  padding:10px 12px 16px; gap:10px; width:100%; max-width:480px; margin:0 auto;
+  overflow-x:hidden;
+}
+.topbar{width:100%; display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--ink-3)}
+.topbar .title{font-weight:700; font-size:15px; color:var(--ink); letter-spacing:.06em}
+.topbar .title em{font-style:normal; color:var(--accent)}
+.hud{width:100%; display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--ink-3)}
+.hud b{font-family:ui-monospace,"SF Mono",Consolas,"Noto Sans Mono CJK SC",monospace; font-variant-numeric:tabular-nums; color:var(--ink-2); font-weight:600; font-size:13px}
+.hud .err b{color:var(--bad)}
+.diff{color:var(--podium); font-weight:600}
+.board{
+  width:100%; aspect-ratio:1; background:var(--surface);
+  border:2px solid var(--edge-strong); border-radius:8px;
+  display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); grid-template-rows:repeat(9,minmax(0,1fr));
+  overflow:hidden;
+}
+.c{
+  display:flex; align-items:center; justify-content:center;
+  font-family:ui-monospace,"SF Mono",Consolas,"Noto Sans Mono CJK SC",monospace;
+  font-variant-numeric:tabular-nums; font-size:clamp(16px,5.2vw,24px);
+  border-right:1px solid var(--edge); border-bottom:1px solid var(--edge);
+  color:var(--ink); position:relative;
+}
+.c:nth-child(9n){border-right:none}
+.c.b3r{border-right:2px solid var(--edge-strong)}
+.c.b3b{border-bottom:2px solid var(--edge-strong)}
+.c.user{color:var(--accent)}
+.c.bad{color:var(--bad); background:var(--chip-bad)}
+.c.same{background:var(--cell-same)}
+.c.peer{background:var(--cell-peer)}
+.c.sel{background:var(--cell-sel); outline:2px solid var(--accent); outline-offset:-2px}
+.c .notes{
+  position:absolute; inset:2px; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr);
+  font-size:clamp(7px,2vw,9px); color:var(--ink-3); line-height:1;
+}
+.c .notes span{display:flex; align-items:center; justify-content:center}
+.tools{width:100%; display:flex; gap:8px}
+.tool{
+  flex:1; background:var(--surface); border:1px solid var(--edge); border-radius:8px;
+  padding:7px 4px 6px; text-align:center; font-size:11px; color:var(--ink-3);
+}
+.tool .ic{display:block; font-size:16px; color:var(--ink-2); font-family:ui-monospace,Consolas,monospace; line-height:1.2}
+.tool.on{border-color:var(--accent); color:var(--accent)}
+.tool.on .ic{color:var(--accent)}
+.tool .cnt{color:var(--podium); font-weight:700}
+.pad{width:100%; display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); gap:6px}
+.key{
+  background:var(--elevated); border:1px solid var(--edge); border-radius:8px;
+  aspect-ratio:.78; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-family:ui-monospace,"SF Mono",Consolas,monospace; font-size:clamp(16px,5vw,22px); color:var(--ink);
+}
+.key small{font-size:9px; color:var(--ink-4); font-variant-numeric:tabular-nums}
+.key.dim{opacity:.35}
+.adbar{
+  width:100%; background:var(--surface); border:1px dashed var(--edge-strong); border-radius:8px;
+  padding:9px 12px; display:flex; align-items:center; gap:10px; font-size:12px; color:var(--ink-2);
+}
+.adbar .tag{background:var(--elevated); color:var(--podium); font-weight:700; font-size:10px; padding:2px 7px; border-radius:4px; letter-spacing:.08em; white-space:nowrap}
+.adbar b{color:var(--accent)}
+.foot{font-size:10px; color:var(--ink-4)}
+</style>
+</head>
+<body>
+  <div class="topbar"><span class="title">数独 <em>SUDOKU</em></span><span>连胜 <b style="color:var(--podium)">4</b></span></div>
+  <div class="hud">
+    <span class="diff">中等</span>
+    <span>用时 <b>07:42</b></span>
+    <span class="err">错误 <b>1/3</b></span>
+    <span>提示 <b style="color:var(--podium)">2</b></span>
+  </div>
+  <div class="board" id="bd"></div>
+  <div class="tools">
+    <div class="tool"><span class="ic">↺</span>撤销</div>
+    <div class="tool on"><span class="ic">✎</span>铅笔</div>
+    <div class="tool"><span class="ic">⌫</span>擦除</div>
+    <div class="tool"><span class="ic">☆</span>提示 <span class="cnt">2</span></div>
+  </div>
+  <div class="pad" id="pad"></div>
+  <div class="adbar"><span class="tag">AD·激励</span><span>提示用完了?看一段广告 <b>+1 次提示</b></span></div>
+  <div class="foot">mockup · generated by coder · 2026-07-27</div>
+<script>
+// 效果图静态脚本:渲染一个真实合法的中等残局(真数据,非乱填)
+const solution=[
+"534678912","672195348","198342567",
+"859761423","426853791","713924856",
+"961537284","287419635","345286179"];
+// givens mask: 1=题面给定
+const given=[
+"110100110","101010001","010011100",
+"100110010","011000110","010011001",
+"001110010","100010101","011001011"];
+// 用户已填(非给定格中部分填了): u=正确用户填, x=错一格
+const bd=document.getElementById('bd');
+const selR=4, selC=4, sameVal='5';
+let userFilled=new Set(['0-3','1-1','2-4','3-5','4-1','5-4','6-2','7-6','8-1']);
+let badCell='4-6'; // 一格错误
+let noteCell='4-4';
+for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+  const d=document.createElement('div');
+  d.className='c';
+  if(c===2||c===5)d.classList.add('b3r');
+  if(r===2||r===5)d.classList.add('b3b');
+  const key=r+'-'+c;
+  const isSel=(r===selR&&c===selC);
+  const inPeer=(r===selR||c===selC||((r/3|0)===(selR/3|0)&&(c/3|0)===(selC/3|0)));
+  const g=given[r][c]==='1';
+  let val=g?solution[r][c]:(userFilled.has(key)?solution[r][c]:'');
+  if(key===badCell){val='7'; d.classList.add('bad');}
+  else if(userFilled.has(key))d.classList.add('user');
+  if(val===sameVal&&!isSel)d.classList.add('same');
+  else if(inPeer&&!isSel)d.classList.add('peer');
+  if(isSel){d.classList.add('sel');
+    const n=document.createElement('div'); n.className='notes';
+    [1,2,5,8].forEach(x=>{});
+    for(let i=1;i<=9;i++){const s=document.createElement('span'); s.textContent=[2,5,8].includes(i)?i:''; n.appendChild(s);}
+    d.appendChild(n); val='';
+  }
+  d.appendChild(document.createTextNode(val));
+  bd.appendChild(d);
+}
+// numpad with remaining counts
+const pad=document.getElementById('pad');
+const remain=[3,2,4,1,0,3,2,5,2];
+for(let i=1;i<=9;i++){
+  const k=document.createElement('div'); k.className='key'+(remain[i-1]===0?' dim':'');
+  k.innerHTML=i+'<small>'+remain[i-1]+'</small>';
+  pad.appendChild(k);
+}
+</script>
+</body>
+</html>

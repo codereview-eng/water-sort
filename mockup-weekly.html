@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每周活动 · mockup（issue #30）</title>
+<style>
+:root{
+  --canvas:#141A16; --surface:#1B231D; --elevated:#232E26;
+  --ink:#E7EDE8; --ink-2:#B2C0B6; --ink-3:#8CA093; --ink-4:#57685D;
+  --accent:#7FC29B; --podium:#D4B36A;
+  --ok:#58B98C; --warn:#D2A05C; --bad:#DE7A70;
+  --edge:#25312A; --edge-strong:#5F7568;
+  --cell-same:#20362A; --overlay:rgba(10,14,11,.72);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none}
+html,body{margin:0}
+body{
+  background:var(--canvas); color:var(--ink);
+  font-family:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+  display:flex; flex-direction:column; align-items:center;
+  padding:10px 12px 16px; gap:10px;
+  width:100%; max-width:480px; margin:0 auto; overflow-x:hidden;
+}
+button{font:inherit; color:inherit; background:none; border:none; padding:0; cursor:pointer}
+.mono{font-family:ui-monospace,"SF Mono",Consolas,"Noto Sans Mono CJK SC",monospace; font-variant-numeric:tabular-nums}
+.page{width:100%; display:none; flex-direction:column; gap:12px}
+.page.on{display:flex}
+
+/* ===================== 首页入口示意 ===================== */
+.home{padding-top:26px; gap:14px}
+.logo{text-align:center; font-size:30px; font-weight:700; letter-spacing:.08em}
+.logo em{font-style:normal; display:block; font-size:13px; letter-spacing:.3em; margin-top:4px; color:var(--ink-3)}
+.energy{
+  background:var(--surface); border:1px solid var(--edge); border-radius:10px;
+  padding:12px 16px; display:flex; align-items:center; gap:12px;
+}
+.energy .icon{font-size:20px}
+.energy .info{flex:1}
+.energy .val{font-weight:700; font-size:16px}
+.energy .val .max{color:var(--ink-4); font-weight:400}
+.energy .sub{font-size:11px; color:var(--ink-3)}
+.energy .bar{height:5px; background:var(--elevated); border-radius:3px; margin-top:6px; overflow:hidden}
+.energy .bar i{display:block; height:100%; width:78%; background:var(--accent); border-radius:3px}
+.bigbtn{
+  width:100%; background:var(--accent); color:var(--canvas); border-radius:12px;
+  padding:16px; font-size:18px; font-weight:700; text-align:center;
+}
+.bigbtn small{display:block; font-size:11px; font-weight:400; opacity:.75; margin-top:2px}
+.homebtn{
+  width:100%; background:var(--surface); border:1px solid var(--edge); border-radius:10px;
+  padding:12px 16px; font-size:14px; color:var(--ink-2);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.homebtn b{color:var(--podium)}
+/* 新增:每周活动入口(高亮描边 + 活动角标 + 碎片数) */
+.eventbtn{
+  position:relative;
+  width:100%; background:linear-gradient(135deg,var(--surface),var(--cell-same));
+  border:1px solid var(--accent); border-radius:10px;
+  padding:13px 16px; font-size:14px; color:var(--ink);
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+}
+.eventbtn .left{display:flex; align-items:center; gap:10px}
+.eventbtn .ic{font-size:20px}
+.eventbtn .t b{display:block; font-size:15px; color:var(--accent)}
+.eventbtn .t span{font-size:11px; color:var(--ink-3)}
+.eventbtn .frag{font-size:12px; color:var(--podium); font-weight:700; white-space:nowrap}
+.eventbtn .badge{
+  position:absolute; top:-7px; right:-4px;
+  background:var(--bad); color:#fff; font-size:10px; font-weight:700;
+  border-radius:8px; padding:2px 7px; letter-spacing:.05em;
+}
+.homestats{display:flex; gap:10px}
+.homestats .st{flex:1; background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:10px 12px; text-align:center}
+.homestats .st b{display:block; font-size:20px; color:var(--accent)}
+.homestats .st span{font-size:11px; color:var(--ink-3)}
+.langrow{display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:10px 12px}
+.langrow label{font-size:13px; color:var(--ink-3)}
+.langrow .sel{background:var(--elevated); color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:6px 10px; font-size:14px}
+
+/* ===================== 每周活动页 ===================== */
+.topbar{width:100%; display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--ink-3); padding-top:4px}
+.topbar .title{font-weight:700; font-size:15px; color:var(--ink); letter-spacing:.06em}
+.topbar .title em{font-style:normal; color:var(--accent)}
+.topbar .backbtn{color:var(--accent); font-weight:600; font-size:13px; padding:4px 2px}
+.themecard{
+  background:linear-gradient(160deg,#18241D 0%,#12281E 60%,#1B231D 100%);
+  border:1px solid var(--edge-strong); border-radius:12px; padding:14px 16px;
+  display:flex; align-items:center; gap:12px; position:relative; overflow:hidden;
+}
+.themecard .deco{position:absolute; right:-12px; top:-16px; opacity:.18; font-size:90px; line-height:1}
+.themecard .t{flex:1}
+.themecard .t b{font-size:19px; letter-spacing:.04em}
+.themecard .t .sub{font-size:11px; color:var(--ink-3); margin-top:3px}
+.themecard .cd{text-align:right}
+.themecard .cd b{display:block; font-size:15px; color:var(--warn)}
+.themecard .cd span{font-size:10px; color:var(--ink-3)}
+.fragrow{
+  background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:12px 16px;
+}
+.fragrow .line1{display:flex; justify-content:space-between; align-items:baseline}
+.fragrow .line1 .lab{font-size:12px; color:var(--ink-3)}
+.fragrow .line1 .num{font-size:22px; font-weight:700; color:var(--podium)}
+.fragrow .line1 .num small{font-size:11px; color:var(--ink-3); font-weight:400}
+.fragrow .carryhint{font-size:11px; color:var(--ok); margin-top:4px}
+.fragrow .gain{font-size:11px; color:var(--ink-4); margin-top:6px; display:flex; gap:12px}
+.fragrow .gain b{color:var(--ink-3); font-weight:600}
+.track{margin-top:10px}
+.track .bar{position:relative; height:8px; background:var(--elevated); border-radius:4px}
+.track .bar i{position:absolute; left:0; top:0; height:100%; width:43.3%; background:linear-gradient(90deg,var(--accent),var(--podium)); border-radius:4px}
+.track .ticks{display:flex; justify-content:space-between; font-size:10px; color:var(--ink-4); margin-top:5px}
+.track .ticks b{color:var(--ink-2)}
+/* 主题图网格 2×3 */
+.grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+.pic{
+  background:var(--surface); border:1px solid var(--edge); border-radius:10px;
+  padding:10px; display:flex; flex-direction:column; gap:8px; position:relative;
+}
+.pic img{width:100%; height:88px; object-fit:cover; border-radius:6px; background:var(--elevated); display:block}
+.pic.lock img{filter:grayscale(1) brightness(.55)}
+.pic .cap{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--ink-3)}
+.pic .cap b{color:var(--ink-2); font-size:12px}
+.pic .tag{font-size:10px; font-weight:700; border-radius:4px; padding:2px 6px; white-space:nowrap}
+.pic.open{border-color:var(--accent)}
+.pic.open .tag{background:var(--cell-same); color:var(--ok)}
+.pic.cur{border-color:var(--podium)}
+.pic.cur .tag{background:#2F281C; color:var(--warn)}
+.pic.lock .tag{background:var(--elevated); color:var(--ink-4)}
+.pic.lock .lockov{
+  position:absolute; inset:10px 10px auto 10px; height:88px; border-radius:6px;
+  background:var(--overlay); display:flex; align-items:center; justify-content:center;
+  font-size:22px;
+}
+.pic .prog{height:4px; background:var(--elevated); border-radius:2px; overflow:hidden}
+.pic .prog i{display:block; height:100%; width:86.7%; background:var(--warn)}
+/* 大奖卡 */
+.grand{
+  border:1px dashed var(--podium); border-radius:12px; background:var(--surface);
+  padding:13px 16px; display:flex; align-items:center; gap:12px;
+}
+.grand .ic{font-size:26px}
+.grand .t{flex:1}
+.grand .t b{font-size:14px; color:var(--podium)}
+.grand .t div{font-size:11px; color:var(--ink-3); margin-top:2px}
+.grand .st{font-size:11px; color:var(--ink-4); border:1px solid var(--edge); border-radius:6px; padding:4px 8px; white-space:nowrap}
+/* 操作区 */
+.adbar{
+  width:100%; border:1px dashed var(--edge-strong); border-radius:10px;
+  padding:11px 14px; display:flex; align-items:center; gap:10px;
+  background:var(--surface); font-size:13px; color:var(--ink-2);
+}
+.adbar .adtag{background:var(--podium); color:var(--canvas); font-size:10px; font-weight:700; border-radius:4px; padding:2px 6px; letter-spacing:.04em; white-space:nowrap}
+.adbar b{color:var(--accent)}
+.note{font-size:11px; color:var(--ink-4); display:flex; gap:8px; align-items:center; padding:0 4px}
+.note .dot{color:var(--ink-3)}
+/* >600 结余状态小样 */
+.altcard{border:1px dashed var(--edge-strong); border-radius:10px; padding:10px 14px 12px; background:transparent}
+.altcard .alt-lab{font-size:10px; color:var(--ink-4); letter-spacing:.06em; margin-bottom:6px}
+/* 下周预告 */
+.nextweek{
+  background:var(--surface); border:1px solid var(--edge); border-radius:10px;
+  padding:11px 14px; display:flex; align-items:center; gap:12px;
+}
+.nextweek .thumb{position:relative; width:64px; height:64px; flex:none}
+.nextweek .thumb img{width:100%; height:100%; object-fit:cover; border-radius:6px; filter:grayscale(.6) brightness(.6)}
+.nextweek .thumb .lk{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:18px}
+.nextweek .t{flex:1}
+.nextweek .t b{font-size:13px; color:var(--ink-2)}
+.nextweek .t div{font-size:11px; color:var(--ink-4); margin-top:3px}
+.foot{font-size:10px; color:var(--ink-4); text-align:center; padding-top:2px}
+</style>
+</head>
+<body>
+
+<!-- ===================== 每周活动页(默认) ===================== -->
+<div class="page weekly on" id="pg-weekly">
+  <div class="topbar">
+    <button class="backbtn">‹ 返回</button>
+    <div class="title">每周活动 <em>WEEKLY</em></div>
+    <span class="mono" style="font-size:11px">第 31 周</span>
+  </div>
+
+  <div class="themecard">
+    <div class="deco">✦</div>
+    <div class="t">
+      <b>星空周</b>
+      <div class="sub">本周主题 · 集碎片点亮 6 幅星空</div>
+    </div>
+    <div class="cd">
+      <b class="mono">剩余 3 天 12:04</b>
+      <span>周日 24:00 重置</span>
+    </div>
+  </div>
+
+  <!-- 我的碎片(精简:无结转来源标注;≤600 不显示结转文字) -->
+  <div class="fragrow">
+    <div class="line1">
+      <span class="lab">我的碎片</span>
+      <span class="num mono">260 <small>/ 600</small></span>
+    </div>
+    <div class="track">
+      <div class="bar"><i></i></div>
+      <div class="ticks"><span>0</span><b>100</b><b>200</b><span>300</span><span>400</span><span>500</span><span>600</span></div>
+    </div>
+    <div class="gain"><b>获取</b><span>每盘胜利 +10</span><span>看广告 +10</span></div>
+  </div>
+
+  <!-- 激励挂点:紧跟碎片块正下方 -->
+  <button class="adbar"><span class="adtag">AD·激励</span>看一段广告 <b>+10 碎片</b></button>
+
+  <!-- 本周大奖 -->
+  <div class="grand">
+    <div class="ic">🏆</div>
+    <div class="t">
+      <b>本周大奖 · 集齐 600 碎片</b>
+      <div>体力 +60 · 提示道具 +5</div>
+    </div>
+    <span class="st">未达成 260/600</span>
+  </div>
+
+  <div class="grid">
+    <div class="pic open">
+      <img src="assets/weekly/starry/1.webp" alt="晓星">
+      <div class="cap"><b>① 晓星</b><span class="tag">已解锁 · 已领 +35 体力</span></div>
+    </div>
+    <div class="pic open">
+      <img src="assets/weekly/starry/2.webp" alt="孤星">
+      <div class="cap"><b>② 孤星</b><span class="tag">已解锁 · 已领 +2 提示</span></div>
+    </div>
+    <div class="pic cur">
+      <img src="assets/weekly/starry/3.webp" alt="行星环">
+      <div class="cap"><b>③ 行星环</b><span class="tag">进行中 260/300</span></div>
+      <div class="prog"><i></i></div>
+    </div>
+    <div class="pic lock">
+      <img src="assets/weekly/starry/4.webp" alt="彗星">
+      <div class="lockov">🔒</div>
+      <div class="cap"><b>④ 彗星</b><span class="tag">400 碎片解锁</span></div>
+    </div>
+    <div class="pic lock">
+      <img src="assets/weekly/starry/5.webp" alt="星云涡">
+      <div class="lockov">🔒</div>
+      <div class="cap"><b>⑤ 星云涡</b><span class="tag">500 碎片解锁</span></div>
+    </div>
+    <div class="pic lock">
+      <img src="assets/weekly/starry/6.webp" alt="星座图">
+      <div class="lockov">🔒</div>
+      <div class="cap"><b>⑥ 星座图</b><span class="tag">600 碎片解锁</span></div>
+    </div>
+  </div>
+
+  <!-- 下周预告:服务器端已预配置,下周自动切换 -->
+  <div class="nextweek">
+    <div class="thumb">
+      <img src="assets/weekly/worldcup/1.webp" alt="世界杯周">
+      <div class="lk">🔒</div>
+    </div>
+    <div class="t">
+      <b>下周预告 · 世界杯周</b>
+      <div>主题已在服务器端预配置(weekly-config.json),到期自动切换,提前不可见内容</div>
+    </div>
+  </div>
+
+  <!-- 状态小样:>600 时才显示「可结余下周 N」 -->
+  <div class="altcard">
+    <div class="alt-lab">状态小样 · 当周碎片 &gt;600 时(仅此时显示结转提示)</div>
+    <div class="fragrow" style="border-style:dashed">
+      <div class="line1">
+        <span class="lab">我的碎片</span>
+        <span class="num mono">620 <small>/ 600</small></span>
+      </div>
+      <div class="carryhint">可结余下周 20</div>
+      <div class="track">
+        <div class="bar"><i style="width:100%"></i></div>
+        <div class="ticks"><span>0</span><span>100</span><span>200</span><span>300</span><span>400</span><span>500</span><b>600</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">mockup · issue #30 · 周主题按 assets/weekly/weekly-config.json 提前部署,客户端按当前 UTC 周取当周主题,下周主题到期自动切换 · generated by coder · 2026-07-30</div>
+</div>
+
+<!-- ===================== 首页入口示意(#home) ===================== -->
+<div class="page home" id="pg-home">
+  <div class="logo">数独 <em>SUDOKU</em></div>
+
+  <div class="energy">
+    <div class="icon">⚡</div>
+    <div class="info">
+      <div class="val">94 <span class="max">/ 120</span></div>
+      <div class="sub">每分钟 +1 · 每盘消耗 15</div>
+      <div class="bar"><i></i></div>
+    </div>
+  </div>
+
+  <button class="bigbtn">开始 第 43 关<small>消耗 15 体力</small></button>
+
+  <!-- 新增:每周活动入口 -->
+  <button class="eventbtn">
+    <span class="badge">本周</span>
+    <span class="left">
+      <span class="ic">✦</span>
+      <span class="t"><b>每周活动 · 星空周</b><span>集碎片开 6 图 · 大奖体力+60</span></span>
+    </span>
+    <span class="frag mono">碎片 260</span>
+  </button>
+
+  <button class="homebtn"><span>排行榜</span><b>›</b></button>
+
+  <div class="homestats">
+    <div class="st"><b>42</b><span>已通关</span></div>
+    <div class="st"><b>7</b><span>连胜</span></div>
+    <div class="st"><b>3</b><span>提示道具</span></div>
+  </div>
+
+  <div class="langrow">
+    <label>语言 / Language</label>
+    <span class="sel">中文 ▾</span>
+  </div>
+
+  <div class="foot">mockup · issue #30 首页入口示意 · generated by coder · 2026-07-30</div>
+</div>
+
+<script>
+// mockup 专用视图切换:#home 显示首页入口示意,默认显示每周活动页
+(function(){
+  if(location.hash === '#home'){
+    document.getElementById('pg-weekly').classList.remove('on');
+    document.getElementById('pg-home').classList.add('on');
+  }
+})();
+</script>
+</body>
+</html>

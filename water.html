@@ -89,6 +89,9 @@
 .slot .tag{font-family:ui-monospace,"SF Mono",monospace;font-size:10px;color:var(--ink-4);line-height:1}
 .slot.done .tag{color:var(--accent)}
 .parhint{width:100%;text-align:center;font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.sfxbtn{min-width:64px;padding:7px 14px;border-radius:9px;border:1px solid var(--edge);
+  background:var(--surface);color:var(--accent);font-size:14px;font-weight:600;cursor:pointer}
+.sfxbtn.off{color:var(--ink-3)}
 .parline{margin:-4px 0 12px;font-size:12px;color:var(--accent);text-align:center}
 .tool.dim{opacity:.35}
 
@@ -353,6 +356,10 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
       <span class="profilesource" id="profileSource">网页本地</span>
     </button>
     <div class="langrow">
+      <label for="sfxToggle" id="sfxLabel">音效</label>
+      <button id="sfxToggle" class="sfxbtn" aria-pressed="true">开</button>
+    </div>
+    <div class="langrow">
       <label for="langSel" id="langLabel">语言</label>
       <select id="langSel" aria-label="语言"></select>
     </div>
@@ -427,8 +434,26 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
   <div class="toast" id="toast"></div>
 
 <script src="./water-engine.js"></script>
+<script src="./water-audio.js"></script>
 <script src="./water-levels.js"></script>
 <script>
+// 运行时错误必须留痕:JS 一抛错整页就是白板/空试管,不能只能靠猜。
+// 平时静默收集,带 #jserr / #sfxlog 时直接显示在页面底部(headless dump-dom 也能取到)。
+window.__jsErrors = [];
+window.addEventListener('error', function (e) {
+  window.__jsErrors.push(String(e.message) + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno);
+  if (!/[#&](jserr|sfxlog)/.test(location.hash)) return;
+  var el = document.getElementById('jserr');
+  if (!el) {
+    el = document.createElement('pre');
+    el.id = 'jserr';
+    el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;margin:0;background:#3a1112;color:#ffb4b4;' +
+      'font-size:10px;z-index:99;white-space:pre-wrap;padding:4px';
+    document.body.appendChild(el);
+  }
+  el.textContent = window.__jsErrors.join('\n');
+});
+
 /* ====================== 数独引擎(与 engine.js 同源,内联;倒水版已不再调用,保留以免动到旧测试) ====================== */
 var SudokuEngine=(function(){
   'use strict';
@@ -631,6 +656,7 @@ const I18N = {
     adRevive: '看广告,错误 -1', revived: '错误 -1,继续!',
     winTitle: '🎉 第 {n} 关通过!', statTime: '用时', statErr: '错误', statWins: '已通关',
     // 倒水玩法新增
+    sfxLabel: '音效', sfxOn: '开', sfxOff: '关',
     statMoves: '步数', statBest: '✨ 正好是最优解!', statPar: '最优解是 {n} 步',
     statNoPar: '', par: '最少 {n} 步可过', hintNone: '这局暂时算不出提示',
     stuckTitle: '没有可走的了', stuckBody: '撤销一步换个走法,或者重开本关(都不花体力)',
@@ -688,6 +714,7 @@ const I18N = {
     adRevive: 'Watch ad · −1 mistake', revived: '−1 mistake, keep going!',
     winTitle: '🎉 Level {n} cleared!', statTime: 'Time', statErr: 'Errors', statWins: 'Cleared',
     // water sort additions
+    sfxLabel: 'Sound', sfxOn: 'On', sfxOff: 'Off',
     statMoves: 'Moves', statBest: '✨ Perfect — optimal solution!', statPar: 'Optimal is {n} moves',
     statNoPar: '', par: 'Best known: {n} moves', hintNone: 'No hint available for this board',
     stuckTitle: 'No legal moves left', stuckBody: 'Undo a move and try another line, or restart the level (both free)',
@@ -763,6 +790,7 @@ function applyStaticI18n() {
   q('#btnUndo').innerHTML = '<span class="ic">\u21ba</span>' + t('undoBtn');
   q('#btnRestart').innerHTML = '<span class="ic">\u27f3</span>' + t('restartBtn');
   q('#btnHint').innerHTML = '<span class="ic">☆</span>' + t('hint') + ' <span class="cnt" id="hintCnt">3</span>';
+  q('#sfxLabel').textContent = t('sfxLabel');
   q('#enSub').textContent = t('energyFull');
   // issue #24/#25:排行榜 Tab 与分享按钮文案
   q('#lbTabLocal').textContent = t('lbTabLocal');
@@ -1049,7 +1077,7 @@ const Profile = {
     Store.get(this.key, (v) => {
       let s = null;
       if (v) { try { s = JSON.parse(v); } catch (e) {} }
-      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, hints: 3, alias: '', localId: '' }, s || {});
+      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, hints: 3, alias: '', localId: '', sfx: true }, s || {});
       // 非 Telegram 环境:稳定化名 + 每浏览器唯一 ID,生成一次后持久保留。
       if (!this.state.alias || !this.state.localId) this.mutate((st) => {
         if (!st.alias) st.alias = t('alias') + Math.floor(1000 + Math.random() * 9000);
@@ -1285,6 +1313,29 @@ function lbSubmit(level) {
   }).catch(() => {}); // 静默:榜不可用不阻塞游戏
 }
 
+/* ====================== 音效开关 ====================== */
+function sfxOn() {
+  // Profile 是 const,首屏静态 i18n 阶段它还在 TDZ 里,直接读会抛 ReferenceError
+  // 把整页 JS 打断(试管全空白)——这里兜住,默认按"开"处理,等 Profile 就绪后由 renderHome 校正。
+  try { return !(Profile.state && Profile.state.sfx === false); } catch (e) { return true; }
+}
+function renderSfxBtn() {
+  const b = document.getElementById('sfxToggle');
+  if (!b) return;
+  const on = sfxOn();
+  WaterAudio.setEnabled(on);
+  b.textContent = on ? t('sfxOn') : t('sfxOff');
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.classList.toggle('off', !on);
+}
+document.getElementById('sfxToggle').addEventListener('click', () => {
+  const next = !sfxOn();
+  Profile.mutate((s) => { s.sfx = next; });
+  renderSfxBtn();
+  if (next) { WaterAudio.unlock(); WaterAudio.play('pick'); }   // 打开时立刻出个声,让人知道生效了
+  haptic('light');
+});
+
 /* ====================== 页面路由 ====================== */
 const pages = { home: document.getElementById('home'), lb: document.getElementById('lbPage'), game: document.getElementById('gamePage'), weekly: document.getElementById('weeklyPage') };
 function show(page) {
@@ -1321,6 +1372,7 @@ function renderHome() {
     const next = Math.max(0, Math.ceil((Reward.E_TICK - (Date.now() - p.lastTs)) / 1000));
     sub.textContent = t('energyRegen', { s: next });
   }
+  renderSfxBtn();
   document.getElementById('startLv').textContent = p.wins + 1;
   document.getElementById('stWins').textContent = p.wins;
   document.getElementById('stHints').textContent = p.hints;
@@ -1525,6 +1577,10 @@ function render() {
     html += '</div>';
   }
   if (S.par) html += '<div class="parhint">' + t('par', { n: S.par }) + '</div>';
+  if (/[#&]sfxlog/.test(location.hash)) {
+    html += '<pre id="sfxlog" style="font-size:9px;color:#888;white-space:pre-wrap">' +
+      JSON.stringify(WaterAudio.stats()) + '</pre>';
+  }
   tubesEl.innerHTML = html;
   document.getElementById('hudLv').textContent = S.level;
   document.getElementById('hudMoves').textContent = S.moves;
@@ -1601,27 +1657,29 @@ function tapTube(i) {
   if (S.finished || S.locked) return;
   if (S.sel === -1) {
     if (!S.tubes[i].length) { shakeTube(i); return; }   // 空管不能当源
-    S.sel = i; haptic('light'); render(); return;
+    S.sel = i; haptic('light'); WaterAudio.play('pick'); render(); return;
   }
   if (S.sel === i) { S.sel = -1; render(); return; }    // 再点一次取消选中
 
   const res = WaterEngine.pour(S.tubes, S.sel, i, S.capacity);
-  if (!res) { haptic('error'); shakeTube(i); return; }
+  if (!res) { haptic('error'); WaterAudio.play('illegal'); shakeTube(i); return; }
 
   const from = S.sel;
   S.undo.push(JSON.stringify(S.tubes));
   S.locked = true; haptic('light');
   // 先播倒水动画(期间不重绘,否则动画节点会被 innerHTML 冲掉),播完再落盘新局面
-  animatePour(from, i, res.color, () => {
+  animatePour(from, i, res.color, res.amount, () => {
     S.tubes = res.state; S.moves++; S.sel = -1; S.locked = false;
     render();
+    // 这一管刚好归位 → 给个上行三音（正反馈落在“完成”而不是每次倒水）
+    if (WaterEngine.isDone(S.tubes[i], S.capacity) && S.tubes[i].length) WaterAudio.play('tubeDone');
     if (WaterEngine.isSolved(S.tubes, S.capacity)) return win();
     if (!WaterEngine.legalMoves(S.tubes, S.capacity).length) stuck();
   });
 }
 
 // 倾倒动画:源管抬起侧倾 → 水柱落进目标管 → 落点水花 → 源管回位
-function animatePour(from, to, color, done) {
+function animatePour(from, to, color, amount, done) {
   const src = tubeEl(from), dst = tubeEl(to);
   if (!src || !dst) { done(); return; }
   // 坐标一律用布局坐标(offsetLeft/Top,相对 .tubes)。
@@ -1640,6 +1698,7 @@ function animatePour(from, to, color, done) {
   const dy = (by - 18) - ay - arm + arm * Math.cos(th);
   src.classList.add('pouring');
   src.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + deg + 'deg)';
+  WaterAudio.play('pour', { amount: amount || 1 });   // 倒得越多，水声越久、气泡越多
 
   // 目标管当前液面(层数越多液面越高),水柱就落到这里
   const filled = S.tubes[to].length / S.capacity;
@@ -1659,7 +1718,10 @@ function animatePour(from, to, color, done) {
   splash.style.cssText = 'left:' + (bx + bw / 2 - 15) + 'px;top:' + (surfaceY - 12) +
     'px;background:' + color;
 
-  setTimeout(() => { tubesEl.appendChild(stream); tubesEl.appendChild(splash); }, 170);
+  setTimeout(() => {
+    tubesEl.appendChild(stream); tubesEl.appendChild(splash);
+    WaterAudio.play('splash');
+  }, 170);
   // 调试入口:#pourhold 把画面停在「正在倒」那一刻(headless 截图抓不到 CSS 动画帧,用它取证)
   if (/[#&]pourhold/.test(location.hash)) {
     setTimeout(() => { splash.style.animation = 'none'; splash.style.opacity = '.95'; }, 260);
@@ -1676,14 +1738,14 @@ document.getElementById('btnUndo').addEventListener('click', () => {
   if (S.finished || S.locked || !S.undo.length) return;
   S.tubes = JSON.parse(S.undo.pop());
   S.moves = Math.max(0, S.moves - 1); S.sel = -1;
-  haptic('light'); render();
+  haptic('light'); WaterAudio.play('undo'); render();
 });
 
 document.getElementById('btnRestart').addEventListener('click', () => {
   if (S.finished || S.locked) return;
   S.tubes = S.start.map((t) => t.slice());
   S.moves = 0; S.undo = []; S.sel = -1;
-  haptic('light'); render();
+  haptic('light'); WaterAudio.play('undo'); render();
 });
 
 // 提示:终身库存,0 时点按钮 → 看广告 +3
@@ -1766,6 +1828,7 @@ document.getElementById('btnStart').addEventListener('click', () => {
     overlay.querySelector('#dlgClose').addEventListener('click', closeDialog);
     return;
   }
+  WaterAudio.unlock();   // 必须挂在用户手势里，否则移动端第一声播不出来
   Profile.mutate((s) => { s.energy -= Reward.E_COST; s.lastTs = s.energy + Reward.E_COST >= Reward.E_MAX ? Date.now() : s.lastTs; });
   haptic('light');
   newGame(Profile.state.wins + 1);
@@ -1828,7 +1891,7 @@ function stuck() {
 }
 
 function win() {
-  stopTimer(); S.finished = true; haptic('success');
+  stopTimer(); S.finished = true; haptic('success'); WaterAudio.play('win');
   Profile.mutate((s) => { s.wins = Math.max(s.wins, S.level); });
  
   lbSubmit(Profile.state.wins);
@@ -1866,10 +1929,13 @@ function autoSolve() {
   if (!r.solvable) return;
   const seq = [];
   for (const mv of r.moves) seq.push(mv[0], mv[1]);
+  // 必须等上一步倒水动画放完再点下一下:动画期间 tapTube 会被 S.locked 挡掉,
+  // 固定间隔点击会被吞掉一次,后面整条序列错位(源/目标互换,于是出现非法移动)。
   (function step(n) {
     if (n >= seq.length) return;
+    if (S.locked) { setTimeout(function () { step(n); }, 60); return; }
     tapTube(seq[n]);
-    setTimeout(() => step(n + 1), 300);
+    setTimeout(function () { step(n + 1); }, 240);
   })(0);
 }
 

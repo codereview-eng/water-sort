@@ -3,7 +3,7 @@
 // 这一步是被真事故逼出来的：之前只验仓库里的 water.html（同级有 assets 和各个 js），
 // 而真正发出去的是单文件页，它少了外部依赖照样"看起来能打开"，实则 JS 全崩、进不了关卡。
 //
-// 断言：① 无运行时 JS 错误 ② 关卡页瓶子与锁定空瓶渲染出来 ③ 道具解锁/重开真实链路正确
+// 断言：① 无运行时 JS 错误 ② 关卡逐瓶锁配置正确渲染 ③ 道具解锁/重开真实链路正确
 // 用法: node verify-preview.mjs [preview.html]
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -86,7 +86,7 @@ if (adUnlockErr) fails.push('广告解锁有运行时 JS 错误:\n    ' + adUnlo
 const tubes = (dom.match(/data-tube="\d+"/g) || []).length;
 if (tubes < 3) fails.push(`关卡页试管没渲染出来（只找到 ${tubes} 根）`);
 const lockedBottles = (dom.match(/data-unlock-bottle="\d+"/g) || []).length;
-if (lockedBottles !== 2) fails.push(`关卡预留空瓶锁定数不对（期望 2，实际 ${lockedBottles}）`);
+if (lockedBottles !== 1) fails.push(`关卡逐瓶锁配置不对（期望 1，实际 ${lockedBottles}）`);
 
 for (const [label, needle] of [['关卡标题', 'id="hudLv"'], ['步数', 'id="hudMoves"'], ['工具栏', 'id="btnBottle"']]) {
   if (!dom.includes(needle)) fails.push(`${label}缺失（${needle}）`);
@@ -99,7 +99,7 @@ if (!gtMatch) {
   const gt = JSON.parse(gtMatch[1]);
   if (gt.tubes !== tubes) fails.push(`解锁空瓶后瓶数发生变化（${tubes} → ${gt.tubes}）`);
   if (gt.empties !== 2) fails.push(`解锁后关卡空瓶数发生变化（empties=${gt.empties}）`);
-  if (gt.stock !== 1 || gt.unlocked !== 1 || gt.locked !== 1) {
+  if (gt.stock !== 1 || gt.unlocked !== 1 || gt.locked !== 0) {
     fails.push(`道具解锁状态不对（stock=${gt.stock}, unlocked=${gt.unlocked}, locked=${gt.locked}）`);
   }
   if (gt.undo !== 0) fails.push(`解锁空瓶后撤销栈异常（undo=${gt.undo}）`);
@@ -112,7 +112,7 @@ if (!adGtMatch) {
 } else {
   const gt = JSON.parse(adGtMatch[1]);
   if (gt.tubes !== tubes || gt.empties !== 2) fails.push('广告解锁改变了关卡瓶数/空瓶数');
-  if (gt.stock !== 2 || gt.unlocked !== 1 || gt.locked !== 1) {
+  if (gt.stock !== 2 || gt.unlocked !== 1 || gt.locked !== 0) {
     fails.push(`广告解锁状态不对（stock=${gt.stock}, unlocked=${gt.unlocked}, locked=${gt.locked}）`);
   }
   if (!gt.restartMatches) fails.push('广告解锁后重开改变了关卡布局');

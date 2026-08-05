@@ -6,6 +6,7 @@ const L = require('./water-levels.js');
 
 test('固定关：数量与形态（非空管根根装满，空管数符合设计）', () => {
   assert.strictEqual(L.FIXED_LEVELS.length, 5);
+  const expectedLocks = [[4], [3], [5], [], []];
   for (let i = 1; i <= L.FIXED_LEVELS.length; i += 1) {
     const lv = L.forLevel(i);
     assert.strictEqual(lv.generated, false);
@@ -15,7 +16,23 @@ test('固定关：数量与形态（非空管根根装满，空管数符合设�
     assert.strictEqual(full.length, lv.colors.length, `L${i} 非空管数`);
     assert.strictEqual(blank.length, lv.empty, `L${i} 空管数`);
     for (const t of full) assert.strictEqual(t.length, lv.capacity, `L${i} 有半满管`);
+    assert.deepStrictEqual(lv.lockedBottleIndexes, expectedLocks[i - 1], `L${i} 锁配置`);
+    for (const index of lv.lockedBottleIndexes) {
+      assert.strictEqual(lv.layout[index].length, 0, `L${i} 只能锁空瓶`);
+    }
   }
+});
+
+test('固定关：锁配置返回独立副本，旧关卡缺省时不自动锁空瓶', () => {
+  const lv = L.forLevel(1);
+  lv.lockedBottleIndexes.push(3);
+  assert.deepStrictEqual(L.forLevel(1).lockedBottleIndexes, [4]);
+  assert.deepStrictEqual(L.normalizeLockedBottleIndexes([], [['mint'], []]), []);
+  assert.deepStrictEqual(L.normalizeLockedBottleIndexes(undefined, [['mint'], []]), []);
+  assert.deepStrictEqual(
+    L.normalizeLockedBottleIndexes([1, 0, 1, -1, 2, 1.5], [['mint'], [], []]),
+    [1, 2],
+  );
 });
 
 test('固定关：可解，且 minMoves 快照与 BFS 标定一致（改盘面必须重跑标定）', () => {
@@ -26,6 +43,12 @@ test('固定关：可解，且 minMoves 快照与 BFS 标定一致（改盘面�
     assert.strictEqual(r.solvable, true, `L${i} 不可解`);
     assert.strictEqual(r.minMoves, lv.minMoves, `L${i} 标定漂移`);
     assert.strictEqual(lv.minMoves, expect[i - 1], `L${i} 快照变了`);
+    for (const lockedIndex of lv.lockedBottleIndexes) {
+      const playable = lv.layout.filter((_, tubeIndex) => tubeIndex !== lockedIndex);
+      const withoutLockedBottle = E.solve(playable, { capacity: lv.capacity });
+      assert.strictEqual(withoutLockedBottle.solvable, true, `L${i} 锁瓶后不可解`);
+      assert.strictEqual(withoutLockedBottle.minMoves, lv.minMoves, `L${i} 锁瓶改变最少步数`);
+    }
   }
 });
 
@@ -43,6 +66,16 @@ test('生成关硬门：6-16 关必须可解、形态整齐、颜色守恒', () 
     for (const t of full) assert.strictEqual(t.length, lv.capacity, `L${i} 有半满管`);
     const r = E.solve(lv.layout, { capacity: lv.capacity, maxVisited: 150000 });
     assert.strictEqual(r.solvable, true, `L${i} 生成了不可解的关`);
+    assert.ok(lv.lockedBottleIndexes.length <= 1, `L${i} 最多配置一根锁瓶`);
+    for (const index of lv.lockedBottleIndexes) {
+      assert.strictEqual(lv.layout[index].length, 0, `L${i} 只能锁空瓶`);
+      const playable = lv.layout.filter((_, tubeIndex) => tubeIndex !== index);
+      assert.strictEqual(
+        E.solve(playable, { capacity: lv.capacity, maxVisited: 150000 }).solvable,
+        true,
+        `L${i} 锁瓶后必须仍可解`,
+      );
+    }
   }
 });
 

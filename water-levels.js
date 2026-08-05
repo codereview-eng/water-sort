@@ -106,6 +106,36 @@
     return isTidy(state, colors, empty, cap) ? state : null;   // 洗出已解态则判废
   }
 
+  // 锁配置只认「合法、去重、且当前为空瓶」的零基索引；缺省即不锁，绝不从空瓶自动推导。
+  function normalizeLockedBottleIndexes(indexes, layout) {
+    if (!Array.isArray(indexes) || !Array.isArray(layout)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const index of indexes) {
+      if (!Number.isInteger(index) || index < 0 || index >= layout.length ||
+          !Array.isArray(layout[index]) || layout[index].length !== 0 || seen.has(index)) continue;
+      seen.add(index);
+      out.push(index);
+    }
+    return out;
+  }
+
+  // 生成关最多锁一根空瓶；只有移除该瓶后仍可解才配置，避免把解锁做成强制付费门。
+  function generatedLockedBottleIndexes(layout, solveFn, capacity) {
+    if (typeof solveFn !== 'function') return [];
+    const empty = [];
+    for (let i = 0; i < layout.length; i += 1) {
+      if (layout[i].length === 0) empty.push(i);
+    }
+    for (let i = empty.length - 1; i >= 0; i -= 1) {
+      const index = empty[i];
+      const playable = layout.filter((_, tubeIndex) => tubeIndex !== index);
+      const result = solveFn(playable, { capacity, maxVisited: 120000 });
+      if (result && result.solvable) return [index];
+    }
+    return [];
+  }
+
   // 生成第 level 关（确定性：同一 level 全网同题）。
   // solveFn 可选：传入求解器则逐个盘面验证可解，不可解就换 seed 重摇（端上开局跑一次，实测 6 色约 0.1s）。
   function genLevel(level, solveFn) {
@@ -134,12 +164,14 @@
     }
     if (!layout) throw new Error('无法为第 ' + level + ' 关生成可用盘面（含放宽空管后）');
 
+    const lockedBottleIndexes = generatedLockedBottleIndexes(layout, solveFn, spec.capacity);
     return {
       id: level,
       capacity: spec.capacity,
       colors: COLOR_ORDER.slice(0, spec.colors),
       empty,
       layout,
+      lockedBottleIndexes,
       minMoves: null,                            // 生成关不标定最短解（端上不跑全量 BFS）
       generated: true,
       degraded,
@@ -151,7 +183,7 @@
   // water-levels.test.js 锁定快照：改动这里必须同步重跑标定。
   const FIXED_LEVELS = [
     { // 第 1 关 · 3 色 2 空管 · seed 17
-      colors: 3, empty: 2, minMoves: 5,
+      colors: 3, empty: 2, minMoves: 5, lockedBottleIndexes: [4],
       layout: [
         ['mint', 'mint', 'mint', 'coral'],
         ['coral', 'gold', 'gold', 'gold'],
@@ -160,7 +192,7 @@
       ],
     },
     { // 第 2 关 · 3 色 2 空管 · seed 6
-      colors: 3, empty: 2, minMoves: 8,
+      colors: 3, empty: 2, minMoves: 8, lockedBottleIndexes: [3],
       layout: [
         ['mint', 'gold', 'coral', 'coral'],
         ['gold', 'mint', 'gold', 'coral'],
@@ -169,7 +201,7 @@
       ],
     },
     { // 第 3 关 · 4 色 2 空管 · seed 3
-      colors: 4, empty: 2, minMoves: 10,
+      colors: 4, empty: 2, minMoves: 10, lockedBottleIndexes: [5],
       layout: [
         ['mint', 'coral', 'mint', 'gold'],
         ['coral', 'mint', 'sky', 'sky'],
@@ -179,7 +211,7 @@
       ],
     },
     { // 第 4 关 · 4 色 2 空管 · seed 1
-      colors: 4, empty: 2, minMoves: 14,
+      colors: 4, empty: 2, minMoves: 14, lockedBottleIndexes: [],
       layout: [
         ['sky', 'mint', 'sky', 'coral'],
         ['gold', 'sky', 'gold', 'coral'],
@@ -189,7 +221,7 @@
       ],
     },
     { // 第 5 关 · 5 色 2 空管 · seed 1
-      colors: 5, empty: 2, minMoves: 15,
+      colors: 5, empty: 2, minMoves: 15, lockedBottleIndexes: [],
       layout: [
         ['coral', 'sky', 'gold', 'gold'],
         ['gold', 'mint', 'coral', 'mint'],
@@ -213,6 +245,7 @@
         colors: COLOR_ORDER.slice(0, fx.colors),
         empty: fx.empty,
         layout: fx.layout.map((t) => t.slice()),
+        lockedBottleIndexes: normalizeLockedBottleIndexes(fx.lockedBottleIndexes, fx.layout),
         minMoves: fx.minMoves,
         generated: false,
       };
@@ -222,6 +255,7 @@
 
   return {
     CAPACITY, PALETTE, COLOR_ORDER, FIXED_LEVELS,
-    levelSpec, levelSeed, rng, scramble, isTidy, buildLayout, genLevel, forLevel,
+    levelSpec, levelSeed, rng, scramble, isTidy, buildLayout,
+    normalizeLockedBottleIndexes, generatedLockedBottleIndexes, genLevel, forLevel,
   };
 }));

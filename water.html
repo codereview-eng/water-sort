@@ -1530,7 +1530,7 @@ const S = {
   capacity: 4,
   level: 1, sel: -1,     // sel = 当前选中的源管下标,-1 为未选
   moves: 0, undo: [],    // 步数与撤销栈(存局面 JSON 快照)
-  emptyBottleSlots: [], unlockedBottles: [], unlockingBottle: -1,
+  lockedBottleSlots: [], unlockedBottles: [], unlockingBottle: -1,
   par: null,             // 该关最短解步数(固定关有,生成关为 null)
   locked: false,         // 倒水动画期间锁输入
   remain: TIME_LIMIT, timeBudget: TIME_LIMIT, timerId: null,
@@ -1732,8 +1732,11 @@ tubesEl.addEventListener('click', (ev) => {
 });
 function tubeEl(i) { return tubesEl.querySelector('[data-tube="' + i + '"]'); }
 function lockedBottleIndexes() {
-  const open = new Set(S.unlockedBottles);
-  return S.emptyBottleSlots.filter((i) => !open.has(i));
+  return WaterPowerups.lockedBottleIndexes(
+    S.tubes,
+    S.lockedBottleSlots,
+    S.unlockedBottles,
+  );
 }
 function isBottleLocked(i) { return lockedBottleIndexes().includes(i); }
 
@@ -1980,6 +1983,7 @@ function unlockBottleWithAd(i) {
   showRewardedAd().then(() => {
     applyBottleUnlock(WaterPowerups.unlockBottle(S.tubes, {
       stock: Profile.state.bottles,
+      lockedBottleIndexes: S.lockedBottleSlots,
       unlocked: S.unlockedBottles,
       mode: 'ad',
       target: i,
@@ -2011,6 +2015,7 @@ document.getElementById('btnBottle').addEventListener('click', () => {
   }
   applyBottleUnlock(WaterPowerups.unlockBottle(S.tubes, {
     stock: Profile.state.bottles,
+    lockedBottleIndexes: S.lockedBottleSlots,
     unlocked: S.unlockedBottles,
     mode: 'item',
   }), 'bottleAdded');
@@ -2165,8 +2170,8 @@ function win() {
 /* ====================== 开局与恢复 ====================== */
 // 调试/回归用:按求解器最优解自动走完当前局(点击路径与真人一致,不走后门改状态)
 function autoSolve() {
-  // 自动化截图/回归入口不模拟付费流程：先开放关卡自带空瓶，再按真人点击路径解题。
-  S.unlockedBottles = S.emptyBottleSlots.slice();
+  // 自动化截图/回归入口不模拟付费流程：先开放关卡明确配置的锁瓶，再按真人点击路径解题。
+  S.unlockedBottles = S.lockedBottleSlots.slice();
   render();
   const r = WaterEngine.solve(S.tubes, { capacity: S.capacity });
   if (!r.solvable) return;
@@ -2190,7 +2195,10 @@ function newGame(level) {
   const lv = WaterLevels.forLevel(level, WaterEngine.solve);
   S.tubes = lv.layout.map((t) => t.slice());
   S.start = lv.layout.map((t) => t.slice());   // 「重开」用的初始快照
-  S.emptyBottleSlots = WaterPowerups.emptyBottleIndexes(S.tubes);
+  S.lockedBottleSlots = WaterPowerups.normalizeLockedBottleIndexes(
+    S.tubes,
+    lv.lockedBottleIndexes,
+  );
   S.unlockedBottles = [];
   S.unlockingBottle = -1;
   S.capacity = lv.capacity;

@@ -5,7 +5,8 @@ const {
   CAPACITY, canMove, canonical, isSolved, legalMoves, pour, pourAmount, topRun,
   assertInvariants, solve, hint,
 } = require('./water-engine.js');
-const { LEVELS, getLevel, initialState } = require('./water-levels.js');
+const L = require('./water-levels.js');
+const initialState = (n) => L.forLevel(n).layout;   // 关卡层的快照/可解性断言在 water-levels.test.js
 
 test('topRun: 顶部同色连续段长度', () => {
   assert.strictEqual(topRun([]), 0);
@@ -72,20 +73,10 @@ test('颜色守恒：随机走 3000 步，每步每色恰好 CAPACITY 层', () =
   }
 });
 
-test('关卡硬门：每一关都可解，且 minMoves 与 solver 标定一致', () => {
-  for (const lv of LEVELS) {
-    assertInvariants(lv.layout, lv.capacity);
-    const r = solve(lv.layout, { capacity: lv.capacity });
-    assert.strictEqual(r.solvable, true, `level ${lv.id} 不可解`);
-    assert.strictEqual(r.minMoves, lv.minMoves,
-      `level ${lv.id} minMoves 标定不符 solver=${r.minMoves} meta=${lv.minMoves}`);
-  }
-});
-
-test('第一关：沿最优解回放必胜，且恰好 4 步', () => {
-  const lv = getLevel(1);
+test('第一关：沿最优解回放必胜，步数等于标定的最短解', () => {
+  const lv = L.forLevel(1);
   const r = solve(lv.layout, { capacity: lv.capacity });
-  assert.strictEqual(r.minMoves, 4);
+  assert.strictEqual(r.minMoves, lv.minMoves);
   let s = initialState(1);
   for (const mv of r.moves) {
     const step = pour(s, mv[0], mv[1], lv.capacity);

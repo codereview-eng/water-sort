@@ -4,301 +4,1864 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>倒水排序 · Water Sort</title>
+<!-- Telegram Mini App SDK(仅在 Telegram 内生效;浏览器打开自动降级)。
+     issue #20:自托管同源副本(telegram.org 在部分网络被墙导致身份丢失),
+     onerror 动态注入官方 URL 作后备。 -->
+<script src="./tg-web-app.js" onerror="(function(){var s=document.createElement('script');s.src='https://telegram.org/js/telegram-web-app.js';document.head.appendChild(s);})()"></script>
+<!-- Monetag SDK(Rewarded Interstitial zone 11440777) -->
+<script src="https://libtl.com/sdk.js" data-zone="11440777" data-sdk="show_11440777"></script>
 <style>
-/* 主题变量与 sudoku.html 同源（墨绿深色），液体色取自 water-levels.js 的 PALETTE */
 :root{
-  --canvas:#141A16; --surface:#1B231D; --ink:#F7EDE8; --ink-2:#B2C0B6; --ink-3:#7C8B81;
-  --accent:#7FC29B; --podium:#D4B36A; --bad:#DE7A70; --warn:#D2A05C;
-  --edge:#25312A; --edge-strong:#3E5145; --overlay:rgba(10,14,11,.72);
-  --mono:ui-monospace,"SF Mono",Consolas,"Noto Sans Mono CJK SC",monospace;
+  --canvas:#141A16; --surface:#1B231D; --elevated:#232E26;
+  --ink:#E7EDE8; --ink-2:#B2C0B6; --ink-3:#8CA093; --ink-4:#57685D;
+  --accent:#7FC29B; --podium:#D4B36A;
+  --ok:#58B98C; --warn:#D2A05C; --bad:#DE7A70;
+  --edge:#25312A; --edge-strong:#5F7568;
+  --cell-same:#20362A; --cell-sel:#2B4636; --cell-peer:#1E2921;
+  --chip-bad:#301F1D; --overlay:rgba(10,14,11,.72);
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%}
-body{
-  background:var(--canvas); color:var(--ink); overflow:hidden;
-  font-family:-apple-system,system-ui,"PingFang SC","Noto Sans CJK SC",sans-serif;
-  display:flex; flex-direction:column; align-items:center;
+:root[data-theme=light]{
+  --canvas:#F1F4F0; --surface:#FFFFFF; --elevated:#E7EDE8;
+  --ink:#1E2922; --ink-2:#43554A; --ink-3:#5F7568; --ink-4:#9AABA0;
+  --accent:#2E7D57; --podium:#8A6D2B;
+  --ok:#247A54; --warn:#8A6414; --bad:#B44438;
+  --edge:#DCE3DD; --edge-strong:#8CA093;
+  --cell-same:#D8EAE0; --cell-sel:#C2E0D0; --cell-peer:#E9F0EA;
+  --chip-bad:#F6E3E0; --overlay:rgba(30,41,34,.45);
 }
-.wrap{width:100%; max-width:480px; height:100%; display:flex; flex-direction:column; padding:10px 16px 18px}
-
-/* ---- 顶栏 ---- */
-.top{display:flex; align-items:center; gap:10px; height:44px; flex:none}
-.icobtn{
-  width:36px;height:36px;flex:none;border:1px solid var(--edge);border-radius:50%;
-  background:var(--surface);color:var(--ink-2);font-size:18px;line-height:1;
-  display:flex;align-items:center;justify-content:center;cursor:pointer
+/* ---------- 试管台（倒水玩法） ---------- */
+.tubes{
+  width:100%; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:18px; padding:10px 0 4px;
 }
-.icobtn:active{background:var(--edge)}
-.title{flex:1;text-align:center;font-size:19px;font-weight:700;letter-spacing:.04em}
-.steps{
-  flex:none;min-width:66px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-3);
-  font-variant-numeric:tabular-nums
-}
-.steps b{color:var(--accent);font-size:15px}
-.sub{flex:none;text-align:center;font-size:12.5px;color:var(--ink-3);margin:2px 0 0}
-.par{
-  display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;
-  background:rgba(127,194,155,.12); border:1px solid rgba(127,194,155,.35);
-  color:var(--accent); font-family:var(--mono); font-size:11.5px
-}
-
-/* ---- 试管区 ---- */
-.board{flex:1;display:flex;flex-direction:column;justify-content:center;gap:20px;padding:6px 0}
-.row{display:flex;justify-content:center;align-items:flex-start;gap:18px}
-.slot{display:flex;flex-direction:column;align-items:center;gap:7px}
+.tubes .row{display:flex; justify-content:center; align-items:flex-start; gap:14px}
+.slot{display:flex; flex-direction:column; align-items:center; gap:6px}
 .tube{
-  width:58px;height:172px;flex:none;position:relative;cursor:pointer;
+  width:52px; height:150px; position:relative; cursor:pointer;
   border:2px solid var(--edge-strong); border-top:2px solid rgba(255,255,255,.10);
-  border-radius:6px 6px 28px 28px;
+  border-radius:6px 6px 26px 26px; overflow:hidden;
   background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
-  display:flex; flex-direction:column-reverse; overflow:hidden;
+  display:flex; flex-direction:column-reverse;
   transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
 }
-.tube::after{ /* 玻璃高光 */
-  content:"";position:absolute;left:7px;top:8px;bottom:14px;width:6px;border-radius:6px;
-  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,0));pointer-events:none
-}
-.tube.sel{transform:translateY(-14px);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 20px rgba(127,194,155,.18)}
+.tube::after{content:"";position:absolute;left:6px;top:7px;bottom:12px;width:5px;border-radius:5px;
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,0));pointer-events:none}
+.tube.empty{border-color:#4B5F53}
+.tube.sel{transform:translateY(-12px);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 18px rgba(127,194,155,.18)}
 .tube.done{border-color:rgba(127,194,155,.55)}
-.tube.shake{animation:shake .32s}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
-.tube.hintsrc,.tube.hintdst{border-color:var(--podium);box-shadow:0 0 0 1px var(--podium)}
-.liq{
-  width:100%;height:25%;flex:none;position:relative;
-  transition:height .22s ease, opacity .22s ease;
-}
-.liq.surface::before{ /* 只有最上层液面画弧线，中间层保持平整 */
-  content:"";position:absolute;left:0;right:0;top:-3px;height:6px;border-radius:50%;
-  background:inherit;filter:brightness(1.18)
-}
-.liq.top-seg::after{
-  content:"";position:absolute;left:0;right:0;top:0;bottom:0;
-  background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 60%)
-}
-.tube.empty{border-color:#4B5F53;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.008))}
-.tag{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1}
+.tube.hint{border-color:var(--podium);box-shadow:0 0 0 1px var(--podium)}
+.tube.shake{animation:tubeshake .32s}
+@keyframes tubeshake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+.liq{width:100%;flex:none;position:relative;transition:height .2s ease}
+.liq.surface::before{content:"";position:absolute;left:0;right:0;top:-3px;height:6px;border-radius:50%;
+  background:inherit;filter:brightness(1.18)}
+.liq.top-seg::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 60%)}
+.slot .tag{font-family:ui-monospace,"SF Mono",monospace;font-size:10px;color:var(--ink-4);line-height:1}
 .slot.done .tag{color:var(--accent)}
+.parhint{width:100%;text-align:center;font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.parline{margin:-4px 0 12px;font-size:12px;color:var(--accent);text-align:center}
+.tool.dim{opacity:.35}
 
-/* ---- 底栏 ---- */
-.bar{flex:none;display:flex;justify-content:center;gap:26px;padding-top:6px}
-.act{
-  width:60px;background:none;border:none;color:var(--ink-2);cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px;padding:0
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none}
+[hidden]{display:none!important}
+html,body{margin:0; height:100%}
+body{
+  background:var(--canvas); color:var(--ink);
+  font-family:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;
+  display:flex; flex-direction:column; align-items:center;
+  padding:10px 12px calc(16px + env(safe-area-inset-bottom)); gap:10px;
+  width:100%; max-width:480px; margin:0 auto; overflow-x:hidden;
 }
-.act .ring{
-  width:50px;height:50px;border-radius:50%;border:1px solid var(--edge);
-  background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:21px
+button{font:inherit; color:inherit; background:none; border:none; padding:0; cursor:pointer}
+.mono{font-family:ui-monospace,"SF Mono",Consolas,"Noto Sans Mono CJK SC",monospace; font-variant-numeric:tabular-nums}
+/* ---------- 首页 ---------- */
+.home{width:100%; display:flex; flex-direction:column; gap:14px; padding-top:26px}
+.home .logo{text-align:center; font-size:30px; font-weight:700; letter-spacing:.08em}
+.home .logo em{font-style:normal; color:var(--accent); display:block; font-size:13px; letter-spacing:.3em; margin-top:4px; color:var(--ink-3)}
+.energy{
+  background:var(--surface); border:1px solid var(--edge); border-radius:10px;
+  padding:12px 16px; display:flex; align-items:center; gap:12px;
 }
-.act:disabled{opacity:.38;cursor:default}
-.act:not(:disabled):active .ring{background:var(--edge)}
-
-/* ---- 胜利遮罩 ---- */
-.win{
-  position:fixed;inset:0;background:var(--overlay);display:none;
-  align-items:center;justify-content:center;backdrop-filter:blur(3px)
+.energy .icon{font-size:20px}
+.energy .info{flex:1}
+.energy .val{font-weight:700; font-size:16px}
+.energy .val .max{color:var(--ink-4); font-weight:400}
+.energy .sub{font-size:11px; color:var(--ink-3)}
+.energy .bar{height:5px; background:var(--elevated); border-radius:3px; margin-top:6px; overflow:hidden}
+.energy .bar i{display:block; height:100%; background:var(--accent); border-radius:3px; transition:width .3s}
+.bigbtn{
+  width:100%; background:var(--accent); color:var(--canvas); border-radius:12px;
+  padding:16px; font-size:18px; font-weight:700; text-align:center;
 }
-.win.show{display:flex}
-.card{
-  width:280px;background:var(--surface);border:1px solid var(--edge);border-radius:16px;
-  padding:22px 20px;text-align:center
+.bigbtn small{display:block; font-size:11px; font-weight:400; opacity:.75; margin-top:2px}
+.homebtn{
+  width:100%; background:var(--surface); border:1px solid var(--edge); border-radius:10px;
+  padding:12px 16px; font-size:14px; color:var(--ink-2); display:flex; justify-content:space-between; align-items:center;
 }
-.card h2{margin:0 0 6px;font-size:22px;color:var(--accent)}
-.card p{margin:0 0 16px;font-size:13px;color:var(--ink-2);font-family:var(--mono)}
-.card button{
-  width:100%;padding:11px;border-radius:10px;border:none;background:var(--accent);
-  color:#10201A;font-size:15px;font-weight:700;cursor:pointer
+.homebtn b{color:var(--podium)}
+/* ---------- 每周活动(issue #30) ---------- */
+.eventbtn{
+  position:relative; width:100%; background:linear-gradient(135deg,var(--surface),var(--cell-same));
+  border:1px solid var(--accent); border-radius:10px; padding:13px 16px; font-size:14px; color:var(--ink);
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
 }
+.eventbtn .left{display:flex; align-items:center; gap:10px; text-align:left}
+.eventbtn .ic{font-size:20px}
+.eventbtn .t b{display:block; font-size:15px; color:var(--accent)}
+.eventbtn .t span{font-size:11px; color:var(--ink-3)}
+.eventbtn .frag{font-size:12px; color:var(--podium); font-weight:700; white-space:nowrap}
+.eventbtn .badge{position:absolute; top:-7px; right:-4px; background:var(--bad); color:#fff; font-size:10px; font-weight:700; border-radius:8px; padding:2px 7px; letter-spacing:.05em}
+.weekly{width:100%; display:flex; flex-direction:column; gap:12px; padding-top:4px}
+.weekly .topbar2{display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--ink-3)}
+.weekly .topbar2 .wtitle{font-weight:700; font-size:15px; color:var(--ink); letter-spacing:.06em}
+.weekly .topbar2 .wtitle em{font-style:normal; color:var(--accent)}
+.weekly .topbar2 button{color:var(--accent); font-weight:600; font-size:13px; padding:4px 2px}
+.themecard{
+  background:linear-gradient(160deg,#18241D 0%,#12281E 60%,#1B231D 100%);
+  border:1px solid var(--edge-strong); border-radius:12px; padding:14px 16px;
+  display:flex; align-items:center; gap:12px; position:relative; overflow:hidden;
+}
+.themecard .deco{position:absolute; right:-12px; top:-16px; opacity:.18; font-size:90px; line-height:1}
+.themecard .t{flex:1}
+/* 背景写死深色渐变,文字用固定浅色(不随明暗主题),否则浅色主题下不可读 */
+.themecard .t b{font-size:19px; letter-spacing:.04em; color:#E7EDE8}
+.themecard .t .sub{font-size:11px; color:#8CA093; margin-top:3px}
+.themecard .cd{text-align:right}
+.themecard .cd b{display:block; font-size:15px; color:#D2A05C}
+.themecard .cd span{font-size:10px; color:#8CA093}
+.themecard .deco{color:#E7EDE8}
+.fragrow{background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:12px 16px}
+.fragrow .line1{display:flex; justify-content:space-between; align-items:baseline}
+.fragrow .line1 .lab{font-size:12px; color:var(--ink-3)}
+.fragrow .line1 .num{font-size:22px; font-weight:700; color:var(--podium)}
+.fragrow .line1 .num small{font-size:11px; color:var(--ink-3); font-weight:400}
+.fragrow .carry{font-size:11px; color:var(--ok); margin-top:2px}
+.track{margin-top:10px}
+.track .bar{position:relative; height:8px; background:var(--elevated); border-radius:4px}
+.track .bar i{position:absolute; left:0; top:0; height:100%; background:linear-gradient(90deg,var(--accent),var(--podium)); border-radius:4px}
+.track .ticks{display:flex; justify-content:space-between; font-size:10px; color:var(--ink-4); margin-top:5px}
+.track .ticks b{color:var(--ink-2)}
+.wkgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+.pic{background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px; position:relative}
+.pic svg{width:100%; height:88px; border-radius:6px; background:var(--elevated); display:block}
+.pic .cap{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--ink-3); gap:6px}
+.pic .cap b{color:var(--ink-2); font-size:12px; white-space:nowrap}
+.pic .tag{font-size:10px; font-weight:700; border-radius:4px; padding:2px 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.pic.open{border-color:var(--accent)}
+.pic.open .tag{background:var(--cell-same); color:var(--ok)}
+.pic.cur{border-color:var(--podium)}
+.pic.cur .tag{background:#2F281C; color:var(--warn)}
+.pic.lock svg{filter:grayscale(1) brightness(.55)}
+.pic.lock .tag{background:var(--elevated); color:var(--ink-4)}
+.pic.lock .lockov{position:absolute; inset:10px 10px auto 10px; height:88px; border-radius:6px; background:var(--overlay); display:flex; align-items:center; justify-content:center; font-size:22px}
+.pic .prog{height:4px; background:var(--elevated); border-radius:2px; overflow:hidden}
+.pic .prog i{display:block; height:100%; background:var(--warn)}
+.grand{border:1px dashed var(--podium); border-radius:12px; background:var(--surface); padding:13px 16px; display:flex; align-items:center; gap:12px}
+.grand .ic{font-size:26px}
+.grand .t{flex:1}
+.grand .t b{font-size:14px; color:var(--podium)}
+.grand .t div{font-size:11px; color:var(--ink-3); margin-top:2px}
+.grand .st{font-size:11px; color:var(--ink-4); border:1px solid var(--edge); border-radius:6px; padding:4px 8px; white-space:nowrap}
+.grand.done .st{color:var(--ok); border-color:var(--accent)}
+.wkadbar{width:100%; border:1px dashed var(--edge-strong); border-radius:10px; padding:11px 14px; display:flex; align-items:center; gap:10px; background:var(--surface); font-size:13px; color:var(--ink-2)}
+.wkadbar .adtag{background:var(--podium); color:var(--canvas); font-size:10px; font-weight:700; border-radius:4px; padding:2px 6px; letter-spacing:.04em; white-space:nowrap}
+.wkadbar b{color:var(--accent)}
+.wknote{font-size:11px; color:var(--ink-4); display:flex; gap:8px; align-items:center; padding:0 4px}
+.wknote .dot{color:var(--ink-3)}
+.homestats{display:flex; gap:10px}
+.homestats .st{flex:1; background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:10px 12px; text-align:center}
+.homestats .st b{display:block; font-size:20px; color:var(--accent)}
+.homestats .st span{font-size:11px; color:var(--ink-3)}
+.langrow{display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:10px 12px}
+.langrow label{font-size:13px; color:var(--ink-3)}
+.langrow select{background:var(--elevated); color:var(--ink); border:1px solid var(--edge); border-radius:6px; padding:6px 10px; font-size:14px}
+.profilerow{width:100%; display:flex; align-items:center; gap:12px; text-align:left; background:var(--surface); border:1px solid var(--edge); border-radius:10px; padding:10px 12px}
+.profilerow .avatar{width:34px; height:34px; flex:0 0 34px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--elevated); color:var(--accent); font-size:15px; font-weight:700}
+.profilerow .profileinfo{min-width:0; flex:1}
+.profilerow .profilelabel{display:block; font-size:11px; color:var(--ink-3)}
+.profilerow .profilename{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-size:14px; font-weight:600}
+.profilerow .profilesource{color:var(--ink-4); font-size:11px; white-space:nowrap}
+/* ---------- 排行榜 ---------- */
+.lb{width:100%; display:flex; flex-direction:column; gap:10px; padding-top:8px}
+.lb h2{margin:0; font-size:18px; display:flex; justify-content:space-between; align-items:center}
+.lb h2 button{color:var(--accent); font-size:13px; font-weight:600}
+.lbrow{
+  display:flex; align-items:center; gap:12px; background:var(--surface);
+  border:1px solid var(--edge); border-radius:8px; padding:9px 14px; font-size:14px;
+}
+.lbrow.me{border-color:var(--accent); background:var(--cell-same)}
+.lbrow .rank{width:26px; color:var(--ink-3); font-weight:700}
+.lbrow .rank.top{color:var(--podium)}
+.lbrow .name{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lbrow .lv{color:var(--accent); font-weight:700}
+.lbnote{font-size:11px; color:var(--ink-4); text-align:center}
+/* issue #24:本国/全球 Tab */
+.lbtabs{display:flex; gap:8px}
+.lbtab{
+  flex:1; padding:7px 0; font-size:13px; font-weight:600; border-radius:8px;
+  border:1px solid var(--edge); background:var(--surface); color:var(--ink-3);
+}
+.lbtab.on{border-color:var(--accent); color:var(--accent); background:var(--cell-same)}
+/* issue #25:分享按钮 */
+.lbshare{
+  padding:9px 0; font-size:14px; font-weight:600; border-radius:8px;
+  border:1px solid var(--accent); color:var(--accent); background:transparent;
+}
+/* ---------- 游戏 ---------- */
+.gamewrap{width:100%; flex:1; display:flex; flex-direction:column; gap:10px; align-items:center}
+.topbar{width:100%; display:flex; align-items:center; justify-content:space-between; font-size:13px; color:var(--ink-3)}
+.topbar .title{font-weight:700; font-size:15px; color:var(--ink); letter-spacing:.06em}
+.topbar .title em{font-style:normal; color:var(--accent)}
+.topbar .backbtn{color:var(--accent); font-weight:600; font-size:13px; padding:4px 2px}
+.hud{width:100%; display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--ink-3)}
+.hud b{color:var(--ink-2); font-weight:600; font-size:13px}
+.hud .err b{color:var(--ink-2)}  /* 倒水版这一格是步数,不是错误数,不用红色 */
+.hud .timer b{color:var(--ink-2)}
+.hud .timer.low b{color:var(--bad)}
+.lvl{color:var(--podium); font-weight:600}
+.board{
+  width:100%; aspect-ratio:1; background:var(--surface);
+  border:2px solid var(--edge-strong); border-radius:8px;
+  display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); grid-template-rows:repeat(9,minmax(0,1fr));
+  overflow:hidden; touch-action:manipulation;
+}
+.c{
+  display:flex; align-items:center; justify-content:center;
+  font-family:ui-monospace,"SF Mono",Consolas,"Noto Sans Mono CJK SC",monospace;
+  font-variant-numeric:tabular-nums; font-size:clamp(16px,5.2vw,24px);
+  border-right:1px solid var(--edge); border-bottom:1px solid var(--edge);
+  color:var(--ink); position:relative; padding:0;
+}
+.c:nth-child(9n){border-right:none}
+.c.b3r{border-right:2px solid var(--edge-strong)}
+.c.b3b{border-bottom:2px solid var(--edge-strong)}
+.c.user{color:var(--accent)}
+.c.bad{color:var(--bad); background:var(--chip-bad)}
+.c.same{background:var(--cell-same)}
+.c.peer{background:var(--cell-peer)}
+.c.sel{background:var(--cell-sel); outline:2px solid var(--accent); outline-offset:-2px}
+.tools{width:100%; display:flex; gap:8px}
+.tool{
+  flex:1; background:var(--surface); border:1px solid var(--edge); border-radius:8px;
+  padding:7px 4px 6px; text-align:center; font-size:11px; color:var(--ink-3);
+}
+.tool .ic{display:block; font-size:16px; color:var(--ink-2); font-family:ui-monospace,Consolas,monospace; line-height:1.2}
+.tool .cnt{color:var(--podium); font-weight:700}
+.tool.ad .cnt{color:var(--warn)}
+.tool:disabled{opacity:.4}
+.pad{width:100%; display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); gap:6px}
+.key{
+  background:var(--elevated); border:1px solid var(--edge); border-radius:8px;
+  aspect-ratio:.78; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-family:ui-monospace,"SF Mono",Consolas,monospace; font-size:clamp(16px,5vw,22px); color:var(--ink);
+}
+.key small{font-size:9px; color:var(--ink-4); font-variant-numeric:tabular-nums}
+.key.dim{opacity:.35}
+/* ---------- 弹窗 / toast ---------- */
+.overlay{
+  position:fixed; inset:0; background:var(--overlay); display:flex; align-items:center; justify-content:center;
+  padding:24px; z-index:10;
+}
+.dialog{
+  background:var(--surface); border:1px solid var(--edge-strong); border-radius:12px;
+  padding:22px 20px; width:100%; max-width:320px; display:flex; flex-direction:column; gap:14px; text-align:center;
+}
+.dialog h2{margin:0; font-size:18px}
+.dialog p{margin:0; font-size:13px; color:var(--ink-2); line-height:1.6}
+.dialog .stats{display:flex; justify-content:center; gap:18px; font-size:12px; color:var(--ink-3)}
+.dialog .stats b{display:block; font-size:18px; color:var(--accent)}
+.dialog input{width:100%; background:var(--elevated); color:var(--ink); border:1px solid var(--edge-strong); border-radius:8px; padding:11px 12px; font-size:16px; outline:none; user-select:text}
+.dialog input:focus{border-color:var(--accent)}
+.btn{
+  border-radius:8px; padding:11px 14px; font-size:14px; font-weight:600;
+  background:var(--accent); color:var(--canvas);
+}
+.btn.ghost{background:var(--elevated); color:var(--ink-2); border:1px solid var(--edge)}
+.btn.ad{background:var(--podium); color:var(--canvas)}
+.toast{
+  position:fixed; bottom:calc(24px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
+  background:var(--elevated); border:1px solid var(--edge-strong); color:var(--ink);
+  border-radius:8px; padding:8px 16px; font-size:13px; z-index:20; white-space:nowrap;
+  opacity:0; transition:opacity .2s; pointer-events:none;
+}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="top">
-    <button class="icobtn" id="btnBack" aria-label="返回">‹</button>
-    <div class="title" id="lvTitle">第 1 关</div>
-    <div class="steps">步数 <b id="stepCount">0</b></div>
-  </div>
-  <div class="sub">
-    把同色液体倒到一起，每根试管只剩一种颜色<br>
-    <span class="par" id="parTag">最少 4 步可过</span>
+  <!-- ============ 首页 ============ -->
+  <div class="home" id="home">
+    <div class="logo">倒水排序<em>WATER SORT</em></div>
+    <div class="energy">
+      <span class="icon">⚡</span>
+      <div class="info">
+        <div class="val"><span class="mono" id="enVal">120</span><span class="max mono"> / 120</span></div>
+        <div class="sub" id="enSub">体力已满</div>
+        <div class="bar"><i id="enBar" style="width:100%"></i></div>
+      </div>
+    </div>
+    <button class="bigbtn" id="btnStart">开始 <span class="mono" id="startLv">1</span><small>消耗 15 体力 · 10 分钟限时</small></button>
+    <button class="eventbtn" id="btnWeekly">
+      <span class="badge" id="wkBadge">本周</span>
+      <span class="left">
+        <span class="ic" id="wkIcHome">✦</span>
+        <span class="t"><b id="wkEntryTitle">每周活动</b><span id="wkEntrySub"></span></span>
+      </span>
+      <span class="frag mono" id="wkEntryFrag"></span>
+    </button>
+    <button class="homebtn" id="btnLb"><span>🏆 排行榜</span><span>›</span></button>
+    <div class="homestats">
+      <div class="st"><b class="mono" id="stWins">0</b><span>已通关</span></div>
+      <div class="st"><b class="mono" id="stHints">3</b><span>提示道具</span></div>
+    </div>
+    <button class="profilerow" id="btnProfile">
+      <span class="avatar" id="profileAvatar">玩</span>
+      <span class="profileinfo">
+        <span class="profilelabel" id="profileLabel">玩家名称</span>
+        <span class="profilename" id="profileName">玩家</span>
+      </span>
+      <span class="profilesource" id="profileSource">网页本地</span>
+    </button>
+    <div class="langrow">
+      <label for="langSel" id="langLabel">语言</label>
+      <select id="langSel" aria-label="语言"></select>
+    </div>
   </div>
 
-  <div class="board" id="board"></div>
-
-  <div class="bar">
-    <button class="act" id="btnUndo" disabled><span class="ring">↺</span><span>撤销</span></button>
-    <button class="act" id="btnReset"><span class="ring">⟳</span><span>重开</span></button>
-    <button class="act" id="btnHint"><span class="ring">💡</span><span>提示</span></button>
+  <!-- ============ 每周活动(issue #30) ============ -->
+  <div class="weekly" id="weeklyPage" hidden>
+    <div class="topbar2">
+      <button id="btnWkBack">‹ 返回</button>
+      <div class="wtitle" id="wkTitle">每周活动 <em>WEEKLY</em></div>
+      <span class="mono" id="wkNo" style="font-size:11px"></span>
+    </div>
+    <div class="themecard">
+      <div class="deco" id="wkDeco">✦</div>
+      <div class="t"><b id="wkTheme"></b><div class="sub" id="wkThemeSub"></div></div>
+      <div class="cd"><b class="mono" id="wkCd"></b><span id="wkCdSub"></span></div>
+    </div>
+    <div class="fragrow">
+      <div class="line1">
+        <span class="lab" id="wkFragLab"></span>
+        <span class="num mono" id="wkFragNum"></span>
+      </div>
+      <div class="carry" id="wkCarry" hidden></div>
+      <div class="track">
+        <div class="bar"><i id="wkBar"></i></div>
+        <div class="ticks" id="wkTicks"></div>
+      </div>
+    </div>
+    <div class="wkgrid" id="wkGrid"></div>
+    <div class="grand" id="wkGrand">
+      <div class="ic">🏆</div>
+      <div class="t"><b id="wkGrandTitle"></b><div id="wkGrandBody"></div></div>
+      <span class="st" id="wkGrandSt"></span>
+    </div>
+    <button class="wkadbar" id="btnWkAd"><span class="adtag">AD</span><span id="wkAdText"></span></button>
+    <div class="wknote"><span class="dot">•</span><span id="wkNote1"></span></div>
+    <div class="wknote"><span class="dot">•</span><span id="wkNote2"></span></div>
   </div>
-</div>
 
-<div class="win" id="winMask">
-  <div class="card">
-    <h2>过关！</h2>
-    <p id="winInfo"></p>
-    <button id="btnAgain">再玩一次</button>
+  <!-- ============ 排行榜 ============ -->
+  <div class="lb" id="lbPage" hidden>
+    <h2>🏆 排行榜<button id="btnLbBack">‹ 返回</button></h2>
+    <div class="lbtabs" role="tablist">
+      <button class="lbtab" id="lbTabLocal" role="tab">本国</button>
+      <button class="lbtab" id="lbTabGlobal" role="tab">全球</button>
+    </div>
+    <div id="lbList"></div>
+    <div class="lbnote" id="lbNote"></div>
+    <button class="lbshare" id="btnLbShare">📣 分享榜单</button>
   </div>
-</div>
+
+  <!-- ============ 游戏 ============ -->
+  <div class="gamewrap" id="gamePage" hidden>
+    <div class="topbar">
+      <span class="title">倒水排序 <em>WATER SORT</em></span>
+      <button class="backbtn" id="btnHome">‹ 首页</button>
+    </div>
+    <div class="hud">
+      <span class="lvl">第 <b class="mono" id="hudLv">1</b> 关</span>
+      <span class="timer" id="hudTimerWrap">剩余 <b class="mono" id="hudTime">10:00</b></span>
+      <span class="err">步数 <b class="mono" id="hudMoves">0</b></span>
+    </div>
+    <div class="tubes" id="tubes" aria-label="试管台"></div>
+    <div class="tools">
+      <button class="tool" id="btnUndo"><span class="ic">↺</span>撤销</button>
+      <button class="tool" id="btnRestart"><span class="ic">⟳</span>重开</button>
+      <button class="tool" id="btnHint"><span class="ic">☆</span>提示 <span class="cnt" id="hintCnt">3</span></button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay" hidden></div>
+  <div class="toast" id="toast"></div>
 
 <script src="./water-engine.js"></script>
 <script src="./water-levels.js"></script>
 <script>
-(function(){
+/* ====================== 数独引擎(与 engine.js 同源,内联;倒水版已不再调用,保留以免动到旧测试) ====================== */
+var SudokuEngine=(function(){
   'use strict';
-  var E = window.WaterEngine, L = window.WaterLevels;
-  var LEVEL_ID = 1;
-  var lv = L.getLevel(LEVEL_ID);
-  var state, undoStack, moves, selected, locked;
-
-  var board = document.getElementById('board');
-  var elSteps = document.getElementById('stepCount');
-  var elUndo = document.getElementById('btnUndo');
-  var winMask = document.getElementById('winMask');
-
-  function reset(){
-    state = L.initialState(LEVEL_ID);
-    undoStack = []; moves = 0; selected = -1; locked = false;
-    winMask.classList.remove('show');
-    render();
-  }
-
-  function tubeEl(i){ return board.querySelector('[data-tube="'+i+'"]'); }
-
-  function render(){
-    // 上排 3 管 + 下排 2 管（试管数变化时按每行最多 4 管自动排布）
-    var perRow = state.length <= 4 ? state.length : Math.ceil(state.length/2);
-    var html = '', idx = 0;
-    while (idx < state.length){
-      html += '<div class="row">';
-      for (var k=0; k<perRow && idx<state.length; k++, idx++){
-        html += renderTube(idx);
-      }
-      html += '</div>';
-    }
-    board.innerHTML = html;
-    elSteps.textContent = moves;
-    elUndo.disabled = undoStack.length === 0;
-  }
-
-  function renderTube(i){
-    var t = state[i];
-    var full = t.length > 0 && E.isDone(t, lv.capacity);
-    var cls = 'tube' + (i===selected ? ' sel' : '') + (full ? ' done' : '') + (t.length===0 ? ' empty' : '');
-    var run = E.topRun(t);
-    var layers = '';
-    for (var k=0; k<t.length; k++){
-      var isTopSeg = k >= t.length - run;       // 顶部同色段：选中时整段一起走
-      var isSurface = k === t.length - 1;       // 最上层：画液面弧线
-      layers += '<div class="liq'+(isTopSeg?' top-seg':'')+(isSurface?' surface':'')+
-                '" style="height:'+(100/lv.capacity)+'%;background:'+L.PALETTE[t[k]]+
-                '" data-color="'+t[k]+'"></div>';
-    }
-    // 标签给的是「还差多少」的判断依据：空管 / 完成 / 这管混了几种颜色
-    var kinds = t.filter(function(c,k){ return t.indexOf(c) === k; }).length;
-    var tag = t.length===0 ? '空管' : (full ? '完成' : kinds + ' 色');
-    return '<div class="slot'+(full?' done':'')+'">'+
-             '<div class="'+cls+'" data-tube="'+i+'">'+layers+'</div>'+
-             '<span class="tag">'+tag+'</span>'+
-           '</div>';
-  }
-
-  function shake(i){
-    var el = tubeEl(i); if(!el) return;
-    el.classList.add('shake');
-    setTimeout(function(){ el.classList.remove('shake'); }, 340);
-  }
-
-  function onTube(i){
-    if (locked) return;
-    if (selected === -1){
-      if (!state[i].length){ shake(i); return; }   // 空管不能当源
-      selected = i; render(); return;
-    }
-    if (selected === i){ selected = -1; render(); return; }  // 再点一次取消
-
-    var res = E.pour(state, selected, i, lv.capacity);
-    if (!res){ shake(i); return; }                 // 非法：抖动，不消耗步数
-
-    undoStack.push(JSON.stringify(state));
-    state = res.state; moves += 1;
-    var from = selected; selected = -1;
-    locked = true;
-    render();
-    // 倒水过渡结束后再解锁 / 判胜（动画期间锁输入）
-    setTimeout(function(){
-      locked = false;
-      if (E.isSolved(state, lv.capacity)) showWin();
-    }, 240);
-    void from;
-  }
-
-  function showWin(){
-    document.getElementById('winInfo').textContent =
-      '用了 ' + moves + ' 步 · 最少 ' + lv.minMoves + ' 步' + (moves === lv.minMoves ? ' · 最优解' : '');
-    winMask.classList.add('show');
-  }
-
-  board.addEventListener('click', function(ev){
-    var el = ev.target.closest ? ev.target.closest('[data-tube]') : null;
-    if (el) onTube(Number(el.getAttribute('data-tube')));
-  });
-
-  elUndo.addEventListener('click', function(){
-    if (!undoStack.length || locked) return;
-    state = JSON.parse(undoStack.pop());
-    moves = Math.max(0, moves-1); selected = -1;
-    render();
-  });
-  document.getElementById('btnReset').addEventListener('click', reset);
-  document.getElementById('btnAgain').addEventListener('click', reset);
-  document.getElementById('btnBack').addEventListener('click', function(){ history.length>1 ? history.back() : reset(); });
-
-  document.getElementById('btnHint').addEventListener('click', function(){
-    if (locked) return;
-    var mv = E.hint(state, { capacity: lv.capacity });
-    if (!mv) return;
-    var a = tubeEl(mv[0]), b = tubeEl(mv[1]);
-    if (a) a.classList.add('hintsrc');
-    if (b) b.classList.add('hintdst');
-    setTimeout(function(){
-      if (a) a.classList.remove('hintsrc');
-      if (b) b.classList.remove('hintdst');
-    }, 1100);
-  });
-
-  document.getElementById('lvTitle').textContent = '第 ' + lv.id + ' 关';
-  document.getElementById('parTag').textContent = '最少 ' + lv.minMoves + ' 步可过';
-
-  // 截图用：?zoom=2 放大整页（headless 下按物理像素出 2x 图，不动布局逻辑）
-  var zoomParam = Number(new URLSearchParams(location.search).get('zoom'));
-  if (zoomParam > 0) document.documentElement.style.zoom = String(zoomParam);
-
-  // ?play=solve：按求解器最优解自动走完（截图/回归验证用，正常玩法不受影响）
-  function autoSolve(){
-    var r = E.solve(state, { capacity: lv.capacity });
-    if (!r.solvable) return;
-    var seq = [], k;
-    for (k=0; k<r.moves.length; k++) seq.push(r.moves[k][0], r.moves[k][1]);
-    (function step(n){
-      if (n >= seq.length) return;
-      onTube(seq[n]);
-      setTimeout(function(){ step(n+1); }, 320);
-    })(0);
-  }
-
-  // 截图/自动化用的 ground-truth 钩子：先断言状态，再截图
-  window.__water = {
-    get state(){ return state; },
-    get moves(){ return moves; },
-    get selected(){ return selected; },
-    get solved(){ return E.isSolved(state, lv.capacity); },
-    level: lv,
-    tap: onTube,
-    reset: reset,
+  const DIFFICULTY={
+    beginner:{givens:[40,47],label:'新手'},
+    easy:{givens:[34,39],label:'简单'},
+    medium:{givens:[28,33],label:'中等'},
+    hard:{givens:[23,27],label:'困难'},
   };
-
-  reset();
-  if (new URLSearchParams(location.search).get('play') === 'solve') setTimeout(autoSolve, 400);
+  function rng(seed){let a=seed>>>0;return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+  function shuffled(arr,rand){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+  function conflicts(g,idx,v){const r=Math.floor(idx/9),c=idx%9,br=Math.floor(r/3)*3,bc=Math.floor(c/3)*3;
+    for(let i=0;i<9;i++){
+      if(g[r*9+i]===v&&r*9+i!==idx)return true;
+      if(g[i*9+c]===v&&i*9+c!==idx)return true;
+      const bi=(br+Math.floor(i/3))*9+bc+(i%3);
+      if(g[bi]===v&&bi!==idx)return true;
+    }return false;}
+  function search(g,digits,count,limit){
+    let best=-1,bestCands=null;
+    for(let i=0;i<81;i++){
+      if(g[i]!==0)continue;
+      const cands=[];
+      for(const v of digits)if(!conflicts(g,i,v))cands.push(v);
+      if(best===-1||cands.length<bestCands.length){best=i;bestCands=cands;}
+      if(bestCands.length===0)return count.n;
+      if(bestCands.length===1)break;
+    }
+    if(best===-1){count.n++;if(!count.first)count.first=g.slice();return count.n;}
+    for(const v of bestCands){g[best]=v;search(g,digits,count,limit);g[best]=0;if(count.n>=limit)return count.n;}
+    return count.n;}
+  const D19=[1,2,3,4,5,6,7,8,9];
+  function validGivens(grid){for(let i=0;i<81;i++)if(grid[i]!==0&&conflicts(grid,i,grid[i]))return false;return true;}
+  function solve(grid){const g=grid.slice();if(!validGivens(g))return null;const count={n:0,first:null};search(g,D19,count,1);return count.first;}
+  function countSolutions(grid,limit){const g=grid.slice();if(!validGivens(g))return 0;const count={n:0,first:null};return search(g,D19,count,limit||2);}
+  function generate(diff,seed){
+    const spec=DIFFICULTY[diff];if(!spec)throw new Error('unknown difficulty: '+diff);
+    const rand=rng(seed===undefined?(Date.now()&0x7fffffff):seed);
+    const full=new Array(81).fill(0);
+    const digits=shuffled(D19,rand);
+    const count={n:0,first:null};
+    search(full,digits,count,1);
+    const solution=count.first;
+    const lo=spec.givens[0],hi=spec.givens[1];
+    const target=lo+Math.floor(rand()*(hi-lo+1));
+    const puzzle=solution.slice();
+    let givens=81;
+    const order=shuffled(Array.from({length:41},(_,i)=>i),rand);
+    for(const i of order){
+      if(givens<=target)break;
+      const j=80-i;
+      const holes=i===j?[i]:[i,j];
+      const saved=holes.map(h=>puzzle[h]);
+      if(saved.every(v=>v===0))continue;
+      if(givens-holes.length<lo)continue;
+      holes.forEach(h=>{puzzle[h]=0;});
+      if(countSolutions(puzzle,2)!==1){holes.forEach((h,k)=>{puzzle[h]=saved[k];});}
+      else{givens-=holes.filter((_,k)=>saved[k]!==0).length;}
+    }
+    if(givens>hi){
+      const singles=shuffled(Array.from({length:81},(_,i)=>i),rand);
+      for(const i of singles){
+        if(givens<=target)break;
+        if(puzzle[i]===0)continue;
+        const v=puzzle[i];puzzle[i]=0;
+        if(countSolutions(puzzle,2)!==1)puzzle[i]=v;else givens--;
+      }
+    }
+    return{puzzle,solution,givens,difficulty:diff};
+  }
+  return{solve,countSolutions,generate,DIFFICULTY};
 })();
+
+/* ====================== 激励循环纯函数(与 reward.js 同源,内联) ====================== */
+var Reward=(function(){
+  'use strict';
+  const E_MAX=120, E_COST=15, E_TICK=60000, E_AD=60;
+  function restore(energy,lastTs,now){
+    if(energy>=E_MAX)return{energy,lastTs:now}; // 超额保留:>=120 不自然恢复、不回收(issue #7)
+    if(now<lastTs)return{energy,lastTs:now};
+    const gained=Math.floor((now-lastTs)/E_TICK);
+    const newEnergy=Math.min(E_MAX,energy+gained);
+    return{energy:newEnergy,lastTs:newEnergy>=E_MAX?now:lastTs+gained*E_TICK};
+  }
+  function levelDiff(level){
+    if(level<=20)return'beginner';
+    if(level<=60)return'easy';
+    if(level<=150)return'medium';
+    return'hard';
+  }
+  function levelSeed(level){return(Math.imul(level,2654435761)^0x5D0C0)>>>1;}
+  return{restore,levelDiff,levelSeed,E_MAX,E_COST,E_TICK,E_AD};
+})();
+
+/* ====================== 前 5 关固定盘面(与 levels.js 同源,内联;issue #14/#16) ======================
+   由 engine.js 离线生成(自定义 givens 档,seed 1065/1060/1055/1050/1045),给定数 65→60→55→50→45 递减爬坡,全网同题;
+   每盘经 countSolutions===1 唯一解校验 + solvableBySingles 全程 naked-single 零卡壳校验(玩家只靠唯一候选即可通关),
+   快照由 levels.test.js 锁定。第 6 关起 seed 随机(beginner 档 givens 40-47,与第 5 关 45 给定自然衔接)。 */
+var SudokuLevels=(function(){
+  'use strict';
+  const FIXED_LEVELS=[
+    {p:'456218937010007456937406218504892301390745082802163509649501723125300060783624195',
+     s:'456218937218937456937456218564892371391745682872163549649581723125379864783624195'},
+    {p:'452063978160078452978400060520300786796805231381007049040006817615780024837210695',
+     s:'452163978163978452978452163524391786796845231381627549249536817615789324837214695'},
+    {p:'614857392807390010092610000146700925900261008728009163000075280080023706279486531',
+     s:'614857392857392614392614857146738925935261478728549163463175289581923746279486531'},
+    {p:'389000067510400389407300002890240671640708025275096034900001706158004093720000148',
+     s:'389512467512467389467389512893245671641738925275196834934821756158674293726953148'},
+    {p:'304006105876025004125004800040608050007539400050702030001900582700250643502400709',
+     s:'394876125876125394125394876943618257217539468658742931431967582789251643562483719'},
+  ];
+  return{FIXED_LEVELS};
+})();
+
+/* ====================== 兜底身份解析(与 tgid.js 同源,内联;issue #20) ====================== */
+const TgId = (function () {
+  'use strict';
+  function parseTgWebAppData(hashOrSearch) {
+    if (!hashOrSearch || typeof hashOrSearch !== 'string') return null;
+    const s = hashOrSearch.replace(/^[#?]/, '');
+    let raw = null;
+    const parts = s.split('&');
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i].indexOf('tgWebAppData=') === 0) { raw = parts[i].slice(13); break; }
+    }
+    if (!raw) return null;
+    let inner;
+    try { inner = decodeURIComponent(raw); } catch (e) { return null; }
+    let userStr = null;
+    const kv = inner.split('&');
+    for (let i = 0; i < kv.length; i++) {
+      if (kv[i].indexOf('user=') === 0) { userStr = kv[i].slice(5); break; }
+    }
+    if (!userStr) return null;
+    let u;
+    try { u = JSON.parse(decodeURIComponent(userStr)); } catch (e) { return null; }
+    if (!u || typeof u !== 'object' || u.id == null) return null;
+    return {
+      id: String(u.id),
+      first_name: u.first_name || '',
+      last_name: u.last_name || '',
+      username: u.username || '',
+      language_code: u.language_code || '',
+    };
+  }
+  function displayName(u) {
+    if (!u) return '';
+    return ((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.username || '';
+  }
+  return { parseTgWebAppData, displayName };
+})();
+
+/* ====================== 平台桥:Telegram / 存储 / 广告 ====================== */
+const TG = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData !== undefined ? window.Telegram.WebApp : null;
+const IN_TG = !!(TG && TG.initData);
+if (TG) { try { TG.ready(); TG.expand(); TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch (e) {} }
+/* issue #20:SDK 不可用时的兜底身份。启动即解析 hash 并存内存;
+   解析成功持久化一份 sessionStorage 镜像(刷新后 hash 可能被清,同会话可恢复;
+   跨会话不留,避免串号——取舍见 issue #20 评论)。SDK 可用时以 SDK 为准。 */
+const TGID_KEY = 'sudoku_tgid';
+let TG_USER = TgId.parseTgWebAppData(location.hash);
+try {
+  if (TG_USER) window.sessionStorage.setItem(TGID_KEY, JSON.stringify(TG_USER));
+  else TG_USER = JSON.parse(window.sessionStorage.getItem(TGID_KEY) || 'null');
+} catch (e) {}
+/* 统一身份取值:SDK 可用取 SDK → 否则 hash 兜底 → 都无 null */
+function tgUser() {
+  return (IN_TG && TG.initDataUnsafe && TG.initDataUnsafe.user) || TG_USER || null;
+}
+
+/* ====================== i18n:语言字典与检测(issue #9;加语言只补字典) ====================== */
+const I18N = {
+  zh: {
+    title: '倒水排序 · Water Sort', logoMain: '倒水排序', logoSub: 'WATER SORT',
+    energyFull: '体力已满', energyRegen: '每分钟恢复 1 · 下一点 {s}s',
+    start: '开始', startCost: '消耗 15 体力 · 10 分钟限时',
+    leaderboard: '🏆 排行榜', wins: '已通关', hintsItem: '提示道具',
+    back: '‹ 返回', home: '‹ 首页',
+    lvlPre: '第 ', lvlPost: ' 关', lvlN: '第 {n} 关', remain: '剩余 ', errors: '错误 ',
+    boardAria: '试管台', hint: '提示', moves: '步数 ', undoBtn: '撤销', restartBtn: '重开',
+    diffBeginner: '新手', diffEasy: '简单', diffMedium: '中等', diffHard: '困难',
+    adDemo: '演示模式:模拟广告播放中…', adFail: '广告未完成,未发放奖励',
+    alias: '玩家', me: '我', lbMe: '(我)', lbLoading: '加载中…',
+    profileLabel: '玩家名称', profileWeb: '网页本地 · 点击修改', profileTelegram: 'Telegram',
+    profileEditTitle: '修改玩家名称', profileEditBody: '此名称只保存在当前浏览器,用于排行榜和分享。', profilePlaceholder: '输入玩家名称',
+    profileSave: '保存', profileCancel: '取消', profileSaved: '玩家名称已保存', profileFromTelegram: '名称来自 Telegram 账号',
+    lbDate: '榜单日期 {d} · 每日刷新', lbOffline: '离线榜单:网络恢复后自动同步', lbMine: '我的成绩',
+    hintEmptyTitle: '提示用完了',
+    hintEmptyBody: '看一段广告,获得 <b style="color:var(--podium)">3 个</b>提示道具(道具永久保留)。',
+    adHint: '看广告 +3 提示', notNow: '先不用', gotHints: '+3 提示道具',
+    energyLowTitle: '体力不足',
+    energyLowBody: '开一关需要 <b class="mono">15</b> 体力,当前只有 <b class="mono" style="color:var(--bad)">{cur}</b>。<br>看一段广告立得 <b style="color:var(--podium)">+{n}</b> 体力,或等待每分钟自动恢复 1 点。',
+    adEnergy: '看广告 +{n} 体力', wait: '等等再玩', gotEnergy: '+{n} 体力',
+    timeUpTitle: '⏰ 时间到',
+    timeUpBody: '倒计时结束还没完成。看一段广告,加 <b style="color:var(--podium)">{n} 秒</b>继续;或放弃本关(体力不退)。',
+    adTime: '看广告 +{n} 秒', giveUp: '放弃本关', gotTime: '+{n} 秒',
+    errFullTitle: '错误已满 {n} 次',
+    errFullBody: '看一段广告,减去 <b style="color:var(--podium)">1 次</b>错误继续本关;或放弃(体力不退)。',
+    adRevive: '看广告,错误 -1', revived: '错误 -1,继续!',
+    winTitle: '🎉 第 {n} 关通过!', statTime: '用时', statErr: '错误', statWins: '已通关',
+    // 倒水玩法新增
+    statMoves: '步数', statBest: '✨ 正好是最优解!', statPar: '最优解是 {n} 步',
+    statNoPar: '', par: '最少 {n} 步可过', hintNone: '这局暂时算不出提示',
+    stuckTitle: '没有可走的了', stuckBody: '撤销一步换个走法,或者重开本关(都不花体力)',
+    stuckUndo: '撤销一步', stuckRestart: '重开本关',
+    share: '分享战绩', next: '下一关(消耗 15 体力)', toHome: '回首页',
+    langLabel: '语言', langName: '中文',
+    shareText: '我在数独里通过了第 {n} 关!来挑战我:',
+    lbTabLocal: '本国', lbTabGlobal: '全球', lbShare: '📣 分享榜单',
+    lbEmpty: '本榜暂无上榜玩家', lbCopied: '榜单已复制,去粘贴给朋友吧',
+    shareTpl: {
+      head: '🧩 数独{scope}排行榜 · {date}',
+      scopeLocal: '本国', scopeGlobal: '全球',
+      row: '{medal} {name} · 第 {level} 关',
+      mineRanked: '我的名次:第 {rank} 名(第 {level} 关)',
+      mineUnranked: '我的成绩:第 {level} 关(尚未上榜)',
+      empty: '榜单虚位以待,快来抢头名!',
+      call: '来挑战我 👉 {url}',
+    },
+    wkEntry: '每周活动 · {theme}', wkEntrySub: '集碎片开 6 图 · 大奖体力+{n}', wkBadge: '本周', wkFragShort: '碎片 {n}',
+    wkTitle: '每周活动 <em>WEEKLY</em>', wkNo: '第 {n} 周', wkThemeSub: '本周主题 · 集碎片点亮 6 幅图',
+    wkCd: '剩余 {d} 天 {t}', wkCdSub: '周日 24:00 重置(UTC)', wkFragLab: '我的碎片', wkCarry: '含上周结转 +{n}',
+    wkOpen: '已解锁 · 已领 {r}', wkCur: '进行中 {a}/{b}', wkLock: '{n} 碎片解锁',
+    wkRewardEnergy: '+{n} 体力', wkRewardHints: '+{n} 提示',
+    wkGrandTitle: '本周大奖 · 集齐 {n} 碎片', wkGrandBody: '体力 +{e} · 提示道具 +{h}',
+    wkGrandNo: '未达成 {a}/{b}', wkGrandYes: '已达成 ✓',
+    wkAd: '看一段广告 +{n} 碎片', wkNote1: '每盘胜利 +{n} 碎片', wkNote2: '超过 {n} 的碎片自动结转下周,下周从结转值起算',
+    wkGotFrags: '+{n} 碎片', wkUnlockToast: '🖼 点亮「{pic}」!奖励 {r}', wkGrandToast: '🏆 本周大奖达成!体力 +{e} · 提示 +{h}',
+  },
+  en: {
+    title: 'Water Sort', logoMain: 'Water Sort', logoSub: 'COLOR PUZZLE',
+    energyFull: 'Energy full', energyRegen: '+1 per minute · next in {s}s',
+    start: 'Start', startCost: '15 energy · 10-minute limit',
+    leaderboard: '🏆 Leaderboard', wins: 'Cleared', hintsItem: 'Hints',
+    back: '‹ Back', home: '‹ Home',
+    lvlPre: 'Level ', lvlPost: '', lvlN: 'Lv {n}', remain: 'Time ', errors: 'Errors ',
+    boardAria: 'Tube rack', hint: 'Hint', moves: 'Moves ', undoBtn: 'Undo', restartBtn: 'Restart',
+    diffBeginner: 'Beginner', diffEasy: 'Easy', diffMedium: 'Medium', diffHard: 'Hard',
+    adDemo: 'Demo mode: simulating an ad…', adFail: 'Ad not completed — no reward',
+    alias: 'Player ', me: 'Me', lbMe: ' (me)', lbLoading: 'Loading…',
+    profileLabel: 'Player name', profileWeb: 'This browser · tap to edit', profileTelegram: 'Telegram',
+    profileEditTitle: 'Edit player name', profileEditBody: 'This name stays in this browser and is used for leaderboards and sharing.', profilePlaceholder: 'Enter player name',
+    profileSave: 'Save', profileCancel: 'Cancel', profileSaved: 'Player name saved', profileFromTelegram: 'Name comes from your Telegram account',
+    lbDate: 'Board of {d} · refreshes daily', lbOffline: 'Offline board: syncs once back online', lbMine: 'My score',
+    hintEmptyTitle: 'Out of hints',
+    hintEmptyBody: 'Watch a short ad to get <b style="color:var(--podium)">3 hints</b> (yours to keep).',
+    adHint: 'Watch ad · +3 hints', notNow: 'Not now', gotHints: '+3 hints',
+    energyLowTitle: 'Not enough energy',
+    energyLowBody: 'Starting a level costs <b class="mono">15</b> energy — you have <b class="mono" style="color:var(--bad)">{cur}</b>.<br>Watch a short ad for <b style="color:var(--podium)">+{n}</b> energy, or wait: +1 per minute.',
+    adEnergy: 'Watch ad · +{n} energy', wait: 'Maybe later', gotEnergy: '+{n} energy',
+    timeUpTitle: "⏰ Time's up",
+    timeUpBody: 'The clock ran out. Watch a short ad for <b style="color:var(--podium)">{n} more seconds</b>, or give up (energy is not refunded).',
+    adTime: 'Watch ad · +{n}s', giveUp: 'Give up', gotTime: '+{n}s',
+    errFullTitle: '{n} mistakes — game over',
+    errFullBody: 'Watch a short ad to remove <b style="color:var(--podium)">1 mistake</b> and keep going, or give up (energy is not refunded).',
+    adRevive: 'Watch ad · −1 mistake', revived: '−1 mistake, keep going!',
+    winTitle: '🎉 Level {n} cleared!', statTime: 'Time', statErr: 'Errors', statWins: 'Cleared',
+    // water sort additions
+    statMoves: 'Moves', statBest: '✨ Perfect — optimal solution!', statPar: 'Optimal is {n} moves',
+    statNoPar: '', par: 'Best known: {n} moves', hintNone: 'No hint available for this board',
+    stuckTitle: 'No legal moves left', stuckBody: 'Undo a move and try another line, or restart the level (both free)',
+    stuckUndo: 'Undo one move', stuckRestart: 'Restart level',
+    share: 'Share result', next: 'Next level (15 energy)', toHome: 'Home',
+    langLabel: 'Language', langName: 'English',
+    shareText: 'I cleared level {n} in Sudoku! Beat me:',
+    lbTabLocal: 'National', lbTabGlobal: 'Global', lbShare: '📣 Share board',
+    lbEmpty: 'No players on this board yet', lbCopied: 'Board copied — paste it to a friend',
+    shareTpl: {
+      head: '🧩 Sudoku {scope} leaderboard · {date}',
+      scopeLocal: 'national', scopeGlobal: 'global',
+      row: '{medal} {name} · Lv {level}',
+      mineRanked: 'My rank: #{rank} (Lv {level})',
+      mineUnranked: 'My score: Lv {level} (not on board yet)',
+      empty: 'The board is wide open — claim the top spot!',
+      call: 'Beat me 👉 {url}',
+    },
+    wkEntry: 'Weekly Event · {theme}', wkEntrySub: 'Collect shards, light 6 pics · grand +{n} energy', wkBadge: 'NEW', wkFragShort: 'Shards {n}',
+    wkTitle: 'Weekly Event <em>WEEKLY</em>', wkNo: 'Week {n}', wkThemeSub: 'This week · collect shards to light 6 pictures',
+    wkCd: '{d}d {t} left', wkCdSub: 'Resets Sunday 24:00 (UTC)', wkFragLab: 'My shards', wkCarry: 'Includes +{n} carried over',
+    wkOpen: 'Unlocked · got {r}', wkCur: 'In progress {a}/{b}', wkLock: 'Unlock at {n}',
+    wkRewardEnergy: '+{n} energy', wkRewardHints: '+{n} hints',
+    wkGrandTitle: 'Grand prize · reach {n} shards', wkGrandBody: '+{e} energy · +{h} hints',
+    wkGrandNo: 'Not yet {a}/{b}', wkGrandYes: 'Done ✓',
+    wkAd: 'Watch ad · +{n} shards', wkNote1: 'Each win: +{n} shards', wkNote2: 'Shards above {n} carry over to next week',
+    wkGotFrags: '+{n} shards', wkUnlockToast: '🖼 "{pic}" lit! Reward: {r}', wkGrandToast: '🏆 Grand prize! +{e} energy · +{h} hints',
+  },
+};
+/* 语言检测(与 i18n.js 同源):?lang= 调试参数(最高优先) → Telegram language_code → navigator.language → 默认 en;zh* 归 zh */
+function detectLang(search, tgCode, navLang) {
+  const m = /[?&]lang=([A-Za-z-]+)/.exec(search || '');
+  const cand = (m && m[1]) || tgCode || navLang || 'en';
+  return /^zh/i.test(cand) ? 'zh' : 'en';
+}
+/* issue #18:已保存语言优先层(与 i18n.js resolveLang 同源)。
+   优先级:?lang=(调试,仅本次会话生效,不写持久化) → saved(手动选择,持久化) → 自动检测。
+   saved 仅接受字典已有语言码,非法值忽略。 */
+function resolveLang(search, saved, tgCode, navLang) {
+  const m = /[?&]lang=([A-Za-z-]+)/.exec(search || '');
+  if (m) return /^zh/i.test(m[1]) ? 'zh' : 'en';
+  if (saved && I18N[saved]) return saved;
+  return detectLang('', tgCode, navLang);
+}
+const LANG_KEY = 'sudoku_lang';
+/* 首屏同步读 localStorage 镜像,避免 CloudStorage 异步导致语言闪切;
+   CloudStorage 权威值在 boot() 里异步对账(跨设备迁移场景)。 */
+let savedLangMirror = null;
+try { savedLangMirror = window.localStorage.getItem(LANG_KEY); } catch (e) {}
+let LANG = resolveLang(location.search, savedLangMirror,
+  (tgUser() && tgUser().language_code) || null,
+  navigator.language);
+function t(key, vars) {
+  let s = (I18N[LANG] && I18N[LANG][key] != null) ? I18N[LANG][key] : I18N.en[key];
+  if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+  return s;
+}
+function applyStaticI18n() {
+  const q = (s) => document.querySelector(s);
+  q('#home .logo').innerHTML = t('logoMain') + '<em>' + t('logoSub') + '</em>';
+  q('#btnStart').innerHTML = t('start') + ' <span class="mono" id="startLv">1</span><small>' + t('startCost') + '</small>';
+  q('#btnLb').innerHTML = '<span>' + t('leaderboard') + '</span><span>›</span>';
+  q('#stWins').nextElementSibling.textContent = t('wins');
+  q('#stHints').nextElementSibling.textContent = t('hintsItem');
+  q('#profileLabel').textContent = t('profileLabel');
+  q('#lbPage h2').innerHTML = t('leaderboard') + '<button id="btnLbBack">' + t('back') + '</button>';
+  q('.topbar .title').innerHTML = t('logoMain') + ' <em>' + t('logoSub') + '</em>';
+  q('#btnHome').textContent = t('home');
+  q('.hud .lvl').innerHTML = t('lvlPre') + '<b class="mono" id="hudLv">1</b>' + t('lvlPost');
+  q('#hudTimerWrap').innerHTML = t('remain') + '<b class="mono" id="hudTime">10:00</b>';
+  q('.hud .err').innerHTML = t('moves') + '<b class="mono" id="hudMoves">0</b>';
+  q('#tubes').setAttribute('aria-label', t('boardAria'));
+  q('#btnUndo').innerHTML = '<span class="ic">\u21ba</span>' + t('undoBtn');
+  q('#btnRestart').innerHTML = '<span class="ic">\u27f3</span>' + t('restartBtn');
+  q('#btnHint').innerHTML = '<span class="ic">☆</span>' + t('hint') + ' <span class="cnt" id="hintCnt">3</span>';
+  q('#enSub').textContent = t('energyFull');
+  // issue #24/#25:排行榜 Tab 与分享按钮文案
+  q('#lbTabLocal').textContent = t('lbTabLocal');
+  q('#lbTabGlobal').textContent = t('lbTabGlobal');
+  q('#btnLbShare').textContent = t('lbShare');
+}
+/* issue #18:语言下拉框(选项从 I18N 字典键自动生成,原生名取各语言字典 langName;加语言只补字典) */
+function populateLangSel() {
+  const sel = document.getElementById('langSel');
+  sel.innerHTML = '';
+  for (const code in I18N) {
+    const o = document.createElement('option');
+    o.value = code;
+    o.textContent = I18N[code].langName || code;
+    if (code === LANG) o.selected = true;
+    sel.appendChild(o);
+  }
+  document.getElementById('langLabel').textContent = t('langLabel');
+  sel.setAttribute('aria-label', t('langLabel'));
+}
+/* 即时整页切换:重刷静态文案 + html lang + document.title + 动态页重渲染 */
+function applyLang(lang) {
+  LANG = I18N[lang] ? lang : 'en';
+  document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('title');
+  applyStaticI18n();
+  // applyStaticI18n 用 innerHTML 重建了 #btnLbBack,需重绑
+  document.getElementById('btnLbBack').addEventListener('click', () => show('home'));
+  populateLangSel();
+  if (typeof pages !== 'undefined') {
+    if (!pages.home.hidden) renderHome();
+    if (!pages.lb.hidden) renderLb();
+  }
+}
+document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+document.title = t('title');
+applyStaticI18n();
+populateLangSel();
+document.getElementById('langSel').addEventListener('change', (e) => {
+  Store.set(LANG_KEY, e.target.value); // 持久化:此后刷新/重开一律用所存语言,清档才回自动检测
+  applyLang(e.target.value);
+});
+
+function applyTheme() {
+  let dark = true;
+  if (TG && TG.colorScheme) dark = TG.colorScheme === 'dark';
+  else if (window.matchMedia) dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  if (TG) { try {
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
+    TG.setBackgroundColor && TG.setBackgroundColor(bg);
+    TG.setHeaderColor && TG.setHeaderColor(bg);
+  } catch (e) {} }
+}
+applyTheme();
+if (TG && TG.onEvent) TG.onEvent('themeChanged', applyTheme);
+else if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+function haptic(kind) {
+  if (!TG || !TG.HapticFeedback) return;
+  try {
+    if (kind === 'success' || kind === 'error') TG.HapticFeedback.notificationOccurred(kind);
+    else TG.HapticFeedback.impactOccurred('light');
+  } catch (e) {}
+}
+
+const Store = (function () {
+  const mem = {};
+  let ls = null;
+  try { ls = window.localStorage; ls.setItem('__t', '1'); ls.removeItem('__t'); } catch (e) { ls = null; }
+  const cloud = IN_TG && TG.CloudStorage && TG.isVersionAtLeast && TG.isVersionAtLeast('6.9') ? TG.CloudStorage : null;
+  return {
+    get(key, cb) {
+      if (cloud) cloud.getItem(key, (err, v) => cb(err ? null : (v || null)));
+      else cb(ls ? ls.getItem(key) : (mem[key] || null));
+    },
+    set(key, val) {
+      if (cloud) cloud.setItem(key, val, () => {});
+      if (ls) { try { ls.setItem(key, val); } catch (e) {} }
+      mem[key] = val;
+    },
+    del(key) {
+      if (cloud) cloud.removeItem(key, () => {});
+      if (ls) { try { ls.removeItem(key); } catch (e) {} }
+      delete mem[key];
+    }
+  };
+})();
+
+/* Monetag 激励广告桥(演示模式:未配置 zone id 时模拟播放后发奖励)。
+   上架:monetag.com 建 Rewarded Interstitial zone → 打开 head 里注释的 <script> 并替换
+   YOUR_ZONE_ID → 下面常量填同一 id。 */
+const MONETAG_ZONE_ID = '11440777';
+function showRewardedAd() {
+  const fn = MONETAG_ZONE_ID && window['show_' + MONETAG_ZONE_ID];
+  if (typeof fn === 'function') return fn();
+  return new Promise((resolve) => {
+    toast(t('adDemo'));
+    setTimeout(resolve, 1200);
+  });
+}
+
+/* ====================== 局间插屏纯函数(与 idlead.js 同源,内联;issue #22) ====================== */
+const IdleAd = (function () {
+  'use strict';
+  const DELAYS = [null, 5000, 10000, 20000];
+  // rand ∈ [0,1);非法输入一律安全回退 null(不弹)
+  function pickInterstitialDelay(rand) {
+    if (typeof rand !== 'number' || !isFinite(rand) || rand < 0 || rand >= 1) return null;
+    return DELAYS[Math.floor(rand * DELAYS.length)];
+  }
+  return { DELAYS, pickInterstitialDelay };
+})();
+
+/* 局间插屏控制器(issue #22):进入结算态随机四态(不弹/空闲5s/10s/20s后弹);
+   期间任何交互(pointerdown/keydown,捕获层)立即取消并清计时器;
+   弹出走现有 Monetag 展示路径,纯曝光不发奖励;同一局最多一次(含抽中"不弹"),重进页面不补弹。 */
+const InterAd = {
+  timer: null, onAct: null, done: false,
+  arm() {
+    this.cancel();
+    if (this.done) return;
+    this.done = true; // 每局只抽一次签
+    const dbg = location.hash.match(/adtest=(\d+)/); // 调试入口:#adtest=毫秒 强制定时弹(截图/验链路用)
+    const delay = dbg ? +dbg[1] : IdleAd.pickInterstitialDelay(Math.random());
+    if (delay == null) return; // 本局不弹
+    this.onAct = () => this.cancel();
+    document.addEventListener('pointerdown', this.onAct, true);
+    document.addEventListener('keydown', this.onAct, true);
+    this.timer = setTimeout(() => {
+      this.cancel();
+      showRewardedAd().catch(() => {}); // 纯曝光:无奖励回调,广告关后结算按钮原位可用
+    }, delay);
+  },
+  cancel() {
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this.onAct) {
+      document.removeEventListener('pointerdown', this.onAct, true);
+      document.removeEventListener('keydown', this.onAct, true);
+      this.onAct = null;
+    }
+  },
+  reset() { this.cancel(); this.done = false; }
+};
+
+/* ====================== 每周活动纯函数(与 weekly.js 同源,内联;issue #30) ======================
+   周界取舍:UTC 周,周一 00:00 UTC 为界(周日 24:00 UTC 重置,与排行榜 todayUTC 同口径) */
+const Weekly = (function () {
+  'use strict';
+  const DAY = 86400000;
+  const WEEK = 7 * DAY;
+  const GOAL = 600;
+  const THRESHOLDS = [100, 200, 300, 400, 500, 600];
+  const FRAG_WIN = 10;
+  const FRAG_AD = 10;
+  const GRAND = { energy: 60, hints: 5 };
+  function weekIndex(now) { return Math.floor((Math.floor(now / DAY) + 3) / 7); }
+  function weekKey(now) { return 'w' + weekIndex(now); }
+  function weekEnd(now) { return (weekIndex(now) + 1) * WEEK - 3 * DAY; }
+  const THEMES = [
+    { zh: { name: '星空周', pics: ['晓星', '孤星', '行星环', '彗星', '星云涡', '星座图'] },
+      en: { name: 'Starry Week', pics: ['Dawn Star', 'Lone Star', 'Ringed Planet', 'Comet', 'Nebula', 'Constellation'] },
+      c1: '#D4B36A', c2: '#7FC29B', bg: '#101820' },
+    { zh: { name: '深海周', pics: ['珍珠', '水母', '游鱼', '海螺', '暗流', '灯塔'] },
+      en: { name: 'Deep Sea Week', pics: ['Pearl', 'Jellyfish', 'Fish', 'Conch', 'Undertow', 'Lighthouse'] },
+      c1: '#7FB8C2', c2: '#7FC29B', bg: '#0E1A20' },
+    { zh: { name: '森林周', pics: ['嫩芽', '孤木', '年轮', '飞鸟', '林间光', '山丘'] },
+      en: { name: 'Forest Week', pics: ['Sprout', 'Lone Tree', 'Rings', 'Bird', 'Sunbeam', 'Hills'] },
+      c1: '#8FC27F', c2: '#D4B36A', bg: '#121D14' },
+    { zh: { name: '灯火周', pics: ['烛光', '灯笼', '街灯', '篝火', '烟花', '灯河'] },
+      en: { name: 'Lantern Week', pics: ['Candle', 'Lantern', 'Streetlamp', 'Bonfire', 'Fireworks', 'River of Light'] },
+      c1: '#D2A05C', c2: '#DE9A70', bg: '#1C1410' },
+  ];
+  function themeFor(now) { return THEMES[weekIndex(now) % THEMES.length]; }
+  function unlockedCount(frags) {
+    let n = 0;
+    for (let i = 0; i < THRESHOLDS.length; i++) if (frags >= THRESHOLDS[i]) n++;
+    return n;
+  }
+  function newlyUnlocked(before, after) {
+    const out = [];
+    for (let i = 0; i < THRESHOLDS.length; i++) if (before < THRESHOLDS[i] && after >= THRESHOLDS[i]) out.push(i);
+    return out;
+  }
+  function rollReward(randType, randAmt) {
+    const ok = (r) => typeof r === 'number' && isFinite(r) && r >= 0 && r < 1;
+    const rt = ok(randType) ? randType : 0;
+    const ra = ok(randAmt) ? randAmt : 0;
+    if (rt < 0.5) return { type: 'energy', n: 10 + Math.floor(ra * 51) };
+    return { type: 'hints', n: 1 + Math.floor(ra * 3) };
+  }
+  function carry(frags) { return Math.max(0, (frags | 0) - GOAL); }
+  function blank(wk) { return { week: wk, frags: 0, carried: 0, claimed: [false, false, false, false, false, false], grand: false }; }
+  function normalize(state, wk) {
+    if (state && state.week === wk && Array.isArray(state.claimed) && state.claimed.length === 6) return state;
+    const b = blank(wk);
+    if (state && typeof state.frags === 'number' && state.week !== wk) {
+      b.carried = carry(state.frags);
+      b.frags = b.carried;
+    }
+    return b;
+  }
+  return { DAY, WEEK, GOAL, THRESHOLDS, FRAG_WIN, FRAG_AD, GRAND, THEMES,
+    weekIndex, weekKey, weekEnd, themeFor, unlockedCount, newlyUnlocked, rollReward, carry, blank, normalize };
+})();
+
+/* 每周活动控制器(issue #30):状态持久化 sudoku_weekly(CloudStorage 优先 + localStorage 镜像,
+   走 Store 同一通道);内存权威副本 + 快照串行 flush,与 Profile 同模式。
+   奖励发放:体力走 Profile(可超 120 持久保留,issue #7),提示走 Profile.hints。 */
+const WeeklyCtl = {
+  key: 'sudoku_weekly',
+  state: null,
+  flushChain: Promise.resolve(),
+  load(cb) {
+    Store.get(this.key, (v) => {
+      let s = null;
+      if (v) { try { s = JSON.parse(v); } catch (e) {} }
+      this.state = Weekly.normalize(s, Weekly.weekKey(Date.now()));
+      if (this.state !== s) this.flush();
+      cb && cb();
+    });
+  },
+  flush() {
+    const snapshot = JSON.stringify(this.state);
+    this.flushChain = this.flushChain.then(() => { Store.set(this.key, snapshot); });
+  },
+  // 周对账:跨周则重置+结转(渲染/加碎片前都先走这里)
+  settle() {
+    const wk = Weekly.weekKey(Date.now());
+    const n = Weekly.normalize(this.state, wk);
+    if (n !== this.state) { this.state = n; this.flush(); }
+  },
+  // 加碎片 + 发放解锁奖励(幂等:claimed/grand 标记);返回 toast 文案数组
+  addFrags(n, randFn) {
+    this.settle();
+    const st = this.state;
+    const rnd = randFn || Math.random;
+    const before = st.frags;
+    st.frags += n;
+    const msgs = [];
+    for (const i of Weekly.newlyUnlocked(before, st.frags)) {
+      if (st.claimed[i]) continue;
+      const r = Weekly.rollReward(rnd(), rnd());
+      st.claimed[i] = true;
+      if (r.type === 'energy') Profile.mutate((s) => { s.energy += r.n; });
+      else Profile.mutate((s) => { s.hints += r.n; });
+      st['r' + i] = r; // 记录已领奖励,活动页展示用
+      const rTxt = t(r.type === 'energy' ? 'wkRewardEnergy' : 'wkRewardHints', { n: r.n });
+      msgs.push(t('wkUnlockToast', { pic: themePics()[i], r: rTxt }));
+    }
+    if (st.frags >= Weekly.GOAL && !st.grand) {
+      st.grand = true;
+      Profile.mutate((s) => { s.energy += Weekly.GRAND.energy; s.hints += Weekly.GRAND.hints; });
+      msgs.push(t('wkGrandToast', { e: Weekly.GRAND.energy, h: Weekly.GRAND.hints }));
+    }
+    this.flush();
+    return msgs;
+  },
+};
+function themePics() {
+  const th = Weekly.themeFor(Date.now());
+  return (th[LANG] || th.en).pics;
+}
+/* 主题图内联 SVG:6 种几何图案按主题色着色,同一主题风格随周轮换(避免外链) */
+function wkSvg(idx, th) {
+  const star = (x, y, r, f) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${f}"/>`;
+  const shapes = [
+    `<circle cx="34" cy="30" r="12" fill="${th.c1}"/><circle cx="34" cy="30" r="18" fill="none" stroke="${th.c1}" stroke-opacity=".35" stroke-width="2"/>${star(90, 58, 2.5, '#E7EDE8')}${star(120, 24, 2, '#E7EDE8')}${star(140, 60, 1.6, '#8CA093')}`,
+    `<path d="M52 26 l6 14 15 1 -11 10 3 15 -13 -8 -13 8 3 -15 -11 -10 15 -1z" fill="${th.c2}"/>${star(112, 30, 2.5, '#E7EDE8')}${star(132, 54, 2, '#E7EDE8')}`,
+    `<ellipse cx="80" cy="44" rx="52" ry="18" fill="none" stroke="${th.c2}" stroke-opacity=".5" stroke-width="3" transform="rotate(-18 80 44)"/><circle cx="80" cy="44" r="10" fill="${th.c1}"/>${star(40, 26, 2, '#E7EDE8')}`,
+    `<path d="M20 70 Q60 20 140 34" fill="none" stroke="${th.c2}" stroke-width="3"/>${star(20, 70, 3, '#E7EDE8')}${star(140, 34, 4, th.c1)}`,
+    `<circle cx="80" cy="44" r="22" fill="none" stroke="#8CA093" stroke-width="2"/><circle cx="80" cy="44" r="12" fill="none" stroke="${th.c1}" stroke-width="2"/><circle cx="80" cy="44" r="4" fill="#E7EDE8"/>`,
+    `<path d="M30 60 L60 30 L84 50 L110 24 L134 40" fill="none" stroke="${th.c1}" stroke-width="2.5"/>${star(30, 60, 3, '#E7EDE8')}${star(60, 30, 3, '#E7EDE8')}${star(84, 50, 3, '#E7EDE8')}${star(110, 24, 3, '#E7EDE8')}${star(134, 40, 3, '#E7EDE8')}`,
+  ];
+  return `<svg viewBox="0 0 160 88"><rect width="160" height="88" fill="${th.bg}"/>${shapes[idx]}</svg>`;
+}
+
+/* ====================== 终身档案:内存权威副本 + 串行 flush(Spike S1 验证模式) ====================== */
+const Profile = {
+  key: 'sudoku_profile',
+  state: null,            // { energy, lastTs, wins, hints, alias, localId }
+  flushChain: Promise.resolve(),
+  load(cb) {
+    Store.get(this.key, (v) => {
+      let s = null;
+      if (v) { try { s = JSON.parse(v); } catch (e) {} }
+      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, hints: 3, alias: '', localId: '' }, s || {});
+      // 非 Telegram 环境:稳定化名 + 每浏览器唯一 ID,生成一次后持久保留。
+      if (!this.state.alias || !this.state.localId) this.mutate((st) => {
+        if (!st.alias) st.alias = t('alias') + Math.floor(1000 + Math.random() * 9000);
+        if (!st.localId) st.localId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+      });
+      this.settle();
+      cb();
+    });
+  },
+  // 所有修改同步走内存副本,快照串行异步落盘 — 不存在读改写竞态窗口
+  mutate(fn) {
+    fn(this.state);
+    const snapshot = JSON.stringify(this.state);
+    this.flushChain = this.flushChain.then(() => { Store.set(this.key, snapshot); });
+  },
+  // 体力离线/在线结算
+  settle() {
+    const r = Reward.restore(this.state.energy, this.state.lastTs, Date.now());
+    if (r.energy !== this.state.energy || r.lastTs !== this.state.lastTs) {
+      this.mutate((s) => { s.energy = r.energy; s.lastTs = r.lastTs; });
+    }
+  },
+};
+
+/* ====================== 排行榜(jsonblob,Spike S2 Go;失败静默降级本地榜) ====================== */
+const LB_URL = 'https://jsonblob.com/api/jsonBlob/019fa340-e5cd-7d24-a1a8-d62fbcd02fd1';
+const FAKE_BOARD = [
+  { id: 'b1', name: 'Aiko', level: 137, country: 'JP' }, { id: 'b2', name: '棋士老周', level: 96, country: 'CN' },
+  { id: 'b3', name: 'Mira', level: 78, country: 'US' }, { id: 'b4', name: '数独萌新', level: 41, country: 'CN' },
+  { id: 'b5', name: 'Leo', level: 23, country: 'GB' }, { id: 'b6', name: '一盘就跑', level: 9, country: 'CN' },
+];
+function myId() {
+  // Telegram 使用用户 ID;普通网页使用当前浏览器持久化的随机 ID,避免共享榜单互相覆盖。
+  const u = tgUser();
+  return (u && u.id != null && String(u.id)) ||
+    ('local:' + ((Profile.state && Profile.state.localId) || 'pending'));
+}
+function myName() {
+  // Telegram 真实昵称:first_name+last_name,退 username;非 TG 环境用本地持久化化名(issue #6)
+  // issue #20:身份来源经 tgUser() 三级兜底
+  const u = tgUser();
+  const tg = u && (((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.username);
+  return tg || (Profile.state && Profile.state.alias) || t('me');
+}
+function normalizeAlias(value) {
+  return String(value == null ? '' : value)
+    .replace(/\s+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, 32);
+}
+/* 每日快照纯函数(与 lb.js 同源,内联;issue #11/#24/#25):UTC 日期;Top50 competition ranking;提交池随重算裁剪;
+   country 字段与本国过滤(#24);分享文本组装(#25,模板走 I18N.shareTpl) */
+const Lb = (function () {
+  const TOP_N = 50;
+  function todayUTC(now) { return new Date(now).toISOString().slice(0, 10); }
+  function needsRebuild(board, today) {
+    return !board || !Array.isArray(board.top) || board.date !== today;
+  }
+  function assignRanks(rows) {
+    let rank = 0, prev = null;
+    rows.forEach((p, i) => {
+      if (p.level !== prev) { rank = i + 1; prev = p.level; }
+      p.rank = rank;
+    });
+    return rows;
+  }
+  function normCountry(c) {
+    const s = String(c || '').toUpperCase();
+    return /^[A-Z]{2}$/.test(s) ? s : 'UN';
+  }
+  function detectCountry(tgCode, navLang) { // issue #27 起退役:不再参与决策,仅保留与 lb.js 同源
+    for (const cand of [tgCode, navLang]) {
+      const m = /^[A-Za-z]{2,3}[-_]([A-Za-z]{2})(?:[-_]|$)/.exec(String(cand || ''));
+      if (m) return m[1].toUpperCase();
+    }
+    return 'UN';
+  }
+  function filterCountry(top, country) {
+    const c = normCountry(country);
+    const rows = (top || []).filter((p) => normCountry(p && p.country) === c)
+      .map((p) => ({ id: p.id, name: p.name, level: p.level, country: normCountry(p.country) }));
+    return assignRanks(rows);
+  }
+  function buildTop(players, today) {
+    const rows = Object.entries(players || {})
+      .map(([id, p]) => p && { id, name: String(p.name == null ? '' : p.name).slice(0, 16), level: Number(p.level), country: normCountry(p.country) })
+      .filter((p) => p && p.name && Number.isFinite(p.level) && p.level > 0)
+      .sort((a, b) => b.level - a.level || a.name.localeCompare(b.name))
+      .slice(0, TOP_N);
+    assignRanks(rows);
+    return { date: today, top: rows };
+  }
+  function trimPlayers(players, top) {
+    const keep = new Set(top.map((p) => p.id));
+    const out = {};
+    for (const id in players) if (keep.has(id)) out[id] = players[id];
+    return out;
+  }
+  const SHARE_TPL = {
+    zh: {
+      head: '🧩 数独{scope}排行榜 · {date}',
+      scopeLocal: '本国', scopeGlobal: '全球',
+      row: '{medal} {name} · 第 {level} 关',
+      mineRanked: '我的名次:第 {rank} 名(第 {level} 关)',
+      mineUnranked: '我的成绩:第 {level} 关(尚未上榜)',
+      empty: '榜单虚位以待,快来抢头名!',
+      call: '来挑战我 👉 {url}',
+    },
+    en: {
+      head: '🧩 Sudoku {scope} leaderboard · {date}',
+      scopeLocal: 'national', scopeGlobal: 'global',
+      row: '{medal} {name} · Lv {level}',
+      mineRanked: 'My rank: #{rank} (Lv {level})',
+      mineUnranked: 'My score: Lv {level} (not on board yet)',
+      empty: 'The board is wide open — claim the top spot!',
+      call: 'Beat me 👉 {url}',
+    },
+  };
+  function fmtTpl(s, vars) { return s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : '')); }
+  function buildShareText(rows, my, lang, opts) {
+    // opts.tpl 可传入 I18N 字典里的模板(sudoku.html 内联走字典;node 直测用内置同源模板)
+    const T = (opts && opts.tpl) || SHARE_TPL[lang] || SHARE_TPL.en;
+    const o = opts || {};
+    const medals = ['🥇', '🥈', '🥉'];
+    const lines = [fmtTpl(T.head, { scope: o.scope === 'global' ? T.scopeGlobal : T.scopeLocal, date: o.date || '' })];
+    const top3 = (rows || []).slice(0, 3);
+    if (top3.length === 0) lines.push(T.empty);
+    else top3.forEach((p, i) => lines.push(fmtTpl(T.row, { medal: medals[i], name: p.name, level: p.level })));
+    if (my && my.level > 0) {
+      lines.push(my.rank ? fmtTpl(T.mineRanked, { rank: my.rank, level: my.level }) : fmtTpl(T.mineUnranked, { level: my.level }));
+    }
+    lines.push(fmtTpl(T.call, { url: o.url || 'https://t.me/sudoku2_bot/sudoku' }));
+    return lines.join('\n');
+  }
+  return { TOP_N, todayUTC, needsRebuild, buildTop, trimPlayers, normCountry, detectCountry, filterCountry, buildShareText };
+})();
+/* 国家判定决策链纯函数(与 geo.js 同源,内联;issue #27):
+   首次启动 IP 归属地判定,判不出记 'other';一经确认永久锁定,后续零 IP 请求。
+   旧 language 推断(Lb.detectCountry,#24)退役,不再参与决策。 */
+const Geo = (function () {
+  const OTHER = 'other';
+  const TIMEOUT_MS = 4000;
+  const PROVIDERS = [
+    { name: 'country.is', url: 'https://api.country.is/' },
+    { name: 'ipwho.is', url: 'https://ipwho.is/' },
+  ];
+  function normCountry(c) {
+    const s = String(c == null ? '' : c).trim().toUpperCase();
+    return /^[A-Z]{2}$/.test(s) ? s : null;
+  }
+  function normSaved(v) {
+    if (v == null) return null;
+    const s = String(v).trim();
+    if (s.toLowerCase() === OTHER) return OTHER;
+    const c = normCountry(s);
+    if (c === 'UN') return OTHER; // 旧 'UN' 桶合并为 other
+    return c;
+  }
+  function parseCountryResponse(provider, json) {
+    if (!json || typeof json !== 'object') return null;
+    if (provider === 'country.is') return normCountry(json.country);
+    if (provider === 'ipwho.is') {
+      if (json.success === false) return null;
+      return normCountry(json.country_code);
+    }
+    return null;
+  }
+  function resolveCountry(saved, fetchers) {
+    const s = normSaved(saved);
+    if (s) return Promise.resolve({ country: s, source: 'saved', requests: 0 });
+    const list = (fetchers || []).slice();
+    let requests = 0;
+    function next(i) {
+      if (i >= list.length) return Promise.resolve({ country: OTHER, source: 'fallback', requests });
+      requests += 1;
+      return Promise.resolve().then(() => list[i]()).then(
+        (c) => {
+          const n = normCountry(c);
+          return n ? { country: n, source: 'ip', requests } : next(i + 1);
+        },
+        () => next(i + 1)
+      );
+    }
+    return next(0);
+  }
+  return { OTHER, TIMEOUT_MS, PROVIDERS, normCountry, normSaved, parseCountryResponse, resolveCountry };
+})();
+
+/* issue #27:当前用户国家 = 已存值(永久锁定)|| 'other'(未确认期间按 other/全球 Tab 处理)。
+   首屏同步读 localStorage 镜像(与 sudoku_lang 同模式),CloudStorage 权威值与首个 IP 判定在 boot() 里异步走。 */
+const COUNTRY_KEY = 'sudoku_country';
+let MY_COUNTRY = null;
+try { MY_COUNTRY = Geo.normSaved(window.localStorage.getItem(COUNTRY_KEY)); } catch (e) {}
+function myCountry() { return MY_COUNTRY || Geo.OTHER; }
+// 单个提供方请求:HTTPS+CORS、4s 超时(AbortController)、静默失败(返回 null 走降级)
+function geoFetchProvider(p) {
+  return function () {
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), Geo.TIMEOUT_MS) : null;
+    return fetch(p.url, { signal: ctrl && ctrl.signal, headers: { Accept: 'application/json' } })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((j) => Geo.parseCountryResponse(p.name, j))
+      .finally(() => { if (timer) clearTimeout(timer); });
+  };
+}
+// 首次确认国家(boot 异步调用,绝不阻塞开局/渲染):已存值短路零请求;否则 IP 决策链,
+// 结果(含 other)立即持久化并永久锁定,此后换网/换语言不再变。
+function confirmCountryOnce(saved) {
+  return Geo.resolveCountry(saved != null ? saved : MY_COUNTRY, Geo.PROVIDERS.map(geoFetchProvider))
+    .then((r) => {
+      MY_COUNTRY = r.country;
+      if (r.source !== 'saved') Store.set(COUNTRY_KEY, r.country); // 首次确认落盘
+      else { try { window.localStorage.setItem(COUNTRY_KEY, r.country); } catch (e) {} } // 云端已有:回写镜像(含 UN→other 迁移)
+      return r.country;
+    });
+}
+function lbFetch() {
+  return fetch(LB_URL, { headers: { Accept: 'application/json' } })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => (d && typeof d === 'object' && d.players) ? d : { players: {} });
+}
+function lbSubmit(level) {
+  return lbFetch().then((d) => {
+    const me = d.players[myId()];
+    if (me && me.level >= level) return;
+    // issue #24:提交带 country;读-改-写只覆盖自己一条,他人记录的 country 原样保留
+    d.players[myId()] = { name: myName(), level, country: myCountry() };
+    return fetch(LB_URL, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(d),
+    });
+  }).catch(() => {}); // 静默:榜不可用不阻塞游戏
+}
+
+/* ====================== 页面路由 ====================== */
+const pages = { home: document.getElementById('home'), lb: document.getElementById('lbPage'), game: document.getElementById('gamePage'), weekly: document.getElementById('weeklyPage') };
+function show(page) {
+  for (const k in pages) pages[k].hidden = k !== page;
+  if (page === 'home') renderHome();
+  if (page === 'weekly') renderWeekly();
+}
+
+/* ====================== 游戏状态 ====================== */
+const TIME_LIMIT = 600, AD_TIME_BONUS = 60;
+const S = {
+  tubes: null,           // 试管数组:每根自底向上的颜色栈
+  capacity: 4,
+  level: 1, sel: -1,     // sel = 当前选中的源管下标,-1 为未选
+  moves: 0, undo: [],    // 步数与撤销栈(存局面 JSON 快照)
+  par: null,             // 该关最短解步数(固定关有,生成关为 null)
+  locked: false,         // 倒水动画期间锁输入
+  remain: TIME_LIMIT, timeBudget: TIME_LIMIT, timerId: null,
+  finished: false,
+};
+
+// 对局快照机制已整体移除:刷新一律回首页,不再断点续玩(issue #6);
+// 旧版本遗留的 sudoku_save 存档在启动时清除。
+/* ====================== 首页渲染 ====================== */
+let homeTimer = null;
+function renderHome() {
+  Profile.settle();
+  const p = Profile.state;
+  document.getElementById('enVal').textContent = p.energy;
+  document.getElementById('enBar').style.width = Math.min(100, Math.round(p.energy / Reward.E_MAX * 100)) + '%';
+  const sub = document.getElementById('enSub');
+  if (p.energy >= Reward.E_MAX) sub.textContent = t('energyFull');
+  else {
+    const next = Math.max(0, Math.ceil((Reward.E_TICK - (Date.now() - p.lastTs)) / 1000));
+    sub.textContent = t('energyRegen', { s: next });
+  }
+  document.getElementById('startLv').textContent = p.wins + 1;
+  document.getElementById('stWins').textContent = p.wins;
+  document.getElementById('stHints').textContent = p.hints;
+  const u = tgUser();
+  const name = myName();
+  document.getElementById('profileName').textContent = name;
+  document.getElementById('profileAvatar').textContent = Array.from(name)[0] || (LANG === 'zh' ? '玩' : 'P');
+  document.getElementById('profileSource').textContent = u ? t('profileTelegram') : t('profileWeb');
+  // issue #30:每周活动入口(角标 + 主题名 + 碎片数)
+  WeeklyCtl.settle();
+  const th = Weekly.themeFor(Date.now());
+  document.getElementById('wkBadge').textContent = t('wkBadge');
+  document.getElementById('wkEntryTitle').textContent = t('wkEntry', { theme: (th[LANG] || th.en).name });
+  document.getElementById('wkEntrySub').textContent = t('wkEntrySub', { n: Weekly.GRAND.energy });
+  document.getElementById('wkEntryFrag').textContent = t('wkFragShort', { n: WeeklyCtl.state ? WeeklyCtl.state.frags : 0 });
+  clearInterval(homeTimer);
+  if (!pages.home.hidden) homeTimer = setInterval(() => { if (!pages.home.hidden) renderHome(); }, 1000);
+}
+
+/* ====================== 每周活动渲染(issue #30) ====================== */
+let wkTimer = null;
+function renderWeekly() {
+  WeeklyCtl.settle();
+  Profile.settle();
+  const st = WeeklyCtl.state;
+  const now = Date.now();
+  const th = Weekly.themeFor(now);
+  const L = th[LANG] || th.en;
+  document.getElementById('wkTitle').innerHTML = t('wkTitle');
+  // 展示用年内周数(第 N 周);内部 weekKey 仍用绝对周序号,跨年结转不受影响
+  const yearWeek = Weekly.weekIndex(now) - Weekly.weekIndex(Date.UTC(new Date(now).getUTCFullYear(), 0, 1)) + 1;
+  document.getElementById('wkNo').textContent = t('wkNo', { n: yearWeek });
+  document.getElementById('wkTheme').textContent = L.name;
+  document.getElementById('wkThemeSub').textContent = t('wkThemeSub');
+  // 倒计时:剩余 d 天 hh:mm(每分钟刷)
+  const left = Math.max(0, Weekly.weekEnd(now) - now);
+  const days = Math.floor(left / Weekly.DAY);
+  const hh = Math.floor((left % Weekly.DAY) / 3600000), mm = Math.floor((left % 3600000) / 60000);
+  document.getElementById('wkCd').textContent = t('wkCd', { d: days, t: String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') });
+  document.getElementById('wkCdSub').textContent = t('wkCdSub');
+  // 碎片与进度条
+  document.getElementById('wkFragLab').textContent = t('wkFragLab');
+  document.getElementById('wkFragNum').innerHTML = st.frags + ' <small>/ ' + Weekly.GOAL + '</small>';
+  const carryEl = document.getElementById('wkCarry');
+  carryEl.hidden = !st.carried;
+  if (st.carried) carryEl.textContent = t('wkCarry', { n: st.carried });
+  document.getElementById('wkBar').style.width = Math.min(100, st.frags / Weekly.GOAL * 100) + '%';
+  document.getElementById('wkTicks').innerHTML = ['0'].concat(Weekly.THRESHOLDS).map((v, i) =>
+    (i > 0 && st.frags >= v) ? '<b>' + v + '</b>' : '<span>' + v + '</span>').join('');
+  // 6 张主题图:已解锁(含已领奖励)/进行中(下一档)/锁定
+  const grid = document.getElementById('wkGrid');
+  grid.innerHTML = '';
+  const nextIdx = Weekly.unlockedCount(st.frags); // 第一个未达档
+  const nums = ['①', '②', '③', '④', '⑤', '⑥'];
+  for (let i = 0; i < 6; i++) {
+    const d = document.createElement('div');
+    const unlocked = st.claimed[i];
+    const cur = !unlocked && i === nextIdx;
+    d.className = 'pic ' + (unlocked ? 'open' : cur ? 'cur' : 'lock');
+    let tag, extra = '';
+    if (unlocked) {
+      const r = st['r' + i];
+      const rTxt = r ? t(r.type === 'energy' ? 'wkRewardEnergy' : 'wkRewardHints', { n: r.n }) : '✓';
+      tag = t('wkOpen', { r: rTxt });
+    } else if (cur) {
+      tag = t('wkCur', { a: st.frags, b: Weekly.THRESHOLDS[i] });
+      const prev = i === 0 ? 0 : Weekly.THRESHOLDS[i - 1];
+      const pct = Math.max(0, Math.min(100, (st.frags - prev) / (Weekly.THRESHOLDS[i] - prev) * 100));
+      extra = '<div class="prog"><i style="width:' + pct + '%"></i></div>';
+    } else {
+      tag = t('wkLock', { n: Weekly.THRESHOLDS[i] });
+    }
+    d.innerHTML = wkSvg(i, th) +
+      (unlocked || cur ? '' : '<div class="lockov">🔒</div>') +
+      '<div class="cap"><b>' + nums[i] + ' ' + themePics()[i] + '</b><span class="tag">' + tag + '</span></div>' + extra;
+    grid.appendChild(d);
+  }
+  // 大奖卡
+  document.getElementById('wkGrand').className = 'grand' + (st.grand ? ' done' : '');
+  document.getElementById('wkGrandTitle').textContent = t('wkGrandTitle', { n: Weekly.GOAL });
+  document.getElementById('wkGrandBody').textContent = t('wkGrandBody', { e: Weekly.GRAND.energy, h: Weekly.GRAND.hints });
+  document.getElementById('wkGrandSt').textContent = st.grand ? t('wkGrandYes') : t('wkGrandNo', { a: st.frags, b: Weekly.GOAL });
+  // 操作区
+  document.getElementById('wkAdText').innerHTML = t('wkAd', { n: Weekly.FRAG_AD }).replace(/(\+\d+[^<]*)/, '<b>$1</b>');
+  document.getElementById('wkNote1').textContent = t('wkNote1', { n: Weekly.FRAG_WIN });
+  document.getElementById('wkNote2').textContent = t('wkNote2', { n: Weekly.GOAL });
+  clearInterval(wkTimer);
+  if (!pages.weekly.hidden) wkTimer = setInterval(() => { if (!pages.weekly.hidden) renderWeekly(); else clearInterval(wkTimer); }, 60000);
+}
+document.getElementById('btnWeekly').addEventListener('click', () => show('weekly'));
+document.getElementById('btnWkBack').addEventListener('click', () => show('home'));
+// 挂点:看广告 +10 碎片(现有 Monetag 激励路径,演示模式兜底)
+document.getElementById('btnWkAd').addEventListener('click', () => {
+  showRewardedAd().then(() => {
+    const msgs = WeeklyCtl.addFrags(Weekly.FRAG_AD);
+    haptic('success');
+    toast(t('wkGotFrags', { n: Weekly.FRAG_AD }));
+    msgs.forEach((m, i) => setTimeout(() => toast(m), 1400 * (i + 1)));
+    renderWeekly();
+  }).catch(() => toast(t('adFail')));
+});
+
+/* ====================== 排行榜渲染 ====================== */
+/* issue #24:Tab 状态。国家可判定时默认「本国」,判不出(UN)默认落「全球」;会话内记住切换 */
+let LB_TAB = null; // 'local' | 'global'
+let LB_VIEW = { rows: [], date: '', offline: false }; // issue #25:分享取当前 Tab 渲染快照
+function lbCurrentTab() {
+  if (LB_TAB) return LB_TAB;
+  return myCountry() === Geo.OTHER ? 'global' : 'local'; // issue #27:other(含未确认期间)默认全球 Tab
+}
+function renderLb() {
+  const list = document.getElementById('lbList');
+  const note = document.getElementById('lbNote');
+  const tab = lbCurrentTab();
+  document.getElementById('lbTabLocal').className = 'lbtab' + (tab === 'local' ? ' on' : '');
+  document.getElementById('lbTabGlobal').className = 'lbtab' + (tab === 'global' ? ' on' : '');
+  list.innerHTML = '<div class="lbnote">' + t('lbLoading') + '</div>';
+  note.textContent = '';
+  const my = { id: myId(), name: myName(), level: Profile.state.wins };
+  const row = (p, me, mineTag) => {
+    const d = document.createElement('div');
+    d.className = 'lbrow' + (me ? ' me' : '');
+    d.innerHTML = '<span class="rank mono' + (p.rank && p.rank <= 3 ? ' top' : '') + '">' + (p.rank || '–') + '</span>' +
+      '<span class="name"></span><span class="lv mono">' + t('lvlN', { n: p.level }) + '</span>';
+    d.querySelector('.name').textContent = p.name + (me ? (mineTag || t('lbMe')) : '');
+    return d;
+  };
+  const finish = (board, offline) => {
+    // issue #24:本国 Tab 按 country 过滤当日快照并国内重排名次;全球 Tab 用全量快照
+    const rows = tab === 'local' ? Lb.filterCountry(board.top, myCountry()) : board.top;
+    list.innerHTML = '';
+    rows.forEach((p) => list.appendChild(row(p, p.id === my.id)));
+    if (rows.length === 0) list.innerHTML = '<div class="lbnote">' + t('lbEmpty') + '</div>';
+    // 自己不在当前榜内:底部附一行自己的成绩(无名次,次日进榜)
+    if (my.level > 0 && !rows.some((p) => p.id === my.id)) {
+      list.appendChild(row({ rank: 0, name: my.name, level: my.level }, true, ' · ' + t('lbMine')));
+    }
+    note.textContent = offline ? t('lbOffline') : t('lbDate', { d: board.date });
+    const mine = rows.find((p) => p.id === my.id);
+    LB_VIEW = { rows, date: board.date, offline, myRank: mine ? mine.rank : 0, myLevel: my.level };
+  };
+  lbFetch().then((d) => {
+    const today = Lb.todayUTC(Date.now());
+    if (Lb.needsRebuild(d.board, today)) {
+      // 当日首访者:从提交池重算 Top50 快照并裁剪提交池,写回失败静默(下个访问者会重试)
+      d.board = Lb.buildTop(d.players, today);
+      d.players = Lb.trimPlayers(d.players, d.board.top);
+      fetch(LB_URL, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(d),
+      }).catch(() => {});
+    }
+    finish(d.board, false);
+  }).catch(() => finish(Lb.buildTop(
+    FAKE_BOARD.reduce((m, p) => (m[p.id] = p, m), {}), Lb.todayUTC(Date.now())), true));
+}
+
+/* ====================== 试管台渲染(倒水) ====================== */
+const tubesEl = document.getElementById('tubes');
+
+// 点击委托:点一根管选中 → 再点另一根倒水(与数独的 selectCell/inputDigit 同位)
+tubesEl.addEventListener('click', (ev) => {
+  const el = ev.target.closest && ev.target.closest('[data-tube]');
+  if (el) tapTube(Number(el.getAttribute('data-tube')));
+});
+function tubeEl(i) { return tubesEl.querySelector('[data-tube="' + i + '"]'); }
+
+function tubeHtml(i) {
+  const t = S.tubes[i], cap = S.capacity;
+  const full = t.length > 0 && WaterEngine.isDone(t, cap);
+  const cls = 'tube' + (i === S.sel ? ' sel' : '') + (full ? ' done' : '') + (t.length === 0 ? ' empty' : '');
+  const run = WaterEngine.topRun(t);
+  let layers = '';
+  for (let k = 0; k < t.length; k++) {
+    const topSeg = k >= t.length - run;        // 顶部同色段:选中时整段一起走
+    const surface = k === t.length - 1;        // 最上层:画液面弧线
+    layers += '<div class="liq' + (topSeg ? ' top-seg' : '') + (surface ? ' surface' : '') +
+      '" style="height:' + (100 / cap) + '%;background:' + WaterLevels.PALETTE[t[k]] +
+      '" data-color="' + t[k] + '"></div>';
+  }
+  const kinds = t.filter((c, k) => t.indexOf(c) === k).length;
+  const tag = t.length === 0 ? '空管' : (full ? '完成' : kinds + ' 色');
+  return '<div class="slot' + (full ? ' done' : '') + '">' +
+    '<div class="' + cls + '" data-tube="' + i + '">' + layers + '</div>' +
+    '<span class="tag">' + tag + '</span></div>';
+}
+
+function render() {
+  if (!S.tubes) return;
+  // 试管排布:≤5 根一行放下,再多就两行(每行最多 ceil(n/2) 根)
+  const perRow = S.tubes.length <= 5 ? S.tubes.length : Math.ceil(S.tubes.length / 2);
+  let html = '', idx = 0;
+  while (idx < S.tubes.length) {
+    html += '<div class="row">';
+    for (let k = 0; k < perRow && idx < S.tubes.length; k++, idx++) html += tubeHtml(idx);
+    html += '</div>';
+  }
+  if (S.par) html += '<div class="parhint">' + t('par', { n: S.par }) + '</div>';
+  tubesEl.innerHTML = html;
+  document.getElementById('hudLv').textContent = S.level;
+  document.getElementById('hudMoves').textContent = S.moves;
+  document.getElementById('btnUndo').classList.toggle('dim', S.undo.length === 0);
+  renderTimer();
+  renderHintBtn();
+}
+
+function fmtTime(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+function renderTimer() {
+  document.getElementById('hudTime').textContent = fmtTime(Math.max(0, S.remain));
+  document.getElementById('hudTimerWrap').classList.toggle('low', S.remain <= 60);
+}
+// 提示按钮:终身库存;0 时显示 + 号(看广告 +3)
+function renderHintBtn() {
+  const btn = document.getElementById('btnHint');
+  const cnt = document.getElementById('hintCnt');
+  const h = Profile.state.hints;
+  cnt.textContent = h > 0 ? h : '+';
+  btn.classList.toggle('ad', h <= 0);
+}
+
+/* ====================== 倒计时 ====================== */
+function tick() {
+  S.remain--;
+  renderTimer();
+  if (S.remain <= 0) { stopTimer(); timeUp(); }
+}
+function startTimer() { stopTimer(); S.timerId = setInterval(tick, 1000); }
+function stopTimer() { if (S.timerId) { clearInterval(S.timerId); S.timerId = null; } }
+function grantTimeBonus(seconds) {
+  S.timeBudget += seconds;
+  S.remain = seconds;
+}
+function elapsedTime() { return Math.max(0, S.timeBudget - Math.max(0, S.remain)); }
+
+let toastTimer = null;
+/* issue #25:公共分享函数。Telegram 内走 share/url 深链;非 TG 降级剪贴板 + toast(与完局分享共用) */
+const GAME_URL = 'https://t.me/sudoku2_bot/sudoku';
+function shareText(text) {
+  if (IN_TG) {
+    try {
+      TG.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(GAME_URL) + '&text=' + encodeURIComponent(text));
+      return;
+    } catch (e) {}
+  }
+  const done = () => toast(t('lbCopied'));
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, done);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta); done();
+    }
+  } catch (e) { done(); }
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ====================== 交互 ====================== */
+function shakeTube(i) {
+  const el = tubeEl(i);
+  if (!el) return;
+  el.classList.add('shake');
+  setTimeout(() => el.classList.remove('shake'), 340);
+}
+
+// 交互规则:点非空管选中 → 点目标管倒水;非法只抖动不计步;倒完判胜;无路可走给出口
+function tapTube(i) {
+  if (S.finished || S.locked) return;
+  if (S.sel === -1) {
+    if (!S.tubes[i].length) { shakeTube(i); return; }   // 空管不能当源
+    S.sel = i; haptic('light'); render(); return;
+  }
+  if (S.sel === i) { S.sel = -1; render(); return; }    // 再点一次取消选中
+
+  const res = WaterEngine.pour(S.tubes, S.sel, i, S.capacity);
+  if (!res) { haptic('error'); shakeTube(i); return; }
+
+  S.undo.push(JSON.stringify(S.tubes));
+  S.tubes = res.state; S.moves++; S.sel = -1;
+  S.locked = true; haptic('light'); render();
+  setTimeout(() => {
+    S.locked = false;
+    if (WaterEngine.isSolved(S.tubes, S.capacity)) return win();
+    if (!WaterEngine.legalMoves(S.tubes, S.capacity).length) stuck();
+  }, 220);
+}
+
+document.getElementById('btnUndo').addEventListener('click', () => {
+  if (S.finished || S.locked || !S.undo.length) return;
+  S.tubes = JSON.parse(S.undo.pop());
+  S.moves = Math.max(0, S.moves - 1); S.sel = -1;
+  haptic('light'); render();
+});
+
+document.getElementById('btnRestart').addEventListener('click', () => {
+  if (S.finished || S.locked) return;
+  S.tubes = S.start.map((t) => t.slice());
+  S.moves = 0; S.undo = []; S.sel = -1;
+  haptic('light'); render();
+});
+
+// 提示:终身库存,0 时点按钮 → 看广告 +3
+document.getElementById('btnHint').addEventListener('click', () => {
+  if (S.finished) return;
+  if (Profile.state.hints <= 0) {
+    dialog(`<h2>${t('hintEmptyTitle')}</h2>
+      <p>${t('hintEmptyBody')}</p>
+      <button class="btn ad" id="dlgAdHint">${t('adHint')}</button>
+      <button class="btn ghost" id="dlgClose">${t('notNow')}</button>`);
+    overlay.querySelector('#dlgAdHint').addEventListener('click', () => {
+      showRewardedAd().then(() => {
+        Profile.mutate((s) => { s.hints += 3; });
+        closeDialog(); haptic('success'); toast(t('gotHints')); render();
+      }).catch(() => toast(t('adFail')));
+    });
+    overlay.querySelector('#dlgClose').addEventListener('click', closeDialog);
+    return;
+  }
+  // 提示 = 求解器算出的下一步最优移动,高亮两根管后替玩家走掉这一步
+  const mv = WaterEngine.hint(S.tubes, { capacity: S.capacity, maxVisited: 120000 });
+  if (!mv) { toast(t('hintNone')); return; }
+  Profile.mutate((s) => { s.hints--; });
+  S.sel = -1; render();
+  const a = tubeEl(mv[0]), b = tubeEl(mv[1]);
+  if (a) a.classList.add('hint');
+  if (b) b.classList.add('hint');
+  haptic('success');
+  setTimeout(() => { S.sel = mv[0]; tapTube(mv[1]); }, 280);
+});
+
+document.getElementById('btnHome').addEventListener('click', () => { stopTimer(); show('home'); });
+document.getElementById('btnLb').addEventListener('click', () => { show('lb'); renderLb(); });
+document.getElementById('btnLbBack').addEventListener('click', () => show('home'));
+document.getElementById('btnProfile').addEventListener('click', () => {
+  if (tgUser()) { toast(t('profileFromTelegram')); return; }
+  dialog(`<h2>${t('profileEditTitle')}</h2>
+    <p>${t('profileEditBody')}</p>
+    <input id="profileInput" maxlength="32" autocomplete="nickname" aria-label="${t('profilePlaceholder')}" placeholder="${t('profilePlaceholder')}">
+    <button class="btn" id="profileSave">${t('profileSave')}</button>
+    <button class="btn ghost" id="profileCancel">${t('profileCancel')}</button>`);
+  const input = overlay.querySelector('#profileInput');
+  input.value = Profile.state.alias || '';
+  input.focus();
+  const save = () => {
+    const alias = normalizeAlias(input.value);
+    if (!alias) { input.focus(); return; }
+    Profile.mutate((s) => { s.alias = alias; });
+    closeDialog(); renderHome(); toast(t('profileSaved'));
+  };
+  overlay.querySelector('#profileSave').addEventListener('click', save);
+  overlay.querySelector('#profileCancel').addEventListener('click', closeDialog);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+});
+// issue #24:Tab 切换(会话内记住选择)
+document.getElementById('lbTabLocal').addEventListener('click', () => { LB_TAB = 'local'; renderLb(); });
+document.getElementById('lbTabGlobal').addEventListener('click', () => { LB_TAB = 'global'; renderLb(); });
+// issue #25:分享当前 Tab 榜单(Telegram 深链;非 TG 降级剪贴板+toast)
+document.getElementById('btnLbShare').addEventListener('click', () => {
+  const text = Lb.buildShareText(LB_VIEW.rows, { rank: LB_VIEW.myRank, level: LB_VIEW.myLevel }, LANG, {
+    date: LB_VIEW.date, scope: lbCurrentTab(), url: GAME_URL, tpl: t('shareTpl'),
+  });
+  shareText(text);
+});
+
+// 开始按钮:先扣体力,扣成功才进游戏(挂点:体力不足看广告)
+document.getElementById('btnStart').addEventListener('click', () => {
+  Profile.settle();
+  if (Profile.state.energy < Reward.E_COST) {
+    dialog(`<h2>${t('energyLowTitle')}</h2>
+      <p>${t('energyLowBody', { cur: Profile.state.energy, n: Reward.E_AD })}</p>
+      <button class="btn ad" id="dlgAdEnergy">${t('adEnergy', { n: Reward.E_AD })}</button>
+      <button class="btn ghost" id="dlgClose">${t('wait')}</button>`);
+    overlay.querySelector('#dlgAdEnergy').addEventListener('click', () => {
+      showRewardedAd().then(() => {
+        Profile.mutate((s) => { s.energy += Reward.E_AD; if (s.energy >= Reward.E_MAX) s.lastTs = Date.now(); }); // 广告补体力可超 120(issue #7)
+        closeDialog(); haptic('success'); toast(t('gotEnergy', { n: Reward.E_AD })); renderHome();
+      }).catch(() => toast(t('adFail')));
+    });
+    overlay.querySelector('#dlgClose').addEventListener('click', closeDialog);
+    return;
+  }
+  Profile.mutate((s) => { s.energy -= Reward.E_COST; s.lastTs = s.energy + Reward.E_COST >= Reward.E_MAX ? Date.now() : s.lastTs; });
+  haptic('light');
+  newGame(Profile.state.wins + 1);
+});
+
+// 键盘快捷:1-9 选管/倒水(桌面调试友好),U 撤销,R 重开
+document.addEventListener('keydown', (e) => {
+  if (pages.game.hidden) return;
+  if (e.key >= '1' && e.key <= '9') {
+    const i = +e.key - 1;
+    if (S.tubes && i < S.tubes.length) tapTube(i);
+  } else if (e.key === 'u' || e.key === 'U') document.getElementById('btnUndo').click();
+  else if (e.key === 'r' || e.key === 'R') document.getElementById('btnRestart').click();
+});
+
+/* ====================== 对话框 ====================== */
+const overlay = document.getElementById('overlay');
+function dialog(html) { overlay.innerHTML = '<div class="dialog">' + html + '</div>'; overlay.hidden = false; }
+function closeDialog() { overlay.hidden = true; overlay.innerHTML = ''; }
+
+// 挂点:倒计时归零 → 看广告 +60s
+function timeUp() {
+  haptic('error');
+  dialog(`<h2>${t('timeUpTitle')}</h2>
+    <p>${t('timeUpBody', { n: AD_TIME_BONUS })}</p>
+    <button class="btn ad" id="dlgAdTime">${t('adTime', { n: AD_TIME_BONUS })}</button>
+    <button class="btn ghost" id="dlgGiveup">${t('giveUp')}</button>`);
+  overlay.querySelector('#dlgAdTime').addEventListener('click', () => {
+    showRewardedAd().then(() => {
+      grantTimeBonus(AD_TIME_BONUS);
+      closeDialog(); haptic('success'); toast(t('gotTime', { n: AD_TIME_BONUS })); renderTimer(); startTimer();
+    }).catch(() => toast(t('adFail')));
+  });
+  overlay.querySelector('#dlgGiveup').addEventListener('click', () => {
+    S.finished = true; closeDialog(); show('home');
+  });
+}
+
+// 倒水没有「填错」这回事,唯一的负向出口是「一步合法移动都没有了」。
+// 这时不判死:给撤销一步 / 重开本关两个出口(撤销是免费的,不逼玩家看广告)。
+function stuck() {
+  stopTimer(); haptic('error');
+  dialog(`<h2>${t('stuckTitle')}</h2>
+    <p>${t('stuckBody')}</p>
+    <button class="btn" id="dlgUndo">${t('stuckUndo')}</button>
+    <button class="btn ghost" id="dlgRestart">${t('stuckRestart')}</button>
+    <button class="btn ghost" id="dlgGiveup">${t('toHome')}</button>`);
+  overlay.querySelector('#dlgUndo').addEventListener('click', () => {
+    closeDialog(); startTimer();
+    document.getElementById('btnUndo').click();
+  });
+  overlay.querySelector('#dlgRestart').addEventListener('click', () => {
+    closeDialog(); startTimer();
+    document.getElementById('btnRestart').click();
+  });
+  overlay.querySelector('#dlgGiveup').addEventListener('click', () => {
+    S.finished = true; closeDialog(); show('home');
+  });
+  InterAd.arm(); // issue #22:结算态空闲插屏
+}
+
+function win() {
+  stopTimer(); S.finished = true; haptic('success');
+  Profile.mutate((s) => { s.wins = Math.max(s.wins, S.level); });
+ 
+  lbSubmit(Profile.state.wins);
+  // issue #30:每盘胜利 +10 碎片(解锁/大奖 toast 延迟播,不遮结算对话框)
+  const wkMsgs = WeeklyCtl.addFrags(Weekly.FRAG_WIN);
+  setTimeout(() => toast(t('wkGotFrags', { n: Weekly.FRAG_WIN })), 700);
+  wkMsgs.forEach((m, i) => setTimeout(() => toast(m), 700 + 1400 * (i + 1)));
+  const used = elapsedTime();
+  const parTxt = S.par ? (S.moves === S.par ? t('statBest') : t('statPar', { n: S.par })) : t('statNoPar');
+  dialog(`<h2>${t('winTitle', { n: S.level })}</h2>
+    <div class="stats">
+      <span><b class="mono">${fmtTime(used)}</b>${t('statTime')}</span>
+      <span><b class="mono">${S.moves}</b>${t('statMoves')}</span>
+      <span><b class="mono">${Profile.state.wins}</b>${t('statWins')}</span>
+    </div>
+    <p class="parline">${parTxt}</p>
+    ${IN_TG ? '<button class="btn ghost" id="dlgShare">' + t('share') + '</button>' : ''}
+    <button class="btn" id="dlgNext">${t('next')}</button>
+    <button class="btn ghost" id="dlgHome">${t('toHome')}</button>`);
+  overlay.querySelector('#dlgNext').addEventListener('click', () => {
+    closeDialog();
+    document.getElementById('btnStart').click();
+  });
+  overlay.querySelector('#dlgHome').addEventListener('click', () => { closeDialog(); show('home'); });
+  const sh = overlay.querySelector('#dlgShare');
+  // issue #25:完局分享改走公共 shareText()(TG 深链/剪贴板降级同一路径)
+  if (sh) sh.addEventListener('click', () => shareText(t('shareText', { n: Profile.state.wins }) + ' ' + GAME_URL));
+  InterAd.arm(); // issue #22:结算态(胜利)空闲插屏
+}
+
+/* ====================== 开局与恢复 ====================== */
+// 调试/回归用:按求解器最优解自动走完当前局(点击路径与真人一致,不走后门改状态)
+function autoSolve() {
+  const r = WaterEngine.solve(S.tubes, { capacity: S.capacity });
+  if (!r.solvable) return;
+  const seq = [];
+  for (const mv of r.moves) seq.push(mv[0], mv[1]);
+  (function step(n) {
+    if (n >= seq.length) return;
+    tapTube(seq[n]);
+    setTimeout(() => step(n + 1), 300);
+  })(0);
+}
+
+function newGame(level) {
+  closeDialog();
+  InterAd.reset(); // issue #22:新一局重置插屏抽签(每局最多一次)
+  // 第 1-5 关内置固定盘面(全网同题);第 6 关起按关卡号确定性生成,
+  // 生成时传入求解器做可解性验证——绝不把不可解的关发给玩家。
+  const lv = WaterLevels.forLevel(level, WaterEngine.solve);
+  S.tubes = lv.layout.map((t) => t.slice());
+  S.start = lv.layout.map((t) => t.slice());   // 「重开」用的初始快照
+  S.capacity = lv.capacity;
+  S.par = lv.minMoves;                          // 生成关为 null,界面就不显示「最少 N 步」
+  S.level = level; S.sel = -1;
+  S.moves = 0; S.undo = []; S.locked = false;
+  S.remain = TIME_LIMIT; S.timeBudget = TIME_LIMIT;
+  S.finished = false;
+
+  show('game'); startTimer(); render();
+}
+
+// 截图用:?zoom=2 整页放大(headless 出 2x 清晰图),不影响布局逻辑
+(function () {
+  const z = Number(new URLSearchParams(location.search).get('zoom'));
+  if (z > 0) document.documentElement.style.zoom = String(z);
+})();
+
+function boot() {
+  // issue #18:语言持久化对账。首屏已同步用 localStorage 镜像渲染(不闪);
+  // 这里异步读 CloudStorage 权威值(跨设备迁移场景),不一致且无 ?lang= 覆盖时切换过去并回写镜像。
+  Store.get(LANG_KEY, (v) => {
+    if (v && I18N[v] && !/[?&]lang=/.test(location.search) && v !== LANG) {
+      try { window.localStorage.setItem(LANG_KEY, v); } catch (e) {}
+      applyLang(v);
+    }
+  });
+  // issue #27:国家确认(异步静默,绝不阻塞开局/渲染)。CloudStorage 权威值优先(跨设备迁移),
+  // 已存值(含 other/旧 UN)短路零 IP 请求;首次才走 IP 决策链并落盘永久锁定。
+  Store.get(COUNTRY_KEY, (v) => {
+    confirmCountryOnce(v != null ? v : MY_COUNTRY).catch(() => {});
+  });
+  Profile.load(() => {
+    Store.del('sudoku_save'); // 清掉旧版遗留对局快照:刷新一律回首页(issue #6)
+    WeeklyCtl.load(() => {
+      // 调试入口:#wkfrags=N 造数(截图/自动化用,只改内存不发奖励)
+      const wf = location.hash.match(/wkfrags=(\d+)/);
+      if (wf) {
+        WeeklyCtl.state.frags = +wf[1];
+        for (let i = 0; i < 6; i++) if (WeeklyCtl.state.frags >= Weekly.THRESHOLDS[i]) {
+          WeeklyCtl.state.claimed[i] = true;
+          WeeklyCtl.state['r' + i] = i % 2 === 0 ? { type: 'energy', n: 35 } : { type: 'hints', n: 2 };
+        }
+        if (WeeklyCtl.state.frags >= Weekly.GOAL) WeeklyCtl.state.grand = true;
+        const wc = location.hash.match(/wkcarry=(\d+)/);
+        if (wc) WeeklyCtl.state.carried = +wc[1];
+      }
+      // 调试入口:#autostart 直接开一局(截图/自动化用,不扣体力)
+      const auto = location.hash.match(/autostart(?:=(\d+))?/);
+      if (auto) {
+        newGame(auto[1] ? +auto[1] : Profile.state.wins + 1);
+        // 调试入口:#wintest 立即进入胜利结算态(issue #22 插屏链路截图/自动化用)
+        if (/[#&]wintest/.test(location.hash)) setTimeout(win, 0);
+        // 调试入口:#autosolve 按求解器最优解自动走完本关(截图/回归验证用,正常玩法不受影响)
+        if (/[#&]autosolve/.test(location.hash)) setTimeout(autoSolve, 300);
+        return;
+      }
+      if (/#lb/.test(location.hash)) { show('lb'); renderLb(); return; } // 调试入口:#lb 直开排行榜(截图用)
+      if (/#weekly/.test(location.hash)) { show('weekly'); return; } // 调试入口:#weekly 直开活动页(截图用)
+      show('home');
+    });
+  });
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (!pages.game.hidden) { stopTimer(); } }
+  else {
+    Profile.settle();
+    if (!pages.game.hidden && S.tubes && !S.finished && overlay.hidden) startTimer();
+    if (!pages.home.hidden) renderHome();
+  }
+});
+boot();
 </script>
 </body>
 </html>

@@ -29,7 +29,7 @@
   --cell-same:#D8EAE0; --cell-sel:#C2E0D0; --cell-peer:#E9F0EA;
   --chip-bad:#F6E3E0; --overlay:rgba(30,41,34,.45);
 }
-/* ---------- 试管台（倒水玩法） ---------- */
+/* ---------- 卡通瓶架（倒水玩法） ---------- */
 .tubes{
   width:100%; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:18px; padding:10px 0 4px;
@@ -59,10 +59,10 @@
   38%{transform:translateY(0) scale(1);opacity:.95}
   100%{transform:translateY(-3px) scale(1.18);opacity:0}}
 .slot{display:flex; flex-direction:column; align-items:center; gap:6px}
-/* 试管本体由 Blender 渲染的素材承担（玻璃折射/厚度/圆底/管口都是真渲染出来的，
+/* 瓶身由 Blender 渲染的素材承担（白瓶口环/透明塑料/圆角底都是真渲染出来的，
    不再用 CSS 描边模拟）；液体 = 纯色块 + 该层遮罩，因此任意配色都能复用同一套素材。 */
 .tube{
-  width:56px; aspect-ratio:240/660; position:relative; cursor:pointer;
+  width:58px; aspect-ratio:250/800; position:relative; cursor:pointer;
   transition:transform .16s ease, filter .16s ease;
 }
 .tube .layer{
@@ -74,13 +74,28 @@
 /* 明暗底图叠在色块上（被同一遮罩裁到该层形状内），让纯色块有玻璃里的立体感 */
 .tube .layer::after{
   content:""; position:absolute; inset:0; pointer-events:none;
-  background:url(./assets/tubes/tube-shade.png) center/100% 100% no-repeat;
-  mix-blend-mode:multiply; opacity:.55;
+  background:url(./assets/bottles/bottle-shade.png) center/100% 100% no-repeat;
+  mix-blend-mode:multiply; opacity:.48;
 }
 .tube .glass{
   position:absolute; inset:0; z-index:2; pointer-events:none;
-  background:url(./assets/tubes/tube-empty.png) center/100% 100% no-repeat;
+  background:url(./assets/bottles/bottle-empty.png) center/100% 100% no-repeat;
+  filter:drop-shadow(0 5px 4px rgba(0,0,0,.28));
 }
+.tube.locked .glass{opacity:.62;filter:grayscale(.35) drop-shadow(0 5px 4px rgba(0,0,0,.18))}
+.bottle-unlock{
+  position:absolute; left:50%; top:48%; transform:translate(-50%,-50%); z-index:4;
+  width:46px; min-height:48px; padding:5px 3px; border-radius:14px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--canvas); background:rgba(138,109,43,.93);
+  border:2px solid rgba(255,255,255,.9); box-shadow:0 4px 10px rgba(30,41,34,.24);
+}
+.bottle-unlock .play{
+  width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  padding-left:2px; color:var(--podium); background:var(--canvas); font-size:12px; line-height:1;
+}
+.bottle-unlock small{font-size:8px;line-height:1.1;white-space:nowrap}
+.bottle-unlock.busy .play{padding-left:0}
 .tube.sel{transform:translateY(-12px);filter:drop-shadow(0 8px 14px rgba(127,194,155,.45))}
 .tube.done{filter:drop-shadow(0 0 6px rgba(127,194,155,.55))}
 .tube.hint{filter:drop-shadow(0 0 7px rgba(212,179,106,.85))}
@@ -279,9 +294,163 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
   padding:7px 4px 6px; text-align:center; font-size:11px; color:var(--ink-3);
 }
 .tool .ic{display:block; font-size:16px; color:var(--ink-2); font-family:ui-monospace,Consolas,monospace; line-height:1.2}
+.tool .bottle-plus{position:relative;width:24px;height:19px;margin:0 auto}
+.tool .bottle-plus::before{
+  content:""; position:absolute; left:7px; top:3px; width:8px; height:13px;
+  border:2px solid currentColor; border-radius:2px 2px 4px 4px;
+}
+.tool .bottle-plus::after{
+  content:"+"; position:absolute; right:0; top:-4px;
+  color:var(--podium); font-size:13px; font-weight:800;
+}
 .tool .cnt{color:var(--podium); font-weight:700}
 .tool.ad .cnt{color:var(--warn)}
 .tool:disabled{opacity:.4}
+/* 倒水页单独采用更接近参考游戏的深色立体舞台；不改变首页/榜单的主题。 */
+body:has(#gamePage:not([hidden])){
+  background:
+    radial-gradient(circle at 18% 18%,rgba(137,149,205,.34),transparent 34%),
+    radial-gradient(circle at 82% 26%,rgba(84,101,159,.3),transparent 31%),
+    linear-gradient(180deg,#666986 0%,#555a78 45%,#3f465f 100%);
+}
+#gamePage{
+  position:relative; isolation:isolate;
+  width:calc(100% + 24px); margin:-10px -12px calc(-16px - env(safe-area-inset-bottom));
+  padding:12px 14px calc(14px + env(safe-area-inset-bottom)); gap:12px;
+  color:#fff; overflow:hidden;
+  background:
+    linear-gradient(90deg,transparent 0 9%,rgba(255,255,255,.025) 9% 10%,transparent 10% 90%,rgba(255,255,255,.025) 90% 91%,transparent 91%),
+    linear-gradient(180deg,rgba(255,255,255,.04),rgba(16,22,42,.12));
+}
+#gamePage::before{
+  content:""; position:absolute; inset:auto -12% 0; height:48%; z-index:-1; pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 2px,transparent 2px 42px),
+    linear-gradient(180deg,rgba(37,44,68,.08),rgba(17,23,40,.38));
+  transform:perspective(260px) rotateX(8deg); transform-origin:bottom;
+}
+#gamePage .topbar{
+  min-height:42px; padding:6px 8px 6px 10px; border-radius:18px;
+  color:#dce3ff; background:rgba(31,37,66,.56);
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 7px 18px rgba(17,22,42,.22),inset 0 1px rgba(255,255,255,.12);
+  backdrop-filter:blur(8px);
+}
+#gamePage .topbar .title{color:#fff;text-shadow:0 2px 4px rgba(12,16,32,.35)}
+#gamePage .topbar .title em{color:#8ff0df}
+#gamePage .topbar .backbtn{
+  padding:7px 11px; border-radius:13px; color:#fff; font-weight:700;
+  background:linear-gradient(180deg,#858db9,#666f9e);
+  box-shadow:inset 0 1px rgba(255,255,255,.3),0 3px 7px rgba(15,20,39,.24);
+}
+#gamePage .hud{
+  gap:7px; align-items:stretch; color:#e8ebff;
+}
+#gamePage .hud > span{
+  flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  min-height:36px; padding:5px 7px; border-radius:15px;
+  background:linear-gradient(180deg,rgba(59,66,105,.92),rgba(42,49,84,.92));
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:inset 0 1px rgba(255,255,255,.14),0 5px 12px rgba(14,18,35,.2);
+}
+#gamePage .hud > span::before{
+  width:20px;height:20px;display:grid;place-items:center;border-radius:50%;
+  font-size:11px;font-weight:900;color:#fff;
+  box-shadow:inset 0 1px rgba(255,255,255,.45),0 2px 4px rgba(13,17,34,.3);
+}
+#gamePage .hud .lvl::before{content:"★";background:linear-gradient(#ffd75a,#e89621)}
+#gamePage .hud .timer::before{content:"♥";background:linear-gradient(#ff8177,#db4e63)}
+#gamePage .hud .err::before{content:"↟";background:linear-gradient(#79d8f2,#4f77d8)}
+#gamePage .hud b,#gamePage .hud .err b,#gamePage .hud .timer b{
+  color:#fff; font-size:13px; text-shadow:0 1px 2px rgba(0,0,0,.3);
+}
+#gamePage .lvl{color:#ffe493}
+#gamePage .tubes{
+  width:calc(100% + 4px); min-height:0; padding:22px 7px 16px; gap:12px;
+  border-radius:24px; overflow:visible;
+  background:
+    radial-gradient(ellipse at 50% 82%,rgba(122,138,191,.34),transparent 52%),
+    linear-gradient(180deg,rgba(77,84,124,.18),rgba(25,31,54,.25));
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:inset 0 1px rgba(255,255,255,.1),0 12px 24px rgba(17,22,41,.18);
+}
+#gamePage .tubes::before{
+  content:""; position:absolute; inset:11% 3% 9%; z-index:0; pointer-events:none;
+  border-radius:22px;
+  background:
+    linear-gradient(180deg,transparent 47%,rgba(16,21,40,.34) 47.5% 50%,rgba(255,255,255,.08) 50% 50.7%,transparent 51.2%),
+    radial-gradient(ellipse at 50% 98%,rgba(9,13,28,.42),transparent 58%);
+}
+#gamePage .tubes .row{gap:7px;position:relative;z-index:1}
+#gamePage .tubes .row:first-child{transform:translateY(12px)}
+#gamePage .tubes .row:last-of-type{transform:translateY(-12px)}
+#gamePage .tubes .row:first-child .slot:nth-child(2){transform:translateY(-14px)}
+#gamePage .tubes .row:last-of-type .slot:nth-child(2){transform:translateY(12px)}
+#gamePage .tube{
+  width:76px;
+  filter:drop-shadow(0 11px 8px rgba(10,14,29,.45)) drop-shadow(0 2px 1px rgba(255,255,255,.22));
+}
+#gamePage .tube::before{
+  content:"";position:absolute;inset:15% 9% 3%;z-index:0;pointer-events:none;
+  clip-path:polygon(25% 0,75% 0,75% 13%,94% 24%,98% 31%,98% 93%,91% 100%,9% 100%,2% 93%,2% 31%,6% 24%,25% 13%);
+  border-radius:10px 10px 18px 18px;
+  background:
+    linear-gradient(90deg,rgba(216,235,255,.34),rgba(150,181,218,.1) 42%,rgba(93,119,159,.18) 76%,rgba(227,241,255,.26)),
+    rgba(177,207,237,.12);
+  box-shadow:inset 4px 0 8px rgba(255,255,255,.15),inset -5px 0 10px rgba(35,53,87,.18);
+}
+#gamePage .tube .layer{filter:saturate(1.78) contrast(1.08) brightness(1.05)}
+#gamePage .tube .layer::after{opacity:.38}
+#gamePage .tube .glass{
+  filter:brightness(1.22) contrast(1.12) drop-shadow(0 5px 4px rgba(9,13,25,.48));
+}
+#gamePage .tube .glass::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 18%,rgba(255,255,255,.72) 25%,rgba(255,255,255,.12) 34%,transparent 44%);
+  -webkit-mask:url(./assets/bottles/bottle-empty.png) center/100% 100% no-repeat;
+  mask:url(./assets/bottles/bottle-empty.png) center/100% 100% no-repeat;
+}
+#gamePage .tube.locked .glass{
+  opacity:.9; filter:brightness(.96) grayscale(.18) drop-shadow(0 7px 6px rgba(8,12,24,.44));
+}
+#gamePage .bottle-unlock{
+  top:50%; width:49px; min-height:48px; border-radius:15px; color:#fff;
+  background:linear-gradient(180deg,rgba(47,52,70,.96),rgba(28,32,48,.98));
+  border:2px solid rgba(255,255,255,.88);
+  box-shadow:inset 0 1px rgba(255,255,255,.18),0 5px 10px rgba(9,12,23,.42);
+}
+#gamePage .bottle-unlock .play{
+  width:27px;height:27px;color:#344067;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.28);
+}
+#gamePage .bottle-unlock small{color:#fff;font-weight:700;text-shadow:0 1px 2px #000}
+#gamePage .slot .tag{
+  min-width:42px; padding:3px 5px; border-radius:8px; text-align:center;
+  color:#eef1ff; background:rgba(29,35,59,.48); font-weight:700;
+  text-shadow:0 1px 2px rgba(0,0,0,.42);
+}
+#gamePage .slot.done .tag{color:#9ff1d3}
+#gamePage .parhint{
+  width:auto; margin-top:4px; padding:5px 12px; border-radius:12px;
+  color:#fff; font-weight:700; background:rgba(32,39,66,.55);
+  border:1px solid rgba(255,255,255,.1); text-shadow:0 1px 2px rgba(0,0,0,.35);
+}
+#gamePage .tools{gap:10px}
+#gamePage .tool{
+  position:relative; min-height:70px; padding:9px 4px 7px; overflow:hidden;
+  border-radius:17px; color:#fff; font-size:12px; font-weight:700;
+  background:linear-gradient(155deg,#8196df 0%,#6477c3 52%,#5364ae 100%);
+  border:3px solid rgba(255,255,255,.88);
+  box-shadow:inset 0 2px rgba(255,255,255,.28),inset 0 -4px rgba(37,48,103,.22),0 7px 12px rgba(16,21,41,.3);
+  text-shadow:0 1px 2px rgba(27,33,70,.48);
+}
+#gamePage .tool::before{
+  content:"";position:absolute;inset:2px;border-radius:13px;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.18),transparent 38%);
+}
+#gamePage .tool .ic{font-size:25px;color:#ffd34f;text-shadow:0 2px 0 #6c5318,0 3px 4px rgba(0,0,0,.3)}
+#gamePage .tool .bottle-plus{height:27px;transform:scale(1.2)}
+#gamePage .tool .cnt{color:#ffe35f;font-size:13px}
+#gamePage .tool:disabled{opacity:.52;filter:saturate(.55)}
 .pad{width:100%; display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); gap:6px}
 .key{
   background:var(--elevated); border:1px solid var(--edge); border-radius:8px;
@@ -345,7 +514,7 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
     <button class="homebtn" id="btnLb"><span>🏆 排行榜</span><span>›</span></button>
     <div class="homestats">
       <div class="st"><b class="mono" id="stWins">0</b><span>已通关</span></div>
-      <div class="st"><b class="mono" id="stHints">3</b><span>提示道具</span></div>
+      <div class="st"><b class="mono" id="stBottles">2</b><span>加瓶道具</span></div>
     </div>
     <button class="profilerow" id="btnProfile">
       <span class="avatar" id="profileAvatar">玩</span>
@@ -422,11 +591,11 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
       <span class="timer" id="hudTimerWrap">剩余 <b class="mono" id="hudTime">10:00</b></span>
       <span class="err">步数 <b class="mono" id="hudMoves">0</b></span>
     </div>
-    <div class="tubes" id="tubes" aria-label="试管台"></div>
+    <div class="tubes" id="tubes" aria-label="瓶架"></div>
     <div class="tools">
       <button class="tool" id="btnUndo"><span class="ic">↺</span>撤销</button>
       <button class="tool" id="btnRestart"><span class="ic">⟳</span>重开</button>
-      <button class="tool" id="btnHint"><span class="ic">☆</span>提示 <span class="cnt" id="hintCnt">3</span></button>
+      <button class="tool" id="btnBottle"><span class="ic bottle-plus"></span>加一瓶 <span class="cnt" id="bottleCnt">2</span></button>
     </div>
   </div>
 
@@ -435,6 +604,7 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
 
 <script src="./water-engine.js"></script>
 <script src="./water-audio.js"></script>
+<script src="./water-powerups.js"></script>
 <script src="./water-levels.js"></script>
 <script>
 // 运行时错误必须留痕:JS 一抛错整页就是白板/空试管,不能只能靠猜。
@@ -631,10 +801,10 @@ const I18N = {
     title: '倒水排序 · Water Sort', logoMain: '倒水排序', logoSub: 'WATER SORT',
     energyFull: '体力已满', energyRegen: '每分钟恢复 1 · 下一点 {s}s',
     start: '开始', startCost: '消耗 15 体力 · 10 分钟限时',
-    leaderboard: '🏆 排行榜', wins: '已通关', hintsItem: '提示道具',
+    leaderboard: '🏆 排行榜', wins: '已通关', bottlesItem: '加瓶道具',
     back: '‹ 返回', home: '‹ 首页',
     lvlPre: '第 ', lvlPost: ' 关', lvlN: '第 {n} 关', remain: '剩余 ', errors: '错误 ',
-    boardAria: '试管台', hint: '提示', moves: '步数 ', undoBtn: '撤销', restartBtn: '重开',
+    boardAria: '瓶架', moves: '步数 ', undoBtn: '撤销', restartBtn: '重开', addBottleBtn: '解锁空瓶',
     diffBeginner: '新手', diffEasy: '简单', diffMedium: '中等', diffHard: '困难',
     adDemo: '演示模式:模拟广告播放中…', adFail: '广告未完成,未发放奖励',
     alias: '玩家', me: '我', lbMe: '(我)', lbLoading: '加载中…',
@@ -642,9 +812,13 @@ const I18N = {
     profileEditTitle: '修改玩家名称', profileEditBody: '此名称只保存在当前浏览器,用于排行榜和分享。', profilePlaceholder: '输入玩家名称',
     profileSave: '保存', profileCancel: '取消', profileSaved: '玩家名称已保存', profileFromTelegram: '名称来自 Telegram 账号',
     lbDate: '榜单日期 {d} · 每日刷新', lbOffline: '离线榜单:网络恢复后自动同步', lbMine: '我的成绩',
-    hintEmptyTitle: '提示用完了',
-    hintEmptyBody: '看一段广告,获得 <b style="color:var(--podium)">3 个</b>提示道具(道具永久保留)。',
-    adHint: '看广告 +3 提示', notNow: '先不用', gotHints: '+3 提示道具',
+    bottleEmptyTitle: '加瓶道具用完了',
+    bottleEmptyBody: '看一段广告,获得 <b style="color:var(--podium)">2 个</b>加瓶道具(永久保留)。',
+    adBottle: '看广告 +2 加瓶', notNow: '先不用', gotBottles: '+2 加瓶道具',
+    bottleAdded: '已用道具解锁 1 个空瓶', bottleUsed: '本关空瓶已全部解锁',
+    bottleUnlockedAd: '广告完成,空瓶已解锁', bottleLocked: '这个空瓶还没解锁',
+    bottleUnlockAd: '广告解锁', bottleUnlocking: '播放中', bottleUnlockAria: '看广告解锁第 {n} 个空瓶',
+    bottleTagLocked: '待解锁', bottleTagEmpty: '空瓶', bottleTagDone: '完成', bottleTagColors: '{n} 色',
     energyLowTitle: '体力不足',
     energyLowBody: '开一关需要 <b class="mono">15</b> 体力,当前只有 <b class="mono" style="color:var(--bad)">{cur}</b>。<br>看一段广告立得 <b style="color:var(--podium)">+{n}</b> 体力,或等待每分钟自动恢复 1 点。',
     adEnergy: '看广告 +{n} 体力', wait: '等等再玩', gotEnergy: '+{n} 体力',
@@ -679,20 +853,20 @@ const I18N = {
     wkTitle: '每周活动 <em>WEEKLY</em>', wkNo: '第 {n} 周', wkThemeSub: '本周主题 · 集碎片点亮 6 幅图',
     wkCd: '剩余 {d} 天 {t}', wkCdSub: '周日 24:00 重置(UTC)', wkFragLab: '我的碎片', wkCarry: '含上周结转 +{n}',
     wkOpen: '已解锁 · 已领 {r}', wkCur: '进行中 {a}/{b}', wkLock: '{n} 碎片解锁',
-    wkRewardEnergy: '+{n} 体力', wkRewardHints: '+{n} 提示',
-    wkGrandTitle: '本周大奖 · 集齐 {n} 碎片', wkGrandBody: '体力 +{e} · 提示道具 +{h}',
+    wkRewardEnergy: '+{n} 体力', wkRewardHints: '+{n} 加瓶',
+    wkGrandTitle: '本周大奖 · 集齐 {n} 碎片', wkGrandBody: '体力 +{e} · 加瓶道具 +{h}',
     wkGrandNo: '未达成 {a}/{b}', wkGrandYes: '已达成 ✓',
     wkAd: '看一段广告 +{n} 碎片', wkNote1: '每盘胜利 +{n} 碎片', wkNote2: '超过 {n} 的碎片自动结转下周,下周从结转值起算',
-    wkGotFrags: '+{n} 碎片', wkUnlockToast: '🖼 点亮「{pic}」!奖励 {r}', wkGrandToast: '🏆 本周大奖达成!体力 +{e} · 提示 +{h}',
+    wkGotFrags: '+{n} 碎片', wkUnlockToast: '🖼 点亮「{pic}」!奖励 {r}', wkGrandToast: '🏆 本周大奖达成!体力 +{e} · 加瓶 +{h}',
   },
   en: {
     title: 'Water Sort', logoMain: 'Water Sort', logoSub: 'COLOR PUZZLE',
     energyFull: 'Energy full', energyRegen: '+1 per minute · next in {s}s',
     start: 'Start', startCost: '15 energy · 10-minute limit',
-    leaderboard: '🏆 Leaderboard', wins: 'Cleared', hintsItem: 'Hints',
+    leaderboard: '🏆 Leaderboard', wins: 'Cleared', bottlesItem: 'Extra bottles',
     back: '‹ Back', home: '‹ Home',
     lvlPre: 'Level ', lvlPost: '', lvlN: 'Lv {n}', remain: 'Time ', errors: 'Errors ',
-    boardAria: 'Tube rack', hint: 'Hint', moves: 'Moves ', undoBtn: 'Undo', restartBtn: 'Restart',
+    boardAria: 'Bottle rack', moves: 'Moves ', undoBtn: 'Undo', restartBtn: 'Restart', addBottleBtn: 'Unlock bottle',
     diffBeginner: 'Beginner', diffEasy: 'Easy', diffMedium: 'Medium', diffHard: 'Hard',
     adDemo: 'Demo mode: simulating an ad…', adFail: 'Ad not completed — no reward',
     alias: 'Player ', me: 'Me', lbMe: ' (me)', lbLoading: 'Loading…',
@@ -700,9 +874,13 @@ const I18N = {
     profileEditTitle: 'Edit player name', profileEditBody: 'This name stays in this browser and is used for leaderboards and sharing.', profilePlaceholder: 'Enter player name',
     profileSave: 'Save', profileCancel: 'Cancel', profileSaved: 'Player name saved', profileFromTelegram: 'Name comes from your Telegram account',
     lbDate: 'Board of {d} · refreshes daily', lbOffline: 'Offline board: syncs once back online', lbMine: 'My score',
-    hintEmptyTitle: 'Out of hints',
-    hintEmptyBody: 'Watch a short ad to get <b style="color:var(--podium)">3 hints</b> (yours to keep).',
-    adHint: 'Watch ad · +3 hints', notNow: 'Not now', gotHints: '+3 hints',
+    bottleEmptyTitle: 'Out of extra bottles',
+    bottleEmptyBody: 'Watch a short ad to get <b style="color:var(--podium)">2 extra bottles</b> (yours to keep).',
+    adBottle: 'Watch ad · +2 bottles', notNow: 'Not now', gotBottles: '+2 extra bottles',
+    bottleAdded: 'Unlocked 1 bottle with an item', bottleUsed: 'All bottles are unlocked',
+    bottleUnlockedAd: 'Ad complete — bottle unlocked', bottleLocked: 'This bottle is still locked',
+    bottleUnlockAd: 'Watch ad', bottleUnlocking: 'Playing', bottleUnlockAria: 'Watch an ad to unlock empty bottle {n}',
+    bottleTagLocked: 'Locked', bottleTagEmpty: 'Empty', bottleTagDone: 'Done', bottleTagColors: '{n} colors',
     energyLowTitle: 'Not enough energy',
     energyLowBody: 'Starting a level costs <b class="mono">15</b> energy — you have <b class="mono" style="color:var(--bad)">{cur}</b>.<br>Watch a short ad for <b style="color:var(--podium)">+{n}</b> energy, or wait: +1 per minute.',
     adEnergy: 'Watch ad · +{n} energy', wait: 'Maybe later', gotEnergy: '+{n} energy',
@@ -737,11 +915,11 @@ const I18N = {
     wkTitle: 'Weekly Event <em>WEEKLY</em>', wkNo: 'Week {n}', wkThemeSub: 'This week · collect shards to light 6 pictures',
     wkCd: '{d}d {t} left', wkCdSub: 'Resets Sunday 24:00 (UTC)', wkFragLab: 'My shards', wkCarry: 'Includes +{n} carried over',
     wkOpen: 'Unlocked · got {r}', wkCur: 'In progress {a}/{b}', wkLock: 'Unlock at {n}',
-    wkRewardEnergy: '+{n} energy', wkRewardHints: '+{n} hints',
-    wkGrandTitle: 'Grand prize · reach {n} shards', wkGrandBody: '+{e} energy · +{h} hints',
+    wkRewardEnergy: '+{n} energy', wkRewardHints: '+{n} extra bottles',
+    wkGrandTitle: 'Grand prize · reach {n} shards', wkGrandBody: '+{e} energy · +{h} extra bottles',
     wkGrandNo: 'Not yet {a}/{b}', wkGrandYes: 'Done ✓',
     wkAd: 'Watch ad · +{n} shards', wkNote1: 'Each win: +{n} shards', wkNote2: 'Shards above {n} carry over to next week',
-    wkGotFrags: '+{n} shards', wkUnlockToast: '🖼 "{pic}" lit! Reward: {r}', wkGrandToast: '🏆 Grand prize! +{e} energy · +{h} hints',
+    wkGotFrags: '+{n} shards', wkUnlockToast: '🖼 "{pic}" lit! Reward: {r}', wkGrandToast: '🏆 Grand prize! +{e} energy · +{h} extra bottles',
   },
 };
 /* 语言检测(与 i18n.js 同源):?lang= 调试参数(最高优先) → Telegram language_code → navigator.language → 默认 en;zh* 归 zh */
@@ -778,7 +956,7 @@ function applyStaticI18n() {
   q('#btnStart').innerHTML = t('start') + ' <span class="mono" id="startLv">1</span><small>' + t('startCost') + '</small>';
   q('#btnLb').innerHTML = '<span>' + t('leaderboard') + '</span><span>›</span>';
   q('#stWins').nextElementSibling.textContent = t('wins');
-  q('#stHints').nextElementSibling.textContent = t('hintsItem');
+  q('#stBottles').nextElementSibling.textContent = t('bottlesItem');
   q('#profileLabel').textContent = t('profileLabel');
   q('#lbPage h2').innerHTML = t('leaderboard') + '<button id="btnLbBack">' + t('back') + '</button>';
   q('.topbar .title').innerHTML = t('logoMain') + ' <em>' + t('logoSub') + '</em>';
@@ -789,7 +967,7 @@ function applyStaticI18n() {
   q('#tubes').setAttribute('aria-label', t('boardAria'));
   q('#btnUndo').innerHTML = '<span class="ic">\u21ba</span>' + t('undoBtn');
   q('#btnRestart').innerHTML = '<span class="ic">\u27f3</span>' + t('restartBtn');
-  q('#btnHint').innerHTML = '<span class="ic">☆</span>' + t('hint') + ' <span class="cnt" id="hintCnt">3</span>';
+  q('#btnBottle').innerHTML = '<span class="ic bottle-plus"></span>' + t('addBottleBtn') + ' <span class="cnt" id="bottleCnt">2</span>';
   q('#sfxLabel').textContent = t('sfxLabel');
   q('#enSub').textContent = t('energyFull');
   // issue #24/#25:排行榜 Tab 与分享按钮文案
@@ -886,7 +1064,8 @@ const Store = (function () {
 const MONETAG_ZONE_ID = '11440777';
 function showRewardedAd() {
   const fn = MONETAG_ZONE_ID && window['show_' + MONETAG_ZONE_ID];
-  if (typeof fn === 'function') return fn();
+  // #demoads 只供发布 gate/截图：仍走真实按钮与奖励回调，但不依赖广告网络是否在 headless 中完成。
+  if (!/[#&]demoads/.test(location.hash) && typeof fn === 'function') return fn();
   return new Promise((resolve) => {
     toast(t('adDemo'));
     setTimeout(resolve, 1200);
@@ -999,7 +1178,7 @@ const Weekly = (function () {
 
 /* 每周活动控制器(issue #30):状态持久化 sudoku_weekly(CloudStorage 优先 + localStorage 镜像,
    走 Store 同一通道);内存权威副本 + 快照串行 flush,与 Profile 同模式。
-   奖励发放:体力走 Profile(可超 120 持久保留,issue #7),提示走 Profile.hints。 */
+   奖励发放:体力走 Profile(可超 120 持久保留,issue #7),道具走 Profile.bottles。 */
 const WeeklyCtl = {
   key: 'sudoku_weekly',
   state: null,
@@ -1036,14 +1215,14 @@ const WeeklyCtl = {
       const r = Weekly.rollReward(rnd(), rnd());
       st.claimed[i] = true;
       if (r.type === 'energy') Profile.mutate((s) => { s.energy += r.n; });
-      else Profile.mutate((s) => { s.hints += r.n; });
+      else Profile.mutate((s) => { s.bottles += r.n; });
       st['r' + i] = r; // 记录已领奖励,活动页展示用
       const rTxt = t(r.type === 'energy' ? 'wkRewardEnergy' : 'wkRewardHints', { n: r.n });
       msgs.push(t('wkUnlockToast', { pic: themePics()[i], r: rTxt }));
     }
     if (st.frags >= Weekly.GOAL && !st.grand) {
       st.grand = true;
-      Profile.mutate((s) => { s.energy += Weekly.GRAND.energy; s.hints += Weekly.GRAND.hints; });
+      Profile.mutate((s) => { s.energy += Weekly.GRAND.energy; s.bottles += Weekly.GRAND.hints; });
       msgs.push(t('wkGrandToast', { e: Weekly.GRAND.energy, h: Weekly.GRAND.hints }));
     }
     this.flush();
@@ -1071,13 +1250,13 @@ function wkSvg(idx, th) {
 /* ====================== 终身档案:内存权威副本 + 串行 flush(Spike S1 验证模式) ====================== */
 const Profile = {
   key: 'sudoku_profile',
-  state: null,            // { energy, lastTs, wins, hints, alias, localId }
+  state: null,            // { energy, lastTs, wins, bottles, alias, localId }
   flushChain: Promise.resolve(),
   load(cb) {
     Store.get(this.key, (v) => {
       let s = null;
       if (v) { try { s = JSON.parse(v); } catch (e) {} }
-      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, hints: 3, alias: '', localId: '', sfx: true }, s || {});
+      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, bottles: 2, alias: '', localId: '', sfx: true }, s || {});
       // 非 Telegram 环境:稳定化名 + 每浏览器唯一 ID,生成一次后持久保留。
       if (!this.state.alias || !this.state.localId) this.mutate((st) => {
         if (!st.alias) st.alias = t('alias') + Math.floor(1000 + Math.random() * 9000);
@@ -1351,6 +1530,7 @@ const S = {
   capacity: 4,
   level: 1, sel: -1,     // sel = 当前选中的源管下标,-1 为未选
   moves: 0, undo: [],    // 步数与撤销栈(存局面 JSON 快照)
+  emptyBottleSlots: [], unlockedBottles: [], unlockingBottle: -1,
   par: null,             // 该关最短解步数(固定关有,生成关为 null)
   locked: false,         // 倒水动画期间锁输入
   remain: TIME_LIMIT, timeBudget: TIME_LIMIT, timerId: null,
@@ -1375,7 +1555,7 @@ function renderHome() {
   renderSfxBtn();
   document.getElementById('startLv').textContent = p.wins + 1;
   document.getElementById('stWins').textContent = p.wins;
-  document.getElementById('stHints').textContent = p.hints;
+  document.getElementById('stBottles').textContent = p.bottles;
   const u = tgUser();
   const name = myName();
   document.getElementById('profileName').textContent = name;
@@ -1533,34 +1713,55 @@ function renderLb() {
 /* ====================== 试管台渲染(倒水) ====================== */
 // Blender 渲出来的分层遮罩（单文件预览版会把这几行替换成内联 data URI）
 var MASK_URLS = [
-  './assets/tubes/mask-l1.png',
-  './assets/tubes/mask-l2.png',
-  './assets/tubes/mask-l3.png',
-  './assets/tubes/mask-l4.png',
+  './assets/bottles/mask-l1.png',
+  './assets/bottles/mask-l2.png',
+  './assets/bottles/mask-l3.png',
+  './assets/bottles/mask-l4.png',
 ];
 const tubesEl = document.getElementById('tubes');
 
 // 点击委托:点一根管选中 → 再点另一根倒水(与数独的 selectCell/inputDigit 同位)
 tubesEl.addEventListener('click', (ev) => {
+  const unlock = ev.target.closest && ev.target.closest('[data-unlock-bottle]');
+  if (unlock) {
+    unlockBottleWithAd(Number(unlock.getAttribute('data-unlock-bottle')));
+    return;
+  }
   const el = ev.target.closest && ev.target.closest('[data-tube]');
   if (el) tapTube(Number(el.getAttribute('data-tube')));
 });
 function tubeEl(i) { return tubesEl.querySelector('[data-tube="' + i + '"]'); }
+function lockedBottleIndexes() {
+  const open = new Set(S.unlockedBottles);
+  return S.emptyBottleSlots.filter((i) => !open.has(i));
+}
+function isBottleLocked(i) { return lockedBottleIndexes().includes(i); }
 
 function tubeHtml(i) {
-  const t = S.tubes[i], cap = S.capacity;
-  const full = t.length > 0 && WaterEngine.isDone(t, cap);
-  const cls = 'tube' + (i === S.sel ? ' sel' : '') + (full ? ' done' : '') + (t.length === 0 ? ' empty' : '');
+  const tube = S.tubes[i], cap = S.capacity;
+  const full = tube.length > 0 && WaterEngine.isDone(tube, cap);
+  const bottleLocked = isBottleLocked(i);
+  const cls = 'tube' + (i === S.sel ? ' sel' : '') + (full ? ' done' : '') +
+    (tube.length === 0 ? ' empty' : '') + (bottleLocked ? ' locked' : '');
   let layers = '';
-  for (let k = 0; k < t.length; k++) {
+  for (let k = 0; k < tube.length; k++) {
     // 第 k+1 层用 Blender 渲的同名遮罩定位形状,颜色由关卡调色板给
     const m = MASK_URLS[Math.min(k, MASK_URLS.length - 1)];
-    layers += '<div class="layer" style="background:' + WaterLevels.PALETTE[t[k]] +
-      ';-webkit-mask-image:url(' + m + ');mask-image:url(' + m + ')" data-color="' + t[k] + '"></div>';
+    layers += '<div class="layer" style="background:' + WaterLevels.PALETTE[tube[k]] +
+      ';-webkit-mask-image:url(' + m + ');mask-image:url(' + m + ')" data-color="' + tube[k] + '"></div>';
   }
   layers += '<div class="glass"></div>';
-  const kinds = t.filter((c, k) => t.indexOf(c) === k).length;
-  const tag = t.length === 0 ? '空管' : (full ? '完成' : kinds + ' 色');
+  if (bottleLocked) {
+    const busy = S.unlockingBottle === i;
+    layers += '<button class="bottle-unlock' + (busy ? ' busy' : '') +
+      '" type="button" data-unlock-bottle="' + i + '" aria-label="' +
+      t('bottleUnlockAria', { n: i + 1 }) + '"><span class="play">' +
+      (busy ? '…' : '▶') + '</span><small>' +
+      (busy ? t('bottleUnlocking') : t('bottleUnlockAd')) + '</small></button>';
+  }
+  const kinds = tube.filter((c, k) => tube.indexOf(c) === k).length;
+  const tag = bottleLocked ? t('bottleTagLocked') : (tube.length === 0 ? t('bottleTagEmpty') :
+    (full ? t('bottleTagDone') : t('bottleTagColors', { n: kinds })));
   return '<div class="slot' + (full ? ' done' : '') + '">' +
     '<div class="' + cls + '" data-tube="' + i + '">' + layers + '</div>' +
     '<span class="tag">' + tag + '</span></div>';
@@ -1569,7 +1770,9 @@ function tubeHtml(i) {
 function render() {
   if (!S.tubes) return;
   // 试管排布:≤5 根一行放下,再多就两行(每行最多 ceil(n/2) 根)
-  const perRow = S.tubes.length <= 5 ? S.tubes.length : Math.ceil(S.tubes.length / 2);
+  // 5 瓶固定采用 3+2 紧凑阵列；解锁只切状态，不新增或重排瓶位。
+  const perRow = S.tubes.length === 5 ? 3
+    : (S.tubes.length < 5 ? S.tubes.length : Math.ceil(S.tubes.length / 2));
   let html = '', idx = 0;
   while (idx < S.tubes.length) {
     html += '<div class="row">';
@@ -1586,7 +1789,7 @@ function render() {
   document.getElementById('hudMoves').textContent = S.moves;
   document.getElementById('btnUndo').classList.toggle('dim', S.undo.length === 0);
   renderTimer();
-  renderHintBtn();
+  renderBottleBtn();
 }
 
 function fmtTime(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
@@ -1594,13 +1797,14 @@ function renderTimer() {
   document.getElementById('hudTime').textContent = fmtTime(Math.max(0, S.remain));
   document.getElementById('hudTimerWrap').classList.toggle('low', S.remain <= 60);
 }
-// 提示按钮:终身库存;0 时显示 + 号(看广告 +3)
-function renderHintBtn() {
-  const btn = document.getElementById('btnHint');
-  const cnt = document.getElementById('hintCnt');
-  const h = Profile.state.hints;
-  cnt.textContent = h > 0 ? h : '+';
-  btn.classList.toggle('ad', h <= 0);
+// 解锁按钮:关卡空瓶已经全部显示;每次消耗 1 个终身库存解锁其中一根。
+function renderBottleBtn() {
+  const btn = document.getElementById('btnBottle');
+  const cnt = document.getElementById('bottleCnt');
+  const n = Profile.state.bottles;
+  cnt.textContent = n > 0 ? n : '+';
+  btn.classList.toggle('ad', n <= 0);
+  btn.classList.toggle('dim', lockedBottleIndexes().length === 0);
 }
 
 /* ====================== 倒计时 ====================== */
@@ -1655,6 +1859,7 @@ function shakeTube(i) {
 // 交互规则:点非空管选中 → 点目标管倒水;非法只抖动不计步;倒完判胜;无路可走给出口
 function tapTube(i) {
   if (S.finished || S.locked) return;
+  if (isBottleLocked(i)) { haptic('error'); shakeTube(i); toast(t('bottleLocked')); return; }
   if (S.sel === -1) {
     if (!S.tubes[i].length) { shakeTube(i); return; }   // 空管不能当源
     S.sel = i; haptic('light'); WaterAudio.play('pick'); render(); return;
@@ -1674,7 +1879,9 @@ function tapTube(i) {
     // 这一管刚好归位 → 给个上行三音（正反馈落在“完成”而不是每次倒水）
     if (WaterEngine.isDone(S.tubes[i], S.capacity) && S.tubes[i].length) WaterAudio.play('tubeDone');
     if (WaterEngine.isSolved(S.tubes, S.capacity)) return win();
-    if (!WaterEngine.legalMoves(S.tubes, S.capacity).length) stuck();
+    const playable = WaterEngine.legalMoves(S.tubes, S.capacity)
+      .filter((mv) => !isBottleLocked(mv[0]) && !isBottleLocked(mv[1]));
+    if (!playable.length) stuck();
   });
 }
 
@@ -1748,33 +1955,65 @@ document.getElementById('btnRestart').addEventListener('click', () => {
   haptic('light'); WaterAudio.play('undo'); render();
 });
 
-// 提示:终身库存,0 时点按钮 → 看广告 +3
-document.getElementById('btnHint').addEventListener('click', () => {
+function applyBottleUnlock(result, toastKey) {
+  if (!result) return false;
+  S.tubes = result.state;
+  S.unlockedBottles = result.unlocked;
+  S.sel = -1;
+  if (Profile.state.bottles !== result.stock) {
+    Profile.mutate((s) => { s.bottles = result.stock; });
+  }
+  haptic('success');
+  WaterAudio.play('tubeDone');
+  toast(t(toastKey));
+  render();
+  return true;
+}
+
+function unlockBottleWithAd(i) {
+  if (S.finished || S.locked || S.unlockingBottle >= 0 || !isBottleLocked(i)) return;
+  const resumeTimer = !!S.timerId;
+  stopTimer();
+  S.sel = -1;
+  S.unlockingBottle = i;
+  render();
+  showRewardedAd().then(() => {
+    applyBottleUnlock(WaterPowerups.unlockBottle(S.tubes, {
+      stock: Profile.state.bottles,
+      unlocked: S.unlockedBottles,
+      mode: 'ad',
+      target: i,
+    }), 'bottleUnlockedAd');
+  }, () => toast(t('adFail'))).then(() => {
+    S.unlockingBottle = -1;
+    if (resumeTimer && !S.finished) startTimer();
+    render();
+  });
+}
+
+// 加瓶道具:不再创建新瓶,而是解锁关卡已经显示的一根空瓶;库存为 0 时仍可看广告补充道具。
+document.getElementById('btnBottle').addEventListener('click', () => {
   if (S.finished) return;
-  if (Profile.state.hints <= 0) {
-    dialog(`<h2>${t('hintEmptyTitle')}</h2>
-      <p>${t('hintEmptyBody')}</p>
-      <button class="btn ad" id="dlgAdHint">${t('adHint')}</button>
+  if (!lockedBottleIndexes().length) { toast(t('bottleUsed')); return; }
+  if (Profile.state.bottles <= 0) {
+    dialog(`<h2>${t('bottleEmptyTitle')}</h2>
+      <p>${t('bottleEmptyBody')}</p>
+      <button class="btn ad" id="dlgAdBottle">${t('adBottle')}</button>
       <button class="btn ghost" id="dlgClose">${t('notNow')}</button>`);
-    overlay.querySelector('#dlgAdHint').addEventListener('click', () => {
+    overlay.querySelector('#dlgAdBottle').addEventListener('click', () => {
       showRewardedAd().then(() => {
-        Profile.mutate((s) => { s.hints += 3; });
-        closeDialog(); haptic('success'); toast(t('gotHints')); render();
+        Profile.mutate((s) => { s.bottles += 2; });
+        closeDialog(); haptic('success'); toast(t('gotBottles')); render();
       }).catch(() => toast(t('adFail')));
     });
     overlay.querySelector('#dlgClose').addEventListener('click', closeDialog);
     return;
   }
-  // 提示 = 求解器算出的下一步最优移动,高亮两根管后替玩家走掉这一步
-  const mv = WaterEngine.hint(S.tubes, { capacity: S.capacity, maxVisited: 120000 });
-  if (!mv) { toast(t('hintNone')); return; }
-  Profile.mutate((s) => { s.hints--; });
-  S.sel = -1; render();
-  const a = tubeEl(mv[0]), b = tubeEl(mv[1]);
-  if (a) a.classList.add('hint');
-  if (b) b.classList.add('hint');
-  haptic('success');
-  setTimeout(() => { S.sel = mv[0]; render(); tapTube(mv[1]); }, 300);
+  applyBottleUnlock(WaterPowerups.unlockBottle(S.tubes, {
+    stock: Profile.state.bottles,
+    unlocked: S.unlockedBottles,
+    mode: 'item',
+  }), 'bottleAdded');
 });
 
 document.getElementById('btnHome').addEventListener('click', () => { stopTimer(); show('home'); });
@@ -1834,7 +2073,7 @@ document.getElementById('btnStart').addEventListener('click', () => {
   newGame(Profile.state.wins + 1);
 });
 
-// 键盘快捷:1-9 选管/倒水(桌面调试友好),U 撤销,R 重开
+// 键盘快捷:1-9 选瓶/倒水(桌面调试友好),U 撤销,R 重开,B 加瓶
 document.addEventListener('keydown', (e) => {
   if (pages.game.hidden) return;
   if (e.key >= '1' && e.key <= '9') {
@@ -1842,6 +2081,7 @@ document.addEventListener('keydown', (e) => {
     if (S.tubes && i < S.tubes.length) tapTube(i);
   } else if (e.key === 'u' || e.key === 'U') document.getElementById('btnUndo').click();
   else if (e.key === 'r' || e.key === 'R') document.getElementById('btnRestart').click();
+  else if (e.key === 'b' || e.key === 'B') document.getElementById('btnBottle').click();
 });
 
 /* ====================== 对话框 ====================== */
@@ -1925,6 +2165,9 @@ function win() {
 /* ====================== 开局与恢复 ====================== */
 // 调试/回归用:按求解器最优解自动走完当前局(点击路径与真人一致,不走后门改状态)
 function autoSolve() {
+  // 自动化截图/回归入口不模拟付费流程：先开放关卡自带空瓶，再按真人点击路径解题。
+  S.unlockedBottles = S.emptyBottleSlots.slice();
+  render();
   const r = WaterEngine.solve(S.tubes, { capacity: S.capacity });
   if (!r.solvable) return;
   const seq = [];
@@ -1947,6 +2190,9 @@ function newGame(level) {
   const lv = WaterLevels.forLevel(level, WaterEngine.solve);
   S.tubes = lv.layout.map((t) => t.slice());
   S.start = lv.layout.map((t) => t.slice());   // 「重开」用的初始快照
+  S.emptyBottleSlots = WaterPowerups.emptyBottleIndexes(S.tubes);
+  S.unlockedBottles = [];
+  S.unlockingBottle = -1;
   S.capacity = lv.capacity;
   S.par = lv.minMoves;                          // 生成关为 null,界面就不显示「最少 N 步」
   S.level = level; S.sel = -1;
@@ -1962,6 +2208,23 @@ function newGame(level) {
   const z = Number(new URLSearchParams(location.search).get('zoom'));
   if (z > 0) document.documentElement.style.zoom = String(z);
 })();
+
+function emitWaterGt() {
+  const old = document.getElementById('watergt');
+  if (old) old.remove();
+  const gt = document.createElement('pre');
+  gt.id = 'watergt'; gt.hidden = true;
+  gt.textContent = JSON.stringify({
+    tubes: S.tubes.length,
+    empties: S.tubes.filter((tube) => tube.length === 0).length,
+    stock: Profile.state.bottles,
+    unlocked: S.unlockedBottles.length,
+    locked: lockedBottleIndexes().length,
+    undo: S.undo.length,
+    restartMatches: JSON.stringify(S.tubes) === JSON.stringify(S.start),
+  });
+  document.body.appendChild(gt);
+}
 
 function boot() {
   // issue #18:语言持久化对账。首屏已同步用 localStorage 镜像渲染(不闪);
@@ -1996,6 +2259,24 @@ function boot() {
       const auto = location.hash.match(/autostart(?:=(\d+))?/);
       if (auto) {
         newGame(auto[1] ? +auto[1] : Profile.state.wins + 1);
+        // 调试入口:#addbottle 通过真实按钮 click 消耗道具解锁空瓶；#restartafter 随后点真实重开按钮。
+        // #watergt 把最终状态写进隐藏 DOM，发布前 gate 可机械断言，不靠截图猜行为。
+        if (/[#&]addbottle/.test(location.hash)) setTimeout(() => {
+          document.getElementById('btnBottle').click();
+          if (/[#&]restartafter/.test(location.hash)) document.getElementById('btnRestart').click();
+          if (/[#&]watergt/.test(location.hash)) emitWaterGt();
+        }, 0);
+        // #adunlock 真实点击第一个瓶上广告按钮；演示广告 1.2s 完成后再写 ground truth。
+        if (/[#&]adunlock/.test(location.hash)) setTimeout(() => {
+          const adBtn = document.querySelector('[data-unlock-bottle]');
+          if (adBtn) adBtn.click();
+          setTimeout(() => {
+            if (/[#&]restartafter/.test(location.hash)) document.getElementById('btnRestart').click();
+            if (/[#&]watergt/.test(location.hash)) emitWaterGt();
+          }, 1500);
+        }, 0);
+        if (/[#&]watergt/.test(location.hash) &&
+            !/[#&](?:addbottle|adunlock)/.test(location.hash)) setTimeout(emitWaterGt, 0);
         // 调试入口:#wintest 立即进入胜利结算态(issue #22 插屏链路截图/自动化用)
         if (/[#&]wintest/.test(location.hash)) setTimeout(win, 0);
         // 调试入口:#autosolve 按求解器最优解自动走完本关(截图/回归验证用,正常玩法不受影响)

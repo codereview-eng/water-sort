@@ -1,0 +1,32 @@
+{
+  "state": "level-1-item-unlocked",
+  "surface": "Water Sort mobile single-file preview · item-unlocked bottle",
+  "kind": "single-file-mobile-e2e",
+  "frame_sha": "15b30d63ec45d440",
+  "mockup_sha": "6ab5b1e133175fb0bcb5c166eb3114c0ef1da18a9ce9b30457c5397fc064007a",
+  "judge_model_id": "gpt-5.6-sol",
+  "votes": 1,
+  "bar": 80,
+  "score": 90,
+  "pass": true,
+  "ground_truth": "GREEN",
+  "anti_cheat": {
+    "evidence_shipped": true,
+    "judge_instruction_gate": "Read GT JSON; verify GREEN, production emitters, artifact SHA-256, fixed five-bottle layout, and reference-image provenance; any mismatch sets fake=true.",
+    "verdict_fake_flag": false
+  },
+  "provenance": {
+    "kind": "single-file-mobile-e2e",
+    "real_gestures": true,
+    "fed_answer": false,
+    "scripted_mock": false,
+    "app": "water.html single-file preview in Headless Chrome at 780x1688",
+    "driver": "Headless Chrome opened water.html?zoom=2#autostart=1&addbottle; #addbottle invokes the real btnBottle.click()",
+    "seams": [
+      "btnBottle click handler",
+      "WaterPowerups.unlockBottle",
+      "render"
+    ]
+  },
+  "reason": "固定 5 瓶 3+2 阵列、道具解锁一个空瓶且库存降为 1、HUD 与底栏均成立；瓶盖与液体层次仍可继续精修。"
+}

@@ -1,0 +1,32 @@
+{
+  "state": "level-1-two-locked",
+  "surface": "Water Sort mobile single-file preview · two locked bottles",
+  "kind": "single-file-mobile-e2e",
+  "frame_sha": "d5660c6f1e3e838d",
+  "mockup_sha": "6ab5b1e133175fb0bcb5c166eb3114c0ef1da18a9ce9b30457c5397fc064007a",
+  "judge_model_id": "gpt-5.6-sol",
+  "votes": 1,
+  "bar": 80,
+  "score": 88,
+  "pass": true,
+  "ground_truth": "GREEN",
+  "anti_cheat": {
+    "evidence_shipped": true,
+    "judge_instruction_gate": "Read GT JSON; verify GREEN, production emitters, artifact SHA-256, fixed five-bottle layout, and reference-image provenance; any mismatch sets fake=true.",
+    "verdict_fake_flag": false
+  },
+  "provenance": {
+    "kind": "single-file-mobile-e2e",
+    "real_gestures": true,
+    "fed_answer": false,
+    "scripted_mock": false,
+    "app": "water.html single-file preview in Headless Chrome at 780x1688",
+    "driver": "Headless Chrome opened water.html?zoom=2#autostart=1",
+    "seams": [
+      "newGame",
+      "tubeHtml",
+      "render"
+    ]
+  },
+  "reason": "固定 5 瓶 3+2 阵列、两根广告锁瓶、完整 HUD 与底栏均成立；深色立体卡通感通过，但瓶体仍略偏透明玻璃质感。"
+}

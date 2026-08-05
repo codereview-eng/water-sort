@@ -34,29 +34,58 @@
   width:100%; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:18px; padding:10px 0 4px;
 }
+.tubes{position:relative}   /* 水流/水花按这里的坐标系绝对定位 */
 .tubes .row{display:flex; justify-content:center; align-items:flex-start; gap:14px}
-.slot{display:flex; flex-direction:column; align-items:center; gap:6px}
-.tube{
-  width:52px; height:150px; position:relative; cursor:pointer;
-  border:2px solid var(--edge-strong); border-top:2px solid rgba(255,255,255,.10);
-  border-radius:6px 6px 26px 26px; overflow:hidden;
-  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
-  display:flex; flex-direction:column-reverse;
-  transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+/* 倾倒:源管抬到目标管口上方并侧倾,倾斜轴放在管底,像真的用手拿着倒 */
+.tube.pouring{z-index:6; transition:transform .22s cubic-bezier(.34,1.15,.64,1)}
+.tube{transform-origin:50% 88%}
+/* 水柱:Blender 渲的白色液柱做遮罩,颜色由倒出的液体决定 */
+.stream{
+  position:absolute; width:22px; z-index:5; pointer-events:none;
+  -webkit-mask-image:url(./assets/tubes/pour-stream.png); mask-image:url(./assets/tubes/pour-stream.png);
+  -webkit-mask-size:100% 100%; mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+  transform-origin:top center; animation:streamIn .16s ease-out;
 }
-.tube::after{content:"";position:absolute;left:6px;top:7px;bottom:12px;width:5px;border-radius:5px;
-  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,0));pointer-events:none}
-.tube.empty{border-color:#4B5F53}
-.tube.sel{transform:translateY(-12px);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 18px rgba(127,194,155,.18)}
-.tube.done{border-color:rgba(127,194,155,.55)}
-.tube.hint{border-color:var(--podium);box-shadow:0 0 0 1px var(--podium)}
+@keyframes streamIn{from{transform:scaleY(.08);opacity:.35}to{transform:scaleY(1);opacity:1}}
+.splash{
+  position:absolute; width:30px; height:19px; z-index:5; pointer-events:none;
+  -webkit-mask-image:url(./assets/tubes/pour-splash.png); mask-image:url(./assets/tubes/pour-splash.png);
+  -webkit-mask-size:100% 100%; mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+  animation:splashPop .36s ease-out forwards;
+}
+@keyframes splashPop{0%{transform:translateY(4px) scale(.45);opacity:0}
+  38%{transform:translateY(0) scale(1);opacity:.95}
+  100%{transform:translateY(-3px) scale(1.18);opacity:0}}
+.slot{display:flex; flex-direction:column; align-items:center; gap:6px}
+/* 试管本体由 Blender 渲染的素材承担（玻璃折射/厚度/圆底/管口都是真渲染出来的，
+   不再用 CSS 描边模拟）；液体 = 纯色块 + 该层遮罩，因此任意配色都能复用同一套素材。 */
+.tube{
+  width:56px; aspect-ratio:240/660; position:relative; cursor:pointer;
+  transition:transform .16s ease, filter .16s ease;
+}
+.tube .layer{
+  position:absolute; inset:0; z-index:1;
+  -webkit-mask-size:100% 100%; mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+  transition:opacity .2s ease;
+}
+/* 明暗底图叠在色块上（被同一遮罩裁到该层形状内），让纯色块有玻璃里的立体感 */
+.tube .layer::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:url(./assets/tubes/tube-shade.png) center/100% 100% no-repeat;
+  mix-blend-mode:multiply; opacity:.55;
+}
+.tube .glass{
+  position:absolute; inset:0; z-index:2; pointer-events:none;
+  background:url(./assets/tubes/tube-empty.png) center/100% 100% no-repeat;
+}
+.tube.sel{transform:translateY(-12px);filter:drop-shadow(0 8px 14px rgba(127,194,155,.45))}
+.tube.done{filter:drop-shadow(0 0 6px rgba(127,194,155,.55))}
+.tube.hint{filter:drop-shadow(0 0 7px rgba(212,179,106,.85))}
 .tube.shake{animation:tubeshake .32s}
 @keyframes tubeshake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
-.liq{width:100%;flex:none;position:relative;transition:height .2s ease}
-.liq.surface::before{content:"";position:absolute;left:0;right:0;top:-3px;height:6px;border-radius:50%;
-  background:inherit;filter:brightness(1.18)}
-.liq.top-seg::after{content:"";position:absolute;inset:0;
-  background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 60%)}
 .slot .tag{font-family:ui-monospace,"SF Mono",monospace;font-size:10px;color:var(--ink-4);line-height:1}
 .slot.done .tag{color:var(--accent)}
 .parhint{width:100%;text-align:center;font-size:11.5px;color:var(--ink-3);margin-top:2px}
@@ -1450,6 +1479,13 @@ function renderLb() {
 }
 
 /* ====================== 试管台渲染(倒水) ====================== */
+// Blender 渲出来的分层遮罩（单文件预览版会把这几行替换成内联 data URI）
+var MASK_URLS = [
+  './assets/tubes/mask-l1.png',
+  './assets/tubes/mask-l2.png',
+  './assets/tubes/mask-l3.png',
+  './assets/tubes/mask-l4.png',
+];
 const tubesEl = document.getElementById('tubes');
 
 // 点击委托:点一根管选中 → 再点另一根倒水(与数独的 selectCell/inputDigit 同位)
@@ -1463,15 +1499,14 @@ function tubeHtml(i) {
   const t = S.tubes[i], cap = S.capacity;
   const full = t.length > 0 && WaterEngine.isDone(t, cap);
   const cls = 'tube' + (i === S.sel ? ' sel' : '') + (full ? ' done' : '') + (t.length === 0 ? ' empty' : '');
-  const run = WaterEngine.topRun(t);
   let layers = '';
   for (let k = 0; k < t.length; k++) {
-    const topSeg = k >= t.length - run;        // 顶部同色段:选中时整段一起走
-    const surface = k === t.length - 1;        // 最上层:画液面弧线
-    layers += '<div class="liq' + (topSeg ? ' top-seg' : '') + (surface ? ' surface' : '') +
-      '" style="height:' + (100 / cap) + '%;background:' + WaterLevels.PALETTE[t[k]] +
-      '" data-color="' + t[k] + '"></div>';
+    // 第 k+1 层用 Blender 渲的同名遮罩定位形状,颜色由关卡调色板给
+    const m = MASK_URLS[Math.min(k, MASK_URLS.length - 1)];
+    layers += '<div class="layer" style="background:' + WaterLevels.PALETTE[t[k]] +
+      ';-webkit-mask-image:url(' + m + ');mask-image:url(' + m + ')" data-color="' + t[k] + '"></div>';
   }
+  layers += '<div class="glass"></div>';
   const kinds = t.filter((c, k) => t.indexOf(c) === k).length;
   const tag = t.length === 0 ? '空管' : (full ? '完成' : kinds + ' 色');
   return '<div class="slot' + (full ? ' done' : '') + '">' +
@@ -1573,14 +1608,68 @@ function tapTube(i) {
   const res = WaterEngine.pour(S.tubes, S.sel, i, S.capacity);
   if (!res) { haptic('error'); shakeTube(i); return; }
 
+  const from = S.sel;
   S.undo.push(JSON.stringify(S.tubes));
-  S.tubes = res.state; S.moves++; S.sel = -1;
-  S.locked = true; haptic('light'); render();
-  setTimeout(() => {
-    S.locked = false;
+  S.locked = true; haptic('light');
+  // 先播倒水动画(期间不重绘,否则动画节点会被 innerHTML 冲掉),播完再落盘新局面
+  animatePour(from, i, res.color, () => {
+    S.tubes = res.state; S.moves++; S.sel = -1; S.locked = false;
+    render();
     if (WaterEngine.isSolved(S.tubes, S.capacity)) return win();
     if (!WaterEngine.legalMoves(S.tubes, S.capacity).length) stuck();
-  }, 220);
+  });
+}
+
+// 倾倒动画:源管抬起侧倾 → 水柱落进目标管 → 落点水花 → 源管回位
+function animatePour(from, to, color, done) {
+  const src = tubeEl(from), dst = tubeEl(to);
+  if (!src || !dst) { done(); return; }
+  // 坐标一律用布局坐标(offsetLeft/Top,相对 .tubes)。
+  // 不能用 getBoundingClientRect:截图/缩放场景下页面带 zoom 时它返回的是缩放后的视口坐标,
+  // 而 transform 的 px 在缩放前的坐标系里,直接相减会把位移放大一倍——源管会飞出屏幕(实测踩过)。
+  const ax = src.offsetLeft, ay = src.offsetTop, aw = src.offsetWidth, ah = src.offsetHeight;
+  const bx = dst.offsetLeft, by = dst.offsetTop, bw = dst.offsetWidth, bh = dst.offsetHeight;
+  const dir = (bx + bw / 2) >= (ax + aw / 2) ? 1 : -1;
+
+  // 倾角要超过 90° 管口才真的朝下倒（58° 只是把管子斜过来，口还朝上，水等于凭空往上冒）。
+  // 位移不再拍脑袋给经验值：按旋转矩阵反解 dx/dy，让「转完之后的管口」正好落在目标管口上方。
+  const deg = 105 * dir;
+  const th = deg * Math.PI / 180;
+  const arm = ah * 0.88;                       // 管口到 transform-origin(50% 88%) 的距离
+  const dx = (bx + bw / 2) - (ax + aw / 2) - arm * Math.sin(th);
+  const dy = (by - 18) - ay - arm + arm * Math.cos(th);
+  src.classList.add('pouring');
+  src.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + deg + 'deg)';
+
+  // 目标管当前液面(层数越多液面越高),水柱就落到这里
+  const filled = S.tubes[to].length / S.capacity;
+  // 水柱要从「倾斜后的管口」出来,不能凭空吊在半空:
+  // 管口原本在 (中心, 顶边),绕 transform-origin(50% 88%) 转 θ 后按旋转矩阵求新位置。
+  const mouthX = ax + aw / 2 + dx + arm * Math.sin(th);
+  const mouthY = ay + arm + dy - arm * Math.cos(th);
+  const surfaceY = by + bh * (0.07 + (1 - filled) * 0.86);
+  const streamTop = Math.min(mouthY + 2, surfaceY - 14);
+  const streamX = (mouthX + bx + bw / 2) / 2;  // 管口与落点之间,视觉上像顺着流下去
+  const stream = document.createElement('div');
+  stream.className = 'stream';
+  stream.style.cssText = 'left:' + (streamX - 11) + 'px;top:' + streamTop +
+    'px;height:' + Math.max(16, surfaceY - streamTop) + 'px;background:' + color;
+  const splash = document.createElement('div');
+  splash.className = 'splash';
+  splash.style.cssText = 'left:' + (bx + bw / 2 - 15) + 'px;top:' + (surfaceY - 12) +
+    'px;background:' + color;
+
+  setTimeout(() => { tubesEl.appendChild(stream); tubesEl.appendChild(splash); }, 170);
+  // 调试入口:#pourhold 把画面停在「正在倒」那一刻(headless 截图抓不到 CSS 动画帧,用它取证)
+  if (/[#&]pourhold/.test(location.hash)) {
+    setTimeout(() => { splash.style.animation = 'none'; splash.style.opacity = '.95'; }, 260);
+    return;
+  }
+  setTimeout(() => {
+    stream.remove(); splash.remove();
+    src.style.transform = '';
+    setTimeout(() => { src.classList.remove('pouring'); done(); }, 150);
+  }, 470);
 }
 
 document.getElementById('btnUndo').addEventListener('click', () => {
@@ -1623,7 +1712,7 @@ document.getElementById('btnHint').addEventListener('click', () => {
   if (a) a.classList.add('hint');
   if (b) b.classList.add('hint');
   haptic('success');
-  setTimeout(() => { S.sel = mv[0]; tapTube(mv[1]); }, 280);
+  setTimeout(() => { S.sel = mv[0]; render(); tapTube(mv[1]); }, 300);
 });
 
 document.getElementById('btnHome').addEventListener('click', () => { stopTimer(); show('home'); });

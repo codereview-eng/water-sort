@@ -488,6 +488,16 @@ body:has(#gamePage:not([hidden])){
 }
 .toast.show{opacity:1}
 @media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+
+  /* ---------- 真实瓶口(#1):剪掉素材顶部的白盖,叠画敲口玻璃口沿+内孔 ---------- */
+  .tube .glass{clip-path:inset(11.6% 0 0 0)}
+  .tube .mouth{position:absolute; left:50%; top:2.4%; width:56%; height:11.4%; transform:translateX(-50%); z-index:3; pointer-events:none}
+  .tube .mouth .neck{position:absolute; inset:24% 5% 0; border-radius:14% 14% 30% 30%/20% 20% 48% 48%;
+    background:linear-gradient(102deg, rgba(191,206,230,.9) 3%, rgba(255,255,255,.96) 20%, rgba(226,235,248,.6) 46%, rgba(172,189,218,.55) 72%, rgba(238,244,252,.92) 97%);
+    box-shadow:inset 0 -3px 5px rgba(35,53,87,.3), inset 0 2px 2px rgba(255,255,255,.8)}
+  .tube .mouth .rim{position:absolute; left:0; right:0; top:0; height:52%; border-radius:50%;
+    background:radial-gradient(ellipse 50% 50% at 50% 58%, rgba(22,32,54,.94) 0 44%, rgba(66,82,112,.9) 52%, rgba(255,255,255,.94) 63%, rgba(206,219,240,.96) 80%, rgba(246,249,254,.98) 100%);
+    box-shadow:0 1px 2px rgba(9,13,25,.4), inset 0 1px 1px rgba(255,255,255,.9)}
 </style>
 </head>
 <body>
@@ -593,7 +603,7 @@ body:has(#gamePage:not([hidden])){
     </div>
     <div class="tubes" id="tubes" aria-label="瓶架"></div>
     <div class="tools">
-      <button class="tool" id="btnUndo"><span class="ic">↺</span>撤销</button>
+      <button class="tool" id="btnUndo"><span class="ic">↺</span>撤销 <span class="cnt" id="undoCnt"></span></button>
       <button class="tool" id="btnRestart"><span class="ic">⟳</span>重开</button>
       <button class="tool" id="btnBottle"><span class="ic bottle-plus"></span>加一瓶 <span class="cnt" id="bottleCnt">2</span></button>
     </div>
@@ -804,7 +814,8 @@ const I18N = {
     leaderboard: '🏆 排行榜', wins: '已通关', bottlesItem: '加瓶道具',
     back: '‹ 返回', home: '‹ 首页',
     lvlPre: '第 ', lvlPost: ' 关', lvlN: '第 {n} 关', remain: '剩余 ', errors: '错误 ',
-    boardAria: '瓶架', moves: '步数 ', undoBtn: '撤销', restartBtn: '重开', addBottleBtn: '解锁空瓶',
+    boardAria: '瓶架', moves: '步数 ', undoBtn: '撤销', restartBtn: '重开',
+    undosItem: '撤销道具', adUndo: '看一段广告，获得 <b style="color:var(--podium)">+{n}</b> 个撤销道具（永久保留）。', gotUndo: '+{n} 撤销道具', undoEmptyTitle: '撤销道具用完了', addBottleBtn: '解锁空瓶',
     diffBeginner: '新手', diffEasy: '简单', diffMedium: '中等', diffHard: '困难',
     adDemo: '演示模式:模拟广告播放中…', adFail: '广告未完成,未发放奖励',
     alias: '玩家', me: '我', lbMe: '(我)', lbLoading: '加载中…',
@@ -866,7 +877,8 @@ const I18N = {
     leaderboard: '🏆 Leaderboard', wins: 'Cleared', bottlesItem: 'Extra bottles',
     back: '‹ Back', home: '‹ Home',
     lvlPre: 'Level ', lvlPost: '', lvlN: 'Lv {n}', remain: 'Time ', errors: 'Errors ',
-    boardAria: 'Bottle rack', moves: 'Moves ', undoBtn: 'Undo', restartBtn: 'Restart', addBottleBtn: 'Unlock bottle',
+    boardAria: 'Bottle rack', moves: 'Moves ', undoBtn: 'Undo', restartBtn: 'Restart',
+    undosItem: 'Undo items', adUndo: 'Watch a short ad to get <b style="color:var(--podium)">+{n}</b> undo items (yours to keep).', gotUndo: '+{n} undo items', undoEmptyTitle: 'Out of undo items', addBottleBtn: 'Unlock bottle',
     diffBeginner: 'Beginner', diffEasy: 'Easy', diffMedium: 'Medium', diffHard: 'Hard',
     adDemo: 'Demo mode: simulating an ad…', adFail: 'Ad not completed — no reward',
     alias: 'Player ', me: 'Me', lbMe: ' (me)', lbLoading: 'Loading…',
@@ -965,7 +977,7 @@ function applyStaticI18n() {
   q('#hudTimerWrap').innerHTML = t('remain') + '<b class="mono" id="hudTime">10:00</b>';
   q('.hud .err').innerHTML = t('moves') + '<b class="mono" id="hudMoves">0</b>';
   q('#tubes').setAttribute('aria-label', t('boardAria'));
-  q('#btnUndo').innerHTML = '<span class="ic">\u21ba</span>' + t('undoBtn');
+  q('#btnUndo').innerHTML = '<span class="ic">\u21ba</span>' + t('undoBtn') + ' <span class="cnt" id="undoCnt"></span>';
   q('#btnRestart').innerHTML = '<span class="ic">\u27f3</span>' + t('restartBtn');
   q('#btnBottle').innerHTML = '<span class="ic bottle-plus"></span>' + t('addBottleBtn') + ' <span class="cnt" id="bottleCnt">2</span>';
   q('#sfxLabel').textContent = t('sfxLabel');
@@ -1256,7 +1268,7 @@ const Profile = {
     Store.get(this.key, (v) => {
       let s = null;
       if (v) { try { s = JSON.parse(v); } catch (e) {} }
-      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, bottles: 2, alias: '', localId: '', sfx: true }, s || {});
+      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, bottles: 2, undos: 3, alias: '', localId: '', sfx: true }, s || {});
       // 非 Telegram 环境:稳定化名 + 每浏览器唯一 ID,生成一次后持久保留。
       if (!this.state.alias || !this.state.localId) this.mutate((st) => {
         if (!st.alias) st.alias = t('alias') + Math.floor(1000 + Math.random() * 9000);
@@ -1753,7 +1765,7 @@ function tubeHtml(i) {
     layers += '<div class="layer" style="background:' + WaterLevels.PALETTE[tube[k]] +
       ';-webkit-mask-image:url(' + m + ');mask-image:url(' + m + ')" data-color="' + tube[k] + '"></div>';
   }
-  layers += '<div class="glass"></div>';
+  layers += '<div class="glass"></div><div class="mouth"><div class="neck"></div><div class="rim"></div></div>';   // 真实瓶口:玻璃口沿+内孔
   if (bottleLocked) {
     const busy = S.unlockingBottle === i;
     layers += '<button class="bottle-unlock' + (busy ? ' busy' : '') +
@@ -1790,7 +1802,7 @@ function render() {
   tubesEl.innerHTML = html;
   document.getElementById('hudLv').textContent = S.level;
   document.getElementById('hudMoves').textContent = S.moves;
-  document.getElementById('btnUndo').classList.toggle('dim', S.undo.length === 0);
+  renderUndoBtn();
   renderTimer();
   renderBottleBtn();
 }
@@ -1801,6 +1813,17 @@ function renderTimer() {
   document.getElementById('hudTimerWrap').classList.toggle('low', S.remain <= 60);
 }
 // 解锁按钮:关卡空瓶已经全部显示;每次消耗 1 个终身库存解锁其中一根。
+// 撤销=道具(与「加一瓶」同体系):持久库存,新玩家送 3 个,用完看广告补充
+const UNDO_AD_GRANT = 2;
+function renderUndoBtn() {
+  const btn = document.getElementById('btnUndo');
+  const cnt = document.getElementById('undoCnt');
+  if (!btn || !cnt || !Profile.state) return;
+  const n = Number(Profile.state.undos) || 0;
+  cnt.textContent = n > 0 ? '\u00d7' + n : 'AD';
+  btn.classList.toggle('ad', n <= 0);
+  btn.classList.toggle('dim', n > 0 && S.undo.length === 0);
+}
 function renderBottleBtn() {
   const btn = document.getElementById('btnBottle');
   const cnt = document.getElementById('bottleCnt');
@@ -1869,7 +1892,7 @@ function tapTube(i) {
   }
   if (S.sel === i) { S.sel = -1; render(); return; }    // 再点一次取消选中
 
-  const res = WaterEngine.pour(S.tubes, S.sel, i, S.capacity);
+  const res = WaterEngine.pour(S.tubes, S.sel, i, S.capacity, 1);   // 一次只倒一格
   if (!res) { haptic('error'); WaterAudio.play('illegal'); shakeTube(i); return; }
 
   const from = S.sel;
@@ -1888,68 +1911,83 @@ function tapTube(i) {
   });
 }
 
-// 倾倒动画:源管抬起侧倾 → 水柱落进目标管 → 落点水花 → 源管回位
+// 倾倒动画(#3):源管飞到目标管口上方侧倾、水柱垂直落进目标管、落点水花、源管回位
 function animatePour(from, to, color, amount, done) {
   const src = tubeEl(from), dst = tubeEl(to);
   if (!src || !dst) { done(); return; }
-  // 坐标一律用布局坐标(offsetLeft/Top,相对 .tubes)。
-  // 不能用 getBoundingClientRect:截图/缩放场景下页面带 zoom 时它返回的是缩放后的视口坐标,
-  // 而 transform 的 px 在缩放前的坐标系里,直接相减会把位移放大一倍——源管会飞出屏幕(实测踩过)。
-  const ax = src.offsetLeft, ay = src.offsetTop, aw = src.offsetWidth, ah = src.offsetHeight;
-  const bx = dst.offsetLeft, by = dst.offsetTop, bw = dst.offsetWidth, bh = dst.offsetHeight;
+  // 坐标统一用「相对 .tubes 的视觉坐标」:getBoundingClientRect 差值再除以缩放系数。
+  // 不能用 offsetLeft/Top:#gamePage 的 .row 有 position:relative,offsetParent 是行而不是 .tubes,
+  // 跨行倒水时 dx/dy 按「行内坐标」算,源管直接飞出棋盘(实测踩过);rect 差值还顺带吃掉行的 translateY。
+  // 除以 zoom:?zoom=2 截图场景 rect 是缩放后视口坐标,而 transform 的 px 在缩放前坐标系。
+  const tubesRect = tubesEl.getBoundingClientRect();
+  const zoom = tubesEl.offsetWidth ? (tubesRect.width / tubesEl.offsetWidth) : 1;
+  const sr = src.getBoundingClientRect(), dr = dst.getBoundingClientRect();
+  const ax = (sr.left - tubesRect.left) / zoom, ay = (sr.top - tubesRect.top) / zoom;
+  const aw = sr.width / zoom, ah = sr.height / zoom;
+  const bx = (dr.left - tubesRect.left) / zoom, by = (dr.top - tubesRect.top) / zoom;
+  const bw = dr.width / zoom;
   const dir = (bx + bw / 2) >= (ax + aw / 2) ? 1 : -1;
-
-  // 倾角要超过 90° 管口才真的朝下倒（58° 只是把管子斜过来，口还朝上，水等于凭空往上冒）。
-  // 位移不再拍脑袋给经验值：按旋转矩阵反解 dx/dy，让「转完之后的管口」正好落在目标管口上方。
+  // 倾角要超过 90° 管口才真的朝下倒(58°只是把管子斜过来,口还朝上,水等于凭空往上冒)。
   const deg = 105 * dir;
   const th = deg * Math.PI / 180;
-  const arm = ah * 0.88;                       // 管口到 transform-origin(50% 88%) 的距离
+  const arm = ah * 0.88;   // 管口到 transform-origin(50% 88%) 的距离
+  // 位移按旋转矩阵反解 dx/dy:让「转完之后的管口」正好悬在目标管口上方。
   const dx = (bx + bw / 2) - (ax + aw / 2) - arm * Math.sin(th);
   const dy = (by - 18) - ay - arm + arm * Math.cos(th);
   src.classList.add('pouring');
   src.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + deg + 'deg)';
-  WaterAudio.play('pour', { amount: amount || 1 });   // 倒得越多，水声越久、气泡越多
-
-  // 目标管当前液面(层数越多液面越高),水柱就落到这里
-  const filled = S.tubes[to].length / S.capacity;
-  // 水柱要从「倾斜后的管口」出来,不能凭空吊在半空:
-  // 管口原本在 (中心, 顶边),绕 transform-origin(50% 88%) 转 θ 后按旋转矩阵求新位置。
-  const mouthX = ax + aw / 2 + dx + arm * Math.sin(th);
+  WaterAudio.play('pour', { amount: amount || 1 });
+  // 管口转完后的坐标(旋转矩阵):水柱从管口出发,垂直落到目标管当前液面。
   const mouthY = ay + arm + dy - arm * Math.cos(th);
-  const surfaceY = by + bh * (0.07 + (1 - filled) * 0.86);
+  const filled = S.tubes[to].length / S.capacity;
+  const surfaceY = by + ah * (0.07 + (1 - filled) * 0.86);
   const streamTop = Math.min(mouthY + 2, surfaceY - 14);
-  const streamX = (mouthX + bx + bw / 2) / 2;  // 管口与落点之间,视觉上像顺着流下去
+  const streamX = bx + bw / 2;
   const stream = document.createElement('div');
   stream.className = 'stream';
-  stream.style.cssText = 'left:' + (streamX - 11) + 'px;top:' + streamTop +
-    'px;height:' + Math.max(16, surfaceY - streamTop) + 'px;background:' + color;
+  stream.style.cssText = 'left:' + (streamX - 11) + 'px;top:' + streamTop + 'px;height:' + Math.max(16, surfaceY - streamTop) + 'px;background:' + color;
   const splash = document.createElement('div');
   splash.className = 'splash';
-  splash.style.cssText = 'left:' + (bx + bw / 2 - 15) + 'px;top:' + (surfaceY - 12) +
-    'px;background:' + color;
-
-  setTimeout(() => {
-    tubesEl.appendChild(stream); tubesEl.appendChild(splash);
-    WaterAudio.play('splash');
-  }, 170);
+  splash.style.cssText = 'left:' + (bx + bw / 2 - 15) + 'px;top:' + (surfaceY - 12) + 'px;background:' + color;
+  tubesEl.appendChild(stream); tubesEl.appendChild(splash);
+  setTimeout(() => { splash.style.animation = 'none'; splash.style.opacity = '.95'; }, 260);
   // 调试入口:#pourhold 把画面停在「正在倒」那一刻(headless 截图抓不到 CSS 动画帧,用它取证)
-  if (/[#&]pourhold/.test(location.hash)) {
-    setTimeout(() => { splash.style.animation = 'none'; splash.style.opacity = '.95'; }, 260);
-    return;
-  }
+  if (/[#&]pourhold/.test(location.hash)) { return; }
+  // 一次一格玩法下倒水更频繁,节奏比整段倒时更紧凑
   setTimeout(() => {
     stream.remove(); splash.remove();
-    src.style.transform = '';
-    setTimeout(() => { src.classList.remove('pouring'); done(); }, 150);
-  }, 470);
+    src.classList.remove('pouring'); src.style.transform = '';
+    setTimeout(done, 100);
+  }, 420);
 }
 
 document.getElementById('btnUndo').addEventListener('click', () => {
-  if (S.finished || S.locked || !S.undo.length) return;
+  if (S.finished || S.locked) return;
+  const stock = Profile.state ? (Number(Profile.state.undos) || 0) : 0;
+  if (stock <= 0) { adRefillUndo(); return; }   // 道具用完 → 看广告补充
+  if (!S.undo.length) return;
+  Profile.mutate((ps) => { ps.undos = Math.max(0, (Number(ps.undos) || 0) - 1); });
   S.tubes = JSON.parse(S.undo.pop());
   S.moves = Math.max(0, S.moves - 1); S.sel = -1;
   haptic('light'); WaterAudio.play('undo'); render();
 });
+// 撤销道具用完 → 与解锁空瓶同一条广告通道补充库存(永久保留)
+let refillingUndo = false;
+function adRefillUndo() {
+  if (refillingUndo) return;
+  refillingUndo = true;
+  const resumeTimer = !!S.timerId;
+  stopTimer();
+  showRewardedAd().then(() => {
+    Profile.mutate((ps) => { ps.undos = (Number(ps.undos) || 0) + UNDO_AD_GRANT; });
+    toast(t('gotUndo').replace('{n}', UNDO_AD_GRANT));
+    WaterAudio.play('tubeDone');
+  }).catch(() => { toast(t('adFail')); }).then(() => {
+    refillingUndo = false;
+    if (resumeTimer && !S.finished) startTimer();
+    render();
+  });
+}
 
 document.getElementById('btnRestart').addEventListener('click', () => {
   if (S.finished || S.locked) return;
@@ -2176,7 +2214,13 @@ function autoSolve() {
   const r = WaterEngine.solve(S.tubes, { capacity: S.capacity });
   if (!r.solvable) return;
   const seq = [];
-  for (const mv of r.moves) seq.push(mv[0], mv[1]);
+  let sim = S.tubes.map((tt) => tt.slice());   // 一次一格玩法:每个整段最优移动要点 amount 次
+      for (const mv of r.moves) {
+        const st = WaterEngine.pour(sim, mv[0], mv[1], S.capacity);
+        const amt = st ? st.amount : 1;
+        for (let k = 0; k < amt; k += 1) seq.push(mv[0], mv[1]);
+        if (st) sim = st.state;
+      }
   // 必须等上一步倒水动画放完再点下一下:动画期间 tapTube 会被 S.locked 挡掉,
   // 固定间隔点击会被吞掉一次,后面整条序列错位(源/目标互换,于是出现非法移动)。
   (function step(n) {
@@ -2202,7 +2246,20 @@ function newGame(level) {
   S.unlockedBottles = [];
   S.unlockingBottle = -1;
   S.capacity = lv.capacity;
-  S.par = lv.minMoves;                          // 生成关为 null,界面就不显示「最少 N 步」
+  S.par = (() => {   // 一次一格玩法:把求解器整段最优路径换算成格数;生成关(minMoves=null)仍不显示
+    if (lv.minMoves == null) return null;
+    try {
+      const r = WaterEngine.solve(S.start, { capacity: S.capacity });
+      if (!r.solvable) return lv.minMoves;
+      let sim = S.start.map((tt) => tt.slice()), units = 0;
+      for (const mv of r.moves) {
+        const pr = WaterEngine.pour(sim, mv[0], mv[1], S.capacity);
+        if (!pr) return lv.minMoves;
+        units += pr.amount; sim = pr.state;
+      }
+      return units;
+    } catch (e) { return lv.minMoves; }
+  })();
   S.level = level; S.sel = -1;
   S.moves = 0; S.undo = []; S.locked = false;
   S.remain = TIME_LIMIT; S.timeBudget = TIME_LIMIT;
@@ -2228,7 +2285,7 @@ function emitWaterGt() {
     stock: Profile.state.bottles,
     unlocked: S.unlockedBottles.length,
     locked: lockedBottleIndexes().length,
-    undo: S.undo.length,
+    undo: S.undo.length, undoItems: Profile.state ? (Number(Profile.state.undos) || 0) : -1,
     restartMatches: JSON.stringify(S.tubes) === JSON.stringify(S.start),
   });
   document.body.appendChild(gt);

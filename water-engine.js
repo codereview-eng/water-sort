@@ -49,11 +49,13 @@
     Math.min(topRun(state[i]), (capacity || CAPACITY) - state[j].length);
 
   // 纯函数：不改入参；非法移动返回 null
-  function pour(state, i, j, capacity) {
+  function pour(state, i, j, capacity, maxAmount) {
     const cap = capacity || CAPACITY;
     if (!canMove(state, i, j, cap)) return null;
     const next = clone(state);
-    const amount = pourAmount(next, i, j, cap);
+    const room = pourAmount(next, i, j, cap);
+    // maxAmount(可选): 单次最多倒几格——玩法侧传 1 实现「每次只倒一格」;不传保持整段语义(求解器/提示用)
+    const amount = Number.isInteger(maxAmount) && maxAmount > 0 ? Math.min(room, maxAmount) : room;
     const color = top(next[i]);
     for (let k = 0; k < amount; k += 1) next[j].push(next[i].pop());
     return { state: next, amount, color };

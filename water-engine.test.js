@@ -100,3 +100,17 @@ test('死局：4 色满管零空管，无合法移动且被判不可解', () => 
   assert.strictEqual(solve(stuck).solvable, false);
   assert.strictEqual(CAPACITY, 4);
 });
+
+test('pour: maxAmount=1 一次只倒一格,重复倒可清空同色段;不传保持整段', () => {
+  const s = [['g', 'r', 'r'], ['r'], []];
+  const r1 = pour(s, 0, 1, 4, 1);
+  assert.strictEqual(r1.amount, 1);
+  assert.deepStrictEqual(r1.state[0], ['g', 'r']);
+  assert.deepStrictEqual(r1.state[1], ['r', 'r']);
+  const r2 = pour(r1.state, 0, 1, 4, 1);
+  assert.strictEqual(r2.amount, 1);
+  assert.deepStrictEqual(r2.state[0], ['g']);
+  assert.deepStrictEqual(r2.state[1], ['r', 'r', 'r']);
+  assert.strictEqual(pour(s, 0, 1, 4).amount, 2);
+  assert.deepStrictEqual(s, [['g', 'r', 'r'], ['r'], []]);   // 纯函数不改入参
+});

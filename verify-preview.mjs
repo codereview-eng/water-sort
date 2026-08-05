@@ -103,6 +103,7 @@ if (!gtMatch) {
     fails.push(`道具解锁状态不对（stock=${gt.stock}, unlocked=${gt.unlocked}, locked=${gt.locked}）`);
   }
   if (gt.undo !== 0) fails.push(`解锁空瓶后撤销栈异常（undo=${gt.undo}）`);
+  if (gt.undoItems !== 3) fails.push(`撤销道具初始库存不对 (undoItems=${gt.undoItems})`);
   if (!gt.restartMatches) fails.push('重开后关卡布局发生变化');
 }
 const adGtMatch = adUnlock.match(/<pre hidden="" id="watergt">([\s\S]*?)<\/pre>/)

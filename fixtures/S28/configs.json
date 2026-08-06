@@ -1,0 +1,5 @@
+{
+  "water": { "catalog": [ { "id": "gold-bottle", "kind": "skin", "price": { "coins": 50 } } ] },
+  "sudoku": { "catalog": [ { "id": "wood-board", "kind": "skin", "price": { "coins": 30 } } ] },
+  "mockc": { "catalog": [ { "id": "rainbow-dot", "kind": "skin", "price": { "coins": 10 } } ] }
+}

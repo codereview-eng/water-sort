@@ -1,0 +1,16 @@
+{
+  "water": {
+    "catalog": [],
+    "themes": { "default": { "bg": "#e8f4ff" }, "sea": { "bg": "#8fd" }, "deep": { "bg": "#046" } },
+    "progressBackgrounds": [ { "fromLevel": 10, "themeId": "sea" }, { "fromLevel": 20, "themeId": "deep" } ]
+  },
+  "sudoku": {
+    "catalog": [],
+    "themes": { "default": { "bg": "#fff" }, "chapter2": { "bg": "#fe9" } },
+    "progressBackgrounds": [ { "fromLevel": 51, "themeId": "chapter2" } ]
+  },
+  "mockc": {
+    "catalog": [],
+    "themes": { "default": { "bg": "#eee" } }
+  }
+}

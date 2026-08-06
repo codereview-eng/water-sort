@@ -70,6 +70,20 @@
         "rewarded": false,
         "interstitial": false
       }
+    },
+    "placements": {
+      "cosmetic-unlock": {
+        "format": "rewarded",
+        "onFail": "deny",
+        "capping": {
+          "startAfterLevel": 5,
+          "maxPerSession": 2
+        }
+      },
+      "fail-revive": {
+        "format": "rewarded",
+        "onFail": "retry"
+      }
     }
   },
   "lifetimeStats": [
@@ -192,6 +206,42 @@
           "id": "hint",
           "amount": 2
         }
+      }
+    ]
+  },
+  "cosmetics": {
+    "catalog": [
+      {
+        "id": "dark-skin",
+        "kind": "skin",
+        "unlock": [
+          {
+            "type": "ad"
+          }
+        ]
+      },
+      {
+        "id": "wood-board",
+        "kind": "skin",
+        "price": {
+          "coins": 30
+        }
+      }
+    ],
+    "themes": {
+      "default": {
+        "bg": "#fff",
+        "piece": "digit.png",
+        "sfx": "tap.mp3"
+      },
+      "paper": {
+        "bg": "#f5ecd7"
+      }
+    },
+    "progressBackgrounds": [
+      {
+        "fromLevel": 51,
+        "themeId": "paper"
       }
     ]
   }

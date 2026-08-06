@@ -70,7 +70,16 @@
     "interstitial": {
       "enabled": false
     },
-    "geo": {}
+    "geo": {},
+    "placements": {
+      "tap-bonus": {
+        "format": "rewarded",
+        "onFail": "deny",
+        "capping": {
+          "maxPerSession": 1
+        }
+      }
+    }
   },
   "lifetimeStats": [
     {
@@ -166,5 +175,33 @@
         }
       }
     ]
+  },
+  "cosmetics": {
+    "catalog": [
+      {
+        "id": "rainbow-dot",
+        "kind": "skin",
+        "price": {
+          "coins": 10
+        }
+      },
+      {
+        "id": "fire-bg",
+        "kind": "background",
+        "unlock": [
+          {
+            "type": "streak",
+            "n": 3
+          }
+        ]
+      }
+    ],
+    "themes": {
+      "default": {
+        "bg": "#eee",
+        "piece": "dot.png",
+        "sfx": "click.mp3"
+      }
+    }
   }
 }

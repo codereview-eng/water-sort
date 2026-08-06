@@ -1,0 +1,9 @@
+{
+  "id": "water",
+  "reward": {
+    "eMax": 120,
+    "eCost": 15,
+    "eTickMs": 60000,
+    "eAd": 60
+  }
+}

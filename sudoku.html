@@ -436,27 +436,11 @@ var SudokuEngine=(function(){
   return{solve,countSolutions,generate,DIFFICULTY};
 })();
 
-/* ====================== 激励循环纯函数(与 reward.js 同源,内联) ====================== */
-var Reward=(function(){
-  'use strict';
-  const E_MAX=120, E_COST=15, E_TICK=60000, E_AD=60;
-  function restore(energy,lastTs,now){
-    if(energy>=E_MAX)return{energy,lastTs:now}; // 超额保留:>=120 不自然恢复、不回收(issue #7)
-    if(now<lastTs)return{energy,lastTs:now};
-    const gained=Math.floor((now-lastTs)/E_TICK);
-    const newEnergy=Math.min(E_MAX,energy+gained);
-    return{energy:newEnergy,lastTs:newEnergy>=E_MAX?now:lastTs+gained*E_TICK};
-  }
-  function levelDiff(level){
-    if(level<=20)return'beginner';
-    if(level<=60)return'easy';
-    if(level<=150)return'medium';
-    return'hard';
-  }
-  function levelSeed(level){return(Math.imul(level,2654435761)^0x5D0C0)>>>1;}
-  return{restore,levelDiff,levelSeed,E_MAX,E_COST,E_TICK,E_AD};
-})();
-
+</script>
+<!-- 激励循环已下沉 core/reward.js + reward.js（构建时内联；issue #1 M3/S1/S2/S19） -->
+<script src="./core/reward.js"></script>
+<script src="./reward.js"></script>
+<script>
 /* ====================== 前 5 关固定盘面(与 levels.js 同源,内联;issue #14/#16) ======================
    由 engine.js 离线生成(自定义 givens 档,seed 1065/1060/1055/1050/1045),给定数 65→60→55→50→45 递减爬坡,全网同题;
    每盘经 countSolutions===1 唯一解校验 + solvableBySingles 全程 naked-single 零卡壳校验(玩家只靠唯一候选即可通关),

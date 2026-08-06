@@ -1,0 +1,5 @@
+{
+  "water": { "base": 10, "firstClearMult": 3 },
+  "sudoku": { "base": 10, "decay": { "rate": 0.5, "floor": 2 } },
+  "mockc": { "base": 10, "firstClearMult": 2, "decay": { "rate": 0.5, "floor": 3 } }
+}

@@ -1,0 +1,4 @@
+{
+  "water": [{ "id": "addBottle", "unlock": [{ "type": "level", "n": 3 }] }],
+  "mockc": [{ "id": "bomb", "unlock": [{ "type": "level", "n": 5 }, { "type": "ad" }] }]
+}

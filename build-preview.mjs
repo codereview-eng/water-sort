@@ -7,8 +7,11 @@
 // 用法: node build-preview.mjs [输出路径]
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
-const out = process.argv[2] || '/tmp/water-sort-preview.html';
-let html = readFileSync('water.html', 'utf8');
+const pageArg = process.argv.find((a) => a.startsWith('--page='));
+const page = pageArg ? pageArg.slice('--page='.length) : 'water.html';
+const rest = process.argv.slice(2).filter((a) => !a.startsWith('--page='));
+const out = rest[0] || ('/tmp/' + page.replace(/\.html$/, '') + (page === 'water.html' ? '-sort' : '') + '-preview.html');
+let html = readFileSync(page, 'utf8');
 
 // 1) 内联所有本地 <script src="./xxx.js">（远程 CDN 的保持原样）
 let scripts = 0;

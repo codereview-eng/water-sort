@@ -1,0 +1,5 @@
+{
+  "water": { "enabled": true, "claimMode": "direct", "policy": { "resetOnLoss": true }, "tiers": [] },
+  "sudoku": { "enabled": true, "claimMode": "direct", "policy": { "dailyFirstLossForgiven": true }, "tiers": [] },
+  "mockc": { "enabled": true, "claimMode": "direct", "policy": { "adRevive": { "enabled": true, "maxPerStreak": 1 } }, "tiers": [] }
+}

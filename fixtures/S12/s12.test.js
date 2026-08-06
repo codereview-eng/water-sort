@@ -38,5 +38,6 @@ test('S12: 真实游戏 config 统计字段集落地且互不相同', () => {
   const c = S.createArchive(gameCfg('mockc').lifetimeStats).keys();
   assert.ok(w.includes('bottles_poured'), 'A 记倒瓶');
   assert.ok(s.includes('cells_filled'), 'B 记填格');
-  assert.ok(c.every((k) => !w.includes(k)), 'mock C 字段集独立');
+  const gameplayKeys = (keys) => keys.filter((k) => !k.endsWith('_streak'));
+  assert.ok(gameplayKeys(c).every((k) => !w.includes(k)), 'mock C 玩法字段集独立（连胜维度是跨游戏共享口径，S23）');
 });

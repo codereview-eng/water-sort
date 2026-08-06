@@ -92,6 +92,12 @@
       "agg": "sum",
       "field": "pts",
       "label": "周积分"
+    },
+    {
+      "key": "current_streak",
+      "event": "streak_changed",
+      "agg": "last",
+      "field": "current"
     }
   ],
   "leaderboards": [
@@ -100,6 +106,13 @@
       "metric": "week_points",
       "order": "desc",
       "operator": "increment",
+      "period": "weekly"
+    },
+    {
+      "id": "streak_weekly",
+      "metric": "current_streak",
+      "order": "desc",
+      "operator": "best",
       "period": "weekly"
     }
   ],
@@ -134,5 +147,24 @@
   },
   "save": {
     "version": 1
+  },
+  "streak": {
+    "enabled": true,
+    "claimMode": "direct",
+    "policy": {
+      "adRevive": {
+        "enabled": true,
+        "maxPerStreak": 1
+      }
+    },
+    "tiers": [
+      {
+        "streak": 3,
+        "reward": {
+          "type": "coins",
+          "amount": 5
+        }
+      }
+    ]
   }
 }

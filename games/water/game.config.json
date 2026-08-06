@@ -119,5 +119,39 @@
   },
   "geoAccess": {
     "mode": "all"
+  },
+  "screens": {
+    "home": {
+      "modules": [
+        {
+          "type": "weekly-event-entry"
+        },
+        {
+          "type": "leaderboard-entry",
+          "props": {
+            "boardId": "fastest"
+          }
+        },
+        {
+          "type": "archive-panel"
+        }
+      ]
+    },
+    "result": {
+      "modules": [
+        {
+          "type": "settle-summary"
+        },
+        {
+          "type": "ad-double-button"
+        }
+      ]
+    }
+  },
+  "host": {
+    "storagePrefix": "water:"
+  },
+  "save": {
+    "version": 1
   }
 }

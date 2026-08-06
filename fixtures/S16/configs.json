@@ -1,0 +1,5 @@
+{
+  "water": { "storagePrefix": "water:" },
+  "sudoku": { "storagePrefix": "sudoku:" },
+  "mockc": { "storagePrefix": "mockc:" }
+}

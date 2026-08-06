@@ -1,0 +1,5 @@
+{
+  "water": { "mode": "all" },
+  "sudoku": { "mode": "allowlist", "countries": ["CN", "US", "DE"] },
+  "mockc": { "mode": "denylist", "countries": ["KP"] }
+}

@@ -1,0 +1,28 @@
+{
+  "water": {
+    "default": "en",
+    "locales": {
+      "en": { "play": "Play", "settings": "Settings", "undo": "Undo" },
+      "zh": { "play": "开始", "settings": "设置" }
+    }
+  },
+  "sudoku": {
+    "default": "en",
+    "locales": {
+      "en": { "play": "Play", "hint": "Hint" },
+      "zh": { "play": "开始", "hint": "提示" },
+      "es": { "play": "Jugar" },
+      "fr": { "play": "Jouer", "hint": "Indice" },
+      "de": { "play": "Spielen" },
+      "ja": { "play": "プレイ" },
+      "ko": { "play": "플레이" },
+      "pt": { "play": "Jogar" }
+    }
+  },
+  "mockc": {
+    "default": "en",
+    "locales": {
+      "en": { "tap": "Tap!" }
+    }
+  }
+}

@@ -1,9 +1,14 @@
 {
   "id": "water",
-  "reward": {
-    "eMax": 120,
-    "eCost": 15,
-    "eTickMs": 60000,
-    "eAd": 60
-  }
+  "reward": { "eMax": 120, "eCost": 15, "eTickMs": 60000, "eAd": 60 },
+  "settle": {
+    "mode": "fixed",
+    "base": 10,
+    "firstClearMult": 3,
+    "adBonus": { "enabled": true, "multiplier": 2, "dailyCap": 10, "cooldownMs": 60000 }
+  },
+  "powerups": [
+    { "id": "undo", "grantOn": [{ "trigger": "levelClear", "qty": 1 }] },
+    { "id": "addBottle", "grantOn": [{ "trigger": "dailyLogin", "qty": 1 }], "unlock": [{ "type": "level", "n": 3 }] }
+  ]
 }

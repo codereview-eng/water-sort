@@ -1,9 +1,15 @@
 {
   "id": "sudoku",
-  "reward": {
-    "eMax": 120,
-    "eCost": 15,
-    "eTickMs": 60000,
-    "eAd": 60
-  }
+  "reward": { "eMax": 120, "eCost": 15, "eTickMs": 60000, "eAd": 60 },
+  "settle": {
+    "mode": "difficulty",
+    "base": 10,
+    "coeff": 0.5,
+    "decay": { "rate": 0.5, "floor": 2 },
+    "adBonus": { "enabled": true, "multiplier": 3, "dailyCap": 5, "cooldownMs": 60000 }
+  },
+  "powerups": [
+    { "id": "hint", "grantOn": [{ "trigger": "levelClear", "qty": 1 }] },
+    { "id": "eraser", "grantOn": [{ "trigger": "purchase", "qty": 5 }] }
+  ]
 }

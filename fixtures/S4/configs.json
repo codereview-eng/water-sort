@@ -1,0 +1,5 @@
+{
+  "water": [{ "id": "undo" }, { "id": "addBottle" }],
+  "sudoku": [{ "id": "hint" }, { "id": "eraser" }],
+  "mockc": [{ "id": "shuffle" }, { "id": "bomb" }]
+}

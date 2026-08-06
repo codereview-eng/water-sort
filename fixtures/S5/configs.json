@@ -1,0 +1,14 @@
+{
+  "mockc": [
+    {
+      "id": "shuffle",
+      "grantOn": [
+        { "trigger": "levelClear", "qty": 1 },
+        { "trigger": "purchase", "qty": 5 },
+        { "trigger": "event", "qty": 1 },
+        { "trigger": "dailyLogin", "qty": 2 }
+      ]
+    }
+  ],
+  "water": [{ "id": "undo", "grantOn": [{ "trigger": "levelClear", "qty": 1 }] }]
+}

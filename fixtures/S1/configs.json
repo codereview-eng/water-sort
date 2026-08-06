@@ -1,0 +1,5 @@
+{
+  "water": { "mode": "fixed", "base": 10 },
+  "sudoku": { "mode": "difficulty", "base": 10, "coeff": 0.5 },
+  "mockc": { "mode": "streakRamp", "base": 10, "coeff": 1, "cap": 60 }
+}

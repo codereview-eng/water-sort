@@ -1,9 +1,15 @@
 {
   "id": "mockc",
-  "reward": {
-    "eMax": 200,
-    "eCost": 10,
-    "eTickMs": 30000,
-    "eAd": 0
-  }
+  "reward": { "eMax": 200, "eCost": 10, "eTickMs": 30000, "eAd": 0 },
+  "settle": {
+    "mode": "streakRamp",
+    "base": 10,
+    "coeff": 1,
+    "cap": 60,
+    "adBonus": { "enabled": false }
+  },
+  "powerups": [
+    { "id": "shuffle", "grantOn": [{ "trigger": "levelClear", "qty": 1 }, { "trigger": "dailyLogin", "qty": 2 }] },
+    { "id": "bomb", "grantOn": [{ "trigger": "purchase", "qty": 5 }, { "trigger": "event", "qty": 1 }], "unlock": [{ "type": "level", "n": 5 }, { "type": "ad" }] }
+  ]
 }

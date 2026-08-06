@@ -1,0 +1,13 @@
+{
+  "water": {
+    "pre-level-interstitial": { "format": "interstitial", "capping": { "minIntervalSec": 60 } },
+    "streak-claim": { "format": "rewarded", "onFail": "grant" }
+  },
+  "sudoku": {
+    "cosmetic-unlock": { "format": "rewarded", "onFail": "deny" },
+    "fail-revive": { "format": "rewarded", "onFail": "retry" }
+  },
+  "mockc": {
+    "streak-revive": { "format": "rewarded", "onFail": "deny" }
+  }
+}

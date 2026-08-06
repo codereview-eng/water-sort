@@ -71,6 +71,22 @@
       "DE": {
         "rewarded": false
       }
+    },
+    "placements": {
+      "pre-level-interstitial": {
+        "format": "interstitial",
+        "capping": {
+          "minIntervalSec": 60,
+          "maxPerDay": 10
+        }
+      },
+      "streak-claim": {
+        "format": "rewarded",
+        "onFail": "grant",
+        "capping": {
+          "maxPerDay": 3
+        }
+      }
     }
   },
   "lifetimeStats": [
@@ -180,6 +196,50 @@
           "type": "coins",
           "amount": 100
         }
+      }
+    ]
+  },
+  "cosmetics": {
+    "catalog": [
+      {
+        "id": "ocean-bg",
+        "kind": "background",
+        "unlock": [
+          {
+            "type": "level",
+            "n": 20
+          }
+        ]
+      },
+      {
+        "id": "gold-bottle",
+        "kind": "skin",
+        "price": {
+          "coins": 50
+        }
+      }
+    ],
+    "themes": {
+      "default": {
+        "bg": "#e8f4ff",
+        "piece": "bottle.png",
+        "sfx": "pour.mp3"
+      },
+      "sea": {
+        "bg": "#8fd"
+      },
+      "deep": {
+        "bg": "#046"
+      }
+    },
+    "progressBackgrounds": [
+      {
+        "fromLevel": 10,
+        "themeId": "sea"
+      },
+      {
+        "fromLevel": 20,
+        "themeId": "deep"
       }
     ]
   }

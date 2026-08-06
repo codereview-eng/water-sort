@@ -1,0 +1,12 @@
+{
+  "water": {
+    "pre-level-interstitial": { "format": "interstitial", "capping": { "minIntervalSec": 60, "maxPerDay": 10 } },
+    "streak-claim": { "format": "rewarded", "onFail": "grant", "capping": { "maxPerDay": 3 } }
+  },
+  "sudoku": {
+    "cosmetic-unlock": { "format": "rewarded", "onFail": "deny", "capping": { "startAfterLevel": 5, "maxPerSession": 2 } }
+  },
+  "mockc": {
+    "tap-bonus": { "format": "rewarded", "onFail": "deny", "capping": { "maxPerSession": 1 } }
+  }
+}

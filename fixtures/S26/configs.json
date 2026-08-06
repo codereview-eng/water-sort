@@ -1,0 +1,25 @@
+{
+  "water": {
+    "catalog": [],
+    "themes": {
+      "default": { "bg": "#e8f4ff", "piece": "bottle.png", "sfx": "pour.mp3" },
+      "night": { "bg": "#101020", "piece": "bottle-dark.png", "sfx": "pour-soft.mp3" }
+    }
+  },
+  "sudoku": {
+    "catalog": [],
+    "themes": {
+      "default": { "bg": "#fff", "piece": "digit.png", "sfx": "tap.mp3" },
+      "paper": { "bg": "#f5ecd7" },
+      "hardMode": { "bg": "#2a0a0a", "piece": "digit-red.png" }
+    },
+    "levelThemes": { "normal": "paper", "hard": "hardMode" }
+  },
+  "mockc": {
+    "catalog": [],
+    "themes": {
+      "default": { "bg": "#eee", "piece": "dot.png", "sfx": "click.mp3" },
+      "neon": { "bg": "#0ff", "piece": "dot-neon.png", "sfx": "zap.mp3" }
+    }
+  }
+}

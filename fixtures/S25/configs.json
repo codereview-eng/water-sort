@@ -1,0 +1,6 @@
+{
+  "water": { "catalog": [ { "id": "ocean-bg", "kind": "background", "unlock": [ { "type": "level", "n": 20 } ] } ] },
+  "sudoku": { "catalog": [ { "id": "dark-skin", "kind": "skin", "unlock": [ { "type": "ad" } ] } ] },
+  "mockcBuy": { "catalog": [ { "id": "gold-skin", "kind": "skin", "price": { "coins": 10 } } ] },
+  "mockcStreak": { "catalog": [ { "id": "fire-bg", "kind": "background", "unlock": [ { "type": "streak", "n": 3 } ] } ] }
+}

@@ -1,0 +1,5 @@
+{
+  "water": { "version": 1 },
+  "sudoku": { "version": 2 },
+  "mockc": { "version": 3 }
+}

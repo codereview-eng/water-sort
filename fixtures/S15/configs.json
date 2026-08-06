@@ -1,0 +1,13 @@
+{
+  "water": {
+    "home": { "modules": [ { "type": "weekly-event-entry" }, { "type": "leaderboard-entry", "props": { "boardId": "fastest" } }, { "type": "archive-panel" } ] },
+    "result": { "modules": [ { "type": "settle-summary" }, { "type": "ad-double-button" } ] }
+  },
+  "sudoku": {
+    "home": { "modules": [ { "type": "level-select" } ] },
+    "result": { "modules": [ { "type": "settle-summary" } ] }
+  },
+  "mockc": {
+    "home": { "modules": [ { "type": "tap-button", "props": { "label": "GO" } } ] }
+  }
+}

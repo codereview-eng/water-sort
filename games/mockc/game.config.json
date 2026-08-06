@@ -116,5 +116,23 @@
     "countries": [
       "KP"
     ]
+  },
+  "screens": {
+    "home": {
+      "modules": [
+        {
+          "type": "tap-button",
+          "props": {
+            "label": "GO"
+          }
+        }
+      ]
+    }
+  },
+  "host": {
+    "storagePrefix": "mockc:"
+  },
+  "save": {
+    "version": 1
   }
 }

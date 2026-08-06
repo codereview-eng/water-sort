@@ -142,5 +142,27 @@
       "US",
       "DE"
     ]
+  },
+  "screens": {
+    "home": {
+      "modules": [
+        {
+          "type": "level-select"
+        }
+      ]
+    },
+    "result": {
+      "modules": [
+        {
+          "type": "settle-summary"
+        }
+      ]
+    }
+  },
+  "host": {
+    "storagePrefix": "sudoku:"
+  },
+  "save": {
+    "version": 1
   }
 }

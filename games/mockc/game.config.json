@@ -1,25 +1,120 @@
 {
   "id": "mockc",
-  "reward": { "eMax": 200, "eCost": 10, "eTickMs": 30000, "eAd": 0 },
+  "reward": {
+    "eMax": 200,
+    "eCost": 10,
+    "eTickMs": 30000,
+    "eAd": 0
+  },
   "settle": {
     "mode": "streakRamp",
     "base": 10,
     "coeff": 1,
     "cap": 60,
-    "adBonus": { "enabled": false }
+    "adBonus": {
+      "enabled": false
+    }
   },
   "powerups": [
-    { "id": "shuffle", "grantOn": [{ "trigger": "levelClear", "qty": 1 }, { "trigger": "dailyLogin", "qty": 2 }] },
-    { "id": "bomb", "grantOn": [{ "trigger": "purchase", "qty": 5 }, { "trigger": "event", "qty": 1 }], "unlock": [{ "type": "level", "n": 5 }, { "type": "ad" }] }
+    {
+      "id": "shuffle",
+      "grantOn": [
+        {
+          "trigger": "levelClear",
+          "qty": 1
+        },
+        {
+          "trigger": "dailyLogin",
+          "qty": 2
+        }
+      ]
+    },
+    {
+      "id": "bomb",
+      "grantOn": [
+        {
+          "trigger": "purchase",
+          "qty": 5
+        },
+        {
+          "trigger": "event",
+          "qty": 1
+        }
+      ],
+      "unlock": [
+        {
+          "type": "level",
+          "n": 5
+        },
+        {
+          "type": "ad"
+        }
+      ]
+    }
   ],
   "weeklyEvent": {
     "enabled": true,
     "metric": "clears",
     "period": "biweekly",
-    "rewards": { "kind": "milestone", "tiers": [{ "at": 5, "coins": 10 }] }
+    "rewards": {
+      "kind": "milestone",
+      "tiers": [
+        {
+          "at": 5,
+          "coins": 10
+        }
+      ]
+    }
   },
   "ads": {
-    "interstitial": { "enabled": false },
+    "interstitial": {
+      "enabled": false
+    },
     "geo": {}
+  },
+  "lifetimeStats": [
+    {
+      "key": "clicks",
+      "event": "click",
+      "agg": "count",
+      "label": "点了多少下"
+    },
+    {
+      "key": "best_combo",
+      "event": "click",
+      "agg": "max",
+      "field": "combo",
+      "label": "最高连击"
+    },
+    {
+      "key": "week_points",
+      "event": "click",
+      "agg": "sum",
+      "field": "pts",
+      "label": "周积分"
+    }
+  ],
+  "leaderboards": [
+    {
+      "id": "weekly",
+      "metric": "week_points",
+      "order": "desc",
+      "operator": "increment",
+      "period": "weekly"
+    }
+  ],
+  "i18n": {
+    "default": "en",
+    "locales": {
+      "en": {
+        "tap": "Tap!"
+      }
+    }
+  },
+  "geoAccess": {
+    "mode": "denylist",
+    "countries": [
+      "KP"
+    ]
   }
 }

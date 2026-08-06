@@ -1,24 +1,123 @@
 {
   "id": "water",
-  "reward": { "eMax": 120, "eCost": 15, "eTickMs": 60000, "eAd": 60 },
+  "reward": {
+    "eMax": 120,
+    "eCost": 15,
+    "eTickMs": 60000,
+    "eAd": 60
+  },
   "settle": {
     "mode": "fixed",
     "base": 10,
     "firstClearMult": 3,
-    "adBonus": { "enabled": true, "multiplier": 2, "dailyCap": 10, "cooldownMs": 60000 }
+    "adBonus": {
+      "enabled": true,
+      "multiplier": 2,
+      "dailyCap": 10,
+      "cooldownMs": 60000
+    }
   },
   "powerups": [
-    { "id": "undo", "grantOn": [{ "trigger": "levelClear", "qty": 1 }] },
-    { "id": "addBottle", "grantOn": [{ "trigger": "dailyLogin", "qty": 1 }], "unlock": [{ "type": "level", "n": 3 }] }
+    {
+      "id": "undo",
+      "grantOn": [
+        {
+          "trigger": "levelClear",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "id": "addBottle",
+      "grantOn": [
+        {
+          "trigger": "dailyLogin",
+          "qty": 1
+        }
+      ],
+      "unlock": [
+        {
+          "type": "level",
+          "n": 3
+        }
+      ]
+    }
   ],
   "weeklyEvent": {
     "enabled": true,
     "metric": "clears",
     "period": "weekly",
-    "rewards": { "kind": "top10", "tiers": [{ "coins": 100 }, { "coins": 50 }, { "coins": 25 }] }
+    "rewards": {
+      "kind": "top10",
+      "tiers": [
+        {
+          "coins": 100
+        },
+        {
+          "coins": 50
+        },
+        {
+          "coins": 25
+        }
+      ]
+    }
   },
   "ads": {
-    "interstitial": { "enabled": true, "everyN": 3 },
-    "geo": { "DE": { "rewarded": false } }
+    "interstitial": {
+      "enabled": true,
+      "everyN": 3
+    },
+    "geo": {
+      "DE": {
+        "rewarded": false
+      }
+    }
+  },
+  "lifetimeStats": [
+    {
+      "key": "bottles_poured",
+      "event": "pour",
+      "agg": "count",
+      "label": "倒了多少瓶"
+    },
+    {
+      "key": "total_clears",
+      "event": "level_cleared",
+      "agg": "count",
+      "label": "通关数"
+    },
+    {
+      "key": "best_time_ms",
+      "event": "level_cleared",
+      "agg": "min",
+      "field": "timeMs",
+      "unit": "ms"
+    }
+  ],
+  "leaderboards": [
+    {
+      "id": "fastest",
+      "metric": "best_time_ms",
+      "order": "asc",
+      "operator": "best",
+      "period": "none"
+    }
+  ],
+  "i18n": {
+    "default": "en",
+    "locales": {
+      "en": {
+        "play": "Play",
+        "settings": "Settings",
+        "undo": "Undo"
+      },
+      "zh": {
+        "play": "开始",
+        "settings": "设置"
+      }
+    }
+  },
+  "geoAccess": {
+    "mode": "all"
   }
 }

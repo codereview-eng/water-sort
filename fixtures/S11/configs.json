@@ -1,0 +1,14 @@
+{
+  "water": {
+    "lifetimeStats": [ { "key": "best_time_ms", "event": "level_cleared", "agg": "min", "field": "timeMs" } ],
+    "leaderboards": [ { "id": "fastest", "metric": "best_time_ms", "order": "asc", "operator": "best", "period": "none" } ]
+  },
+  "sudoku": {
+    "lifetimeStats": [ { "key": "best_score", "event": "level_cleared", "agg": "max", "field": "score" } ],
+    "leaderboards": [ { "id": "top_score", "metric": "best_score", "order": "desc", "operator": "best", "period": "none" } ]
+  },
+  "mockc": {
+    "lifetimeStats": [ { "key": "week_points", "event": "click", "agg": "sum", "field": "pts" } ],
+    "leaderboards": [ { "id": "weekly", "metric": "week_points", "order": "desc", "operator": "increment", "period": "weekly" } ]
+  }
+}

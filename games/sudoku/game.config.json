@@ -1,25 +1,146 @@
 {
   "id": "sudoku",
-  "reward": { "eMax": 120, "eCost": 15, "eTickMs": 60000, "eAd": 60 },
+  "reward": {
+    "eMax": 120,
+    "eCost": 15,
+    "eTickMs": 60000,
+    "eAd": 60
+  },
   "settle": {
     "mode": "difficulty",
     "base": 10,
     "coeff": 0.5,
-    "decay": { "rate": 0.5, "floor": 2 },
-    "adBonus": { "enabled": true, "multiplier": 3, "dailyCap": 5, "cooldownMs": 60000 }
+    "decay": {
+      "rate": 0.5,
+      "floor": 2
+    },
+    "adBonus": {
+      "enabled": true,
+      "multiplier": 3,
+      "dailyCap": 5,
+      "cooldownMs": 60000
+    }
   },
   "powerups": [
-    { "id": "hint", "grantOn": [{ "trigger": "levelClear", "qty": 1 }] },
-    { "id": "eraser", "grantOn": [{ "trigger": "purchase", "qty": 5 }] }
+    {
+      "id": "hint",
+      "grantOn": [
+        {
+          "trigger": "levelClear",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "id": "eraser",
+      "grantOn": [
+        {
+          "trigger": "purchase",
+          "qty": 5
+        }
+      ]
+    }
   ],
   "weeklyEvent": {
     "enabled": true,
     "metric": "stars",
     "period": "weekly",
-    "rewards": { "kind": "milestone", "tiers": [{ "at": 10, "coins": 5 }, { "at": 50, "coins": 30 }] }
+    "rewards": {
+      "kind": "milestone",
+      "tiers": [
+        {
+          "at": 10,
+          "coins": 5
+        },
+        {
+          "at": 50,
+          "coins": 30
+        }
+      ]
+    }
   },
   "ads": {
-    "interstitial": { "enabled": true, "everyN": 5, "minGapSec": 60 },
-    "geo": { "CN": { "rewarded": false, "interstitial": false } }
+    "interstitial": {
+      "enabled": true,
+      "everyN": 5,
+      "minGapSec": 60
+    },
+    "geo": {
+      "CN": {
+        "rewarded": false,
+        "interstitial": false
+      }
+    }
+  },
+  "lifetimeStats": [
+    {
+      "key": "cells_filled",
+      "event": "fill",
+      "agg": "count",
+      "label": "填了多少格"
+    },
+    {
+      "key": "total_stars",
+      "event": "level_cleared",
+      "agg": "sum",
+      "field": "stars",
+      "label": "总星数"
+    },
+    {
+      "key": "best_score",
+      "event": "level_cleared",
+      "agg": "max",
+      "field": "score",
+      "label": "最高分"
+    }
+  ],
+  "leaderboards": [
+    {
+      "id": "top_score",
+      "metric": "best_score",
+      "order": "desc",
+      "operator": "best",
+      "period": "none"
+    }
+  ],
+  "i18n": {
+    "default": "en",
+    "locales": {
+      "en": {
+        "play": "Play",
+        "hint": "Hint"
+      },
+      "zh": {
+        "play": "开始",
+        "hint": "提示"
+      },
+      "es": {
+        "play": "Jugar"
+      },
+      "fr": {
+        "play": "Jouer",
+        "hint": "Indice"
+      },
+      "de": {
+        "play": "Spielen"
+      },
+      "ja": {
+        "play": "プレイ"
+      },
+      "ko": {
+        "play": "플레이"
+      },
+      "pt": {
+        "play": "Jogar"
+      }
+    }
+  },
+  "geoAccess": {
+    "mode": "allowlist",
+    "countries": [
+      "CN",
+      "US",
+      "DE"
+    ]
   }
 }

@@ -1,0 +1,6 @@
+{
+  "water": { "enabled": true, "metric": "clears", "period": "weekly" },
+  "sudoku": { "enabled": true, "metric": "stars", "period": "weekly" },
+  "mockc": { "enabled": true, "metric": "clears", "period": "biweekly" },
+  "off": { "enabled": false }
+}

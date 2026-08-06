@@ -10,5 +10,15 @@
   "powerups": [
     { "id": "undo", "grantOn": [{ "trigger": "levelClear", "qty": 1 }] },
     { "id": "addBottle", "grantOn": [{ "trigger": "dailyLogin", "qty": 1 }], "unlock": [{ "type": "level", "n": 3 }] }
-  ]
+  ],
+  "weeklyEvent": {
+    "enabled": true,
+    "metric": "clears",
+    "period": "weekly",
+    "rewards": { "kind": "top10", "tiers": [{ "coins": 100 }, { "coins": 50 }, { "coins": 25 }] }
+  },
+  "ads": {
+    "interstitial": { "enabled": true, "everyN": 3 },
+    "geo": { "DE": { "rewarded": false } }
+  }
 }

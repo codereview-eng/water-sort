@@ -1,0 +1,5 @@
+{
+  "water": { "enabled": true, "claimMode": "direct", "tiers": [ { "streak": 3, "reward": { "type": "coins", "amount": 30 } } ] },
+  "sudoku": { "enabled": true, "claimMode": "direct", "tiers": [ { "streak": 3, "reward": { "type": "item", "id": "hint", "amount": 2 } } ] },
+  "mockc": { "enabled": true, "claimMode": "direct", "tiers": [ { "streak": 3, "reward": { "type": "coins", "amount": 5 } }, { "streak": 6, "reward": { "type": "cosmetic", "id": "neon-theme" } } ] }
+}

@@ -92,12 +92,25 @@
       "agg": "max",
       "field": "score",
       "label": "最高分"
+    },
+    {
+      "key": "best_streak",
+      "event": "streak_changed",
+      "agg": "max",
+      "field": "best"
     }
   ],
   "leaderboards": [
     {
       "id": "top_score",
       "metric": "best_score",
+      "order": "desc",
+      "operator": "best",
+      "period": "none"
+    },
+    {
+      "id": "streak_best",
+      "metric": "best_streak",
       "order": "desc",
       "operator": "best",
       "period": "none"
@@ -164,5 +177,22 @@
   },
   "save": {
     "version": 1
+  },
+  "streak": {
+    "enabled": true,
+    "claimMode": "direct",
+    "policy": {
+      "dailyFirstLossForgiven": true
+    },
+    "tiers": [
+      {
+        "streak": 5,
+        "reward": {
+          "type": "item",
+          "id": "hint",
+          "amount": 2
+        }
+      }
+    ]
   }
 }

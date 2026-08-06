@@ -92,6 +92,12 @@
       "agg": "min",
       "field": "timeMs",
       "unit": "ms"
+    },
+    {
+      "key": "current_streak",
+      "event": "streak_changed",
+      "agg": "last",
+      "field": "current"
     }
   ],
   "leaderboards": [
@@ -99,6 +105,13 @@
       "id": "fastest",
       "metric": "best_time_ms",
       "order": "asc",
+      "operator": "best",
+      "period": "none"
+    },
+    {
+      "id": "streak_now",
+      "metric": "current_streak",
+      "order": "desc",
       "operator": "best",
       "period": "none"
     }
@@ -153,5 +166,21 @@
   },
   "save": {
     "version": 1
+  },
+  "streak": {
+    "enabled": true,
+    "claimMode": "ad",
+    "policy": {
+      "resetOnLoss": true
+    },
+    "tiers": [
+      {
+        "streak": 10,
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        }
+      }
+    ]
   }
 }

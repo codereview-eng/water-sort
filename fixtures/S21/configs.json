@@ -1,0 +1,5 @@
+{
+  "water": { "enabled": true, "claimMode": "ad", "tiers": [ { "streak": 10, "reward": { "type": "coins", "amount": 100 } } ] },
+  "sudoku": { "enabled": true, "claimMode": "direct", "tiers": [ { "streak": 5, "reward": { "type": "coins", "amount": 40 } } ] },
+  "mockc": { "enabled": false }
+}

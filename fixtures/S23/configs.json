@@ -1,0 +1,14 @@
+{
+  "water": {
+    "lifetimeStats": [ { "key": "current_streak", "event": "streak_changed", "agg": "last", "field": "current" } ],
+    "leaderboards": [ { "id": "streak_now", "metric": "current_streak", "order": "desc", "operator": "best", "period": "none" } ]
+  },
+  "sudoku": {
+    "lifetimeStats": [ { "key": "best_streak", "event": "streak_changed", "agg": "max", "field": "best" } ],
+    "leaderboards": [ { "id": "streak_best", "metric": "best_streak", "order": "desc", "operator": "best", "period": "none" } ]
+  },
+  "mockc": {
+    "lifetimeStats": [ { "key": "current_streak", "event": "streak_changed", "agg": "last", "field": "current" } ],
+    "leaderboards": [ { "id": "streak_weekly", "metric": "current_streak", "order": "desc", "operator": "best", "period": "weekly" } ]
+  }
+}

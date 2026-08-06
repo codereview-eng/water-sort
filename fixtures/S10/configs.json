@@ -1,0 +1,6 @@
+{
+  "geo": {
+    "DE": { "rewarded": false },
+    "CN": { "rewarded": false, "interstitial": false }
+  }
+}

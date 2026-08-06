@@ -1,0 +1,16 @@
+{
+  "top10": {
+    "enabled": true,
+    "rewards": { "kind": "top10", "tiers": [{ "coins": 100 }, { "coins": 50 }, { "coins": 25 }] }
+  },
+  "milestone": {
+    "enabled": true,
+    "rewards": { "kind": "milestone", "tiers": [{ "at": 10, "coins": 5 }, { "at": 50, "coins": 30 }] }
+  },
+  "mockc": {
+    "enabled": true,
+    "metric": "clears",
+    "period": "biweekly",
+    "rewards": { "kind": "milestone", "tiers": [{ "at": 5, "coins": 10 }] }
+  }
+}

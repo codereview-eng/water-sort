@@ -11,5 +11,15 @@
   "powerups": [
     { "id": "shuffle", "grantOn": [{ "trigger": "levelClear", "qty": 1 }, { "trigger": "dailyLogin", "qty": 2 }] },
     { "id": "bomb", "grantOn": [{ "trigger": "purchase", "qty": 5 }, { "trigger": "event", "qty": 1 }], "unlock": [{ "type": "level", "n": 5 }, { "type": "ad" }] }
-  ]
+  ],
+  "weeklyEvent": {
+    "enabled": true,
+    "metric": "clears",
+    "period": "biweekly",
+    "rewards": { "kind": "milestone", "tiers": [{ "at": 5, "coins": 10 }] }
+  },
+  "ads": {
+    "interstitial": { "enabled": false },
+    "geo": {}
+  }
 }

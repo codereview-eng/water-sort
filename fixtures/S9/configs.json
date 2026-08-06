@@ -1,0 +1,5 @@
+{
+  "water": { "enabled": true, "everyN": 3 },
+  "sudoku": { "enabled": true, "everyN": 5, "minGapSec": 60 },
+  "mockc": { "enabled": false }
+}

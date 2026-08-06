@@ -11,5 +11,15 @@
   "powerups": [
     { "id": "hint", "grantOn": [{ "trigger": "levelClear", "qty": 1 }] },
     { "id": "eraser", "grantOn": [{ "trigger": "purchase", "qty": 5 }] }
-  ]
+  ],
+  "weeklyEvent": {
+    "enabled": true,
+    "metric": "stars",
+    "period": "weekly",
+    "rewards": { "kind": "milestone", "tiers": [{ "at": 10, "coins": 5 }, { "at": 50, "coins": 30 }] }
+  },
+  "ads": {
+    "interstitial": { "enabled": true, "everyN": 5, "minGapSec": 60 },
+    "geo": { "CN": { "rewarded": false, "interstitial": false } }
+  }
 }

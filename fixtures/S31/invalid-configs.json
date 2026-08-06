@@ -1,0 +1,14 @@
+[
+  { "module": "cosmetics", "cfg": { "catalog": [], "themes": { "default": { "bg": "#fff" } }, "progressBackgrounds": [ { "fromLevel": 5, "themeId": "ghost-theme" } ] }, "error": "引用不存在 themeId", "why": "引用不存在的皮肤资源" },
+  { "module": "cosmetics", "cfg": { "catalog": [ { "id": "x", "unlock": [ { "type": "vip" } ] } ] }, "error": "未知 unlock\\.type", "why": "未知解锁条件类型" },
+  { "module": "cosmetics.noStreak", "cfg": { "catalog": [ { "id": "x", "unlock": [ { "type": "streak", "n": 5 } ] } ] }, "error": "未启用 streak", "why": "解锁条件引用未声明的连胜系统" },
+  { "module": "cosmetics", "cfg": { "catalog": [ { "id": "x", "price": { "coins": -5 } } ] }, "error": "必须是 >0 整数", "why": "负价格" },
+  { "module": "cosmetics", "cfg": { "catalog": [ { "id": "x", "price": { "gems": 5 } } ] }, "error": "引用不存在货币", "why": "幽灵货币" },
+  { "module": "cosmetics", "cfg": { "catalog": [], "themes": { "neon": { "bg": "#0ff" } } }, "error": "缺 default 主题", "why": "无 token 全量基准" },
+  { "module": "cosmetics", "cfg": { "catalog": [], "themes": { "default": { "bg": "#fff" }, "neon": { "shadow": "x" } } }, "error": "基准外 token", "why": "主题携带基准外 token" },
+  { "module": "cosmetics", "cfg": { "catalog": [ { "id": "x" } ] }, "error": "双缺", "why": "price 与 unlock 双缺" },
+  { "module": "streak", "cfg": { "enabled": true, "claimMode": "ad", "tiers": [ { "streak": 5, "reward": { "type": "coins", "amount": 1 } }, { "streak": 3, "reward": { "type": "coins", "amount": 2 } } ] }, "error": "严格递增", "why": "连胜阈值乱序" },
+  { "module": "streak", "cfg": { "enabled": true, "claimMode": "ad", "tiers": [ { "streak": 3, "reward": { "type": "cosmetic" } } ] }, "error": "按 id 引用", "why": "皮肤奖励缺 id 引用" },
+  { "module": "placements", "cfg": { "skin-unlock": { "format": "rewarded" } }, "error": "缺 onFail", "why": "rewarded 未声明失败策略" },
+  { "module": "placements", "cfg": { "pre": { "format": "interstitial", "capping": { "maxPerSession": 9, "maxPerDay": 1 } } }, "error": "矛盾", "why": "矛盾频控声明" }
+]

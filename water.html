@@ -827,7 +827,7 @@ const I18N = {
     bottleEmptyBody: '看一段广告,获得 <b style="color:var(--podium)">2 个</b>加瓶道具(永久保留)。',
     adBottle: '看广告 +2 加瓶', notNow: '先不用', gotBottles: '+2 加瓶道具',
     bottleAdded: '已用道具解锁 1 个空瓶', bottleUsed: '本关空瓶已全部解锁',
-    bottleUnlockedAd: '广告完成,空瓶已解锁', bottleLocked: '这个空瓶还没解锁',
+    bottleUnlockedAd: '广告完成,空瓶已解锁', bottleLocked: '这个空瓶还没解锁', noRoom: '目标瓶空位不足,这段同色倒不下',
     bottleUnlockAd: '广告解锁', bottleUnlocking: '播放中', bottleUnlockAria: '看广告解锁第 {n} 个空瓶',
     bottleTagLocked: '待解锁', bottleTagEmpty: '空瓶', bottleTagDone: '完成', bottleTagColors: '{n} 色',
     energyLowTitle: '体力不足',
@@ -890,7 +890,7 @@ const I18N = {
     bottleEmptyBody: 'Watch a short ad to get <b style="color:var(--podium)">2 extra bottles</b> (yours to keep).',
     adBottle: 'Watch ad · +2 bottles', notNow: 'Not now', gotBottles: '+2 extra bottles',
     bottleAdded: 'Unlocked 1 bottle with an item', bottleUsed: 'All bottles are unlocked',
-    bottleUnlockedAd: 'Ad complete — bottle unlocked', bottleLocked: 'This bottle is still locked',
+    bottleUnlockedAd: 'Ad complete — bottle unlocked', bottleLocked: 'This bottle is still locked', noRoom: 'Not enough room in the target bottle',
     bottleUnlockAd: 'Watch ad', bottleUnlocking: 'Playing', bottleUnlockAria: 'Watch an ad to unlock empty bottle {n}',
     bottleTagLocked: 'Locked', bottleTagEmpty: 'Empty', bottleTagDone: 'Done', bottleTagColors: '{n} colors',
     energyLowTitle: 'Not enough energy',
@@ -1892,8 +1892,8 @@ function tapTube(i) {
   }
   if (S.sel === i) { S.sel = -1; render(); return; }    // 再点一次取消选中
 
-  const res = WaterEngine.pour(S.tubes, S.sel, i, S.capacity, 1);   // 一次只倒一格
-  if (!res) { haptic('error'); WaterAudio.play('illegal'); shakeTube(i); return; }
+  const res = WaterEngine.pour(S.tubes, S.sel, i, S.capacity); // 整段倒入: 源顶连续同色段一次全部倒入
+  if (!res) { const _s = S.tubes[S.sel], _d = S.tubes[i]; if (_d.length > 0 && _d.length < S.capacity && WaterEngine.top(_d) === WaterEngine.top(_s) && S.capacity - _d.length < WaterEngine.topRun(_s)) toast(t('noRoom')); haptic('error'); WaterAudio.play('illegal'); shakeTube(i); return; }
 
   const from = S.sel;
   S.undo.push(JSON.stringify(S.tubes));

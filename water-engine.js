@@ -41,21 +41,22 @@
     if (dst.length > 0 && top(dst) !== top(src)) return false;
     // 无意义平移：源已单色 且 目标为空
     if (dst.length === 0 && isMonochrome(src)) return false;
+    // 整段倒入硬门: 目标空位必须容得下源顶连续同色段, 空位不足则该步非法
+    if (cap - dst.length < topRun(src)) return false;
     return true;
   }
 
-  // 方案 A：部分倒出 —— 倒出量受目标剩余容量限制
+  // 倒出量 = 源顶连续同色段长(整段倒入; 空位不足的移动已被 canMove 拦下)
   const pourAmount = (state, i, j, capacity) =>
     Math.min(topRun(state[i]), (capacity || CAPACITY) - state[j].length);
 
   // 纯函数：不改入参；非法移动返回 null
-  function pour(state, i, j, capacity, maxAmount) {
+  function pour(state, i, j, capacity) {
     const cap = capacity || CAPACITY;
     if (!canMove(state, i, j, cap)) return null;
     const next = clone(state);
     const room = pourAmount(next, i, j, cap);
-    // maxAmount(可选): 单次最多倒几格——玩法侧传 1 实现「每次只倒一格」;不传保持整段语义(求解器/提示用)
-    const amount = Number.isInteger(maxAmount) && maxAmount > 0 ? Math.min(room, maxAmount) : room;
+  const amount = room; // 整段倒入: canMove 已保证目标空位容得下源顶连续同色段
     const color = top(next[i]);
     for (let k = 0; k < amount; k += 1) next[j].push(next[i].pop());
     return { state: next, amount, color };

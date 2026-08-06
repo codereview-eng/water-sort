@@ -33,14 +33,16 @@ test('canMove: 单色管→空管 判非法（无意义平移，也砍掉求解�
   assert.strictEqual(canMove([['r', 'r', 'r', 'r'], []], 0, 1), false);
 });
 
-test('pourAmount / pour: 方案 A 部分倒出，受目标剩余容量限制', () => {
-  const s = [['g', 'r', 'r', 'r'], ['r', 'r']];
-  assert.strictEqual(pourAmount(s, 0, 1), 2);
+test('pourAmount / pour: 整段倒入, 空位不足的移动直接非法', () => {
+  const s = [['g', 'r', 'r'], ['r'], []];
+  assert.strictEqual(pourAmount(s, 0, 1), 2); // 顶段整段长度
   const r = pour(s, 0, 1);
-  assert.deepStrictEqual(r.state[0], ['g', 'r']);
-  assert.deepStrictEqual(r.state[1], ['r', 'r', 'r', 'r']);
   assert.strictEqual(r.amount, 2);
   assert.strictEqual(r.color, 'r');
+  assert.deepStrictEqual(r.state[0], ['g']);
+  assert.deepStrictEqual(r.state[1], ['r', 'r', 'r']);
+  // 空位(1) < 源顶同色段(2): canMove 拦下, pour 返回 null
+  assert.strictEqual(pour([['g', 'r', 'r'], ['r', 'r', 'r'], []], 0, 1), null);
 });
 
 test('pour: 纯函数不改入参；非法移动返回 null', () => {
@@ -101,16 +103,21 @@ test('死局：4 色满管零空管，无合法移动且被判不可解', () => 
   assert.strictEqual(CAPACITY, 4);
 });
 
-test('pour: maxAmount=1 一次只倒一格,重复倒可清空同色段;不传保持整段', () => {
+test('pour: 整段倒入——源顶连续同色段一次全部倒入', () => {
   const s = [['g', 'r', 'r'], ['r'], []];
-  const r1 = pour(s, 0, 1, 4, 1);
-  assert.strictEqual(r1.amount, 1);
-  assert.deepStrictEqual(r1.state[0], ['g', 'r']);
-  assert.deepStrictEqual(r1.state[1], ['r', 'r']);
-  const r2 = pour(r1.state, 0, 1, 4, 1);
-  assert.strictEqual(r2.amount, 1);
-  assert.deepStrictEqual(r2.state[0], ['g']);
-  assert.deepStrictEqual(r2.state[1], ['r', 'r', 'r']);
-  assert.strictEqual(pour(s, 0, 1, 4).amount, 2);
-  assert.deepStrictEqual(s, [['g', 'r', 'r'], ['r'], []]);   // 纯函数不改入参
+  const r1 = pour(s, 0, 1, 4);
+  assert.strictEqual(r1.amount, 2);
+  assert.deepStrictEqual(r1.state[0], ['g']);
+  assert.deepStrictEqual(r1.state[1], ['r', 'r', 'r']);
+  assert.deepStrictEqual(s, [['g', 'r', 'r'], ['r'], []]); // 纯函数不改入参
+});
+
+test('pour: 目标空位不足整段时禁倒(canMove=false 且 pour=null); 恰好等于整段可倒', () => {
+  const lack = [['g', 'r', 'r'], ['r', 'r', 'r'], []]; // 空位1 < 顶段2
+  assert.strictEqual(canMove(lack, 0, 1, 4), false);
+  assert.strictEqual(pour(lack, 0, 1, 4), null);
+  const fit = [['g', 'r', 'r'], ['r', 'r'], []]; // 空位2 === 顶段2
+  const r = pour(fit, 0, 1, 4);
+  assert.strictEqual(r.amount, 2);
+  assert.deepStrictEqual(r.state[1], ['r', 'r', 'r', 'r']);
 });

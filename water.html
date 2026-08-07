@@ -830,6 +830,9 @@ const I18N = {
     statNoPar: '', par: '最少 {n} 步可过', hintNone: '这局暂时算不出提示',
     stuckTitle: '没有可走的了', stuckBody: '撤销一步换个走法,或者重开本关(都不花体力)',
     stuckUndo: '撤销一步', stuckRestart: '重开本关',
+    stuckBodyBottle: '本关还有<b style="color:var(--podium)">没解锁的空瓶</b>,解锁 1 个就能继续;也可以撤销一步或重开本关(都不花体力)',
+    stuckBottleAd: '看广告解锁空瓶', stuckBottleItem: '用道具解锁空瓶(剩 {n})',
+    stuckStillNoMove: '解锁后仍然没有可走的了',
     share: '分享战绩', next: '下一关(消耗 15 体力)', toHome: '回首页',
     langLabel: '语言', langName: '中文',
     shareText: '我在数独里通过了第 {n} 关!来挑战我:',
@@ -893,6 +896,9 @@ const I18N = {
     statNoPar: '', par: 'Best known: {n} moves', hintNone: 'No hint available for this board',
     stuckTitle: 'No legal moves left', stuckBody: 'Undo a move and try another line, or restart the level (both free)',
     stuckUndo: 'Undo one move', stuckRestart: 'Restart level',
+    stuckBodyBottle: 'This level still has a <b style="color:var(--podium)">locked empty bottle</b> — unlock one to keep going, or undo / restart (both free)',
+    stuckBottleAd: 'Watch ad · unlock a bottle', stuckBottleItem: 'Use item · unlock a bottle ({n} left)',
+    stuckStillNoMove: 'Still no legal move after unlocking',
     share: 'Share result', next: 'Next level (15 energy)', toHome: 'Home',
     langLabel: 'Language', langName: 'English',
     shareText: 'I cleared level {n} in Sudoku! Beat me:',
@@ -2136,13 +2142,28 @@ function timeUp() {
 
 // 倒水没有「填错」这回事,唯一的负向出口是「一步合法移动都没有了」。
 // 这时不判死:给撤销一步 / 重开本关两个出口(撤销是免费的,不逼玩家看广告)。
+//
+// 关键:死局判定(tapTube 里的 playable)把「还没解锁的空瓶」当作不可用,
+// 所以只要本关还锁着空瓶,这就是**伪死局**——解锁一个空瓶就能继续玩。
+// 早先这里写死三个按钮(撤销/重开/首页),玩家明明能开瓶却被逼撤销或重开,白丢一局。
+// 现在按局面动态给出口:还有锁着的空瓶 → 补「解锁空瓶」(有道具直接用道具,
+// 没道具才看广告);没有锁着的空瓶才是真死局,维持原来三个出口。
 function stuck() {
   stopTimer(); haptic('error');
+  const lockedLeft = lockedBottleIndexes().length;
+  const stock = Profile.state ? (Number(Profile.state.bottles) || 0) : 0;
+  const bottleBtn = !lockedLeft ? ''
+    : (stock > 0
+      ? `<button class="btn" id="dlgStuckBottle">${t('stuckBottleItem', { n: stock })}</button>`
+      : `<button class="btn ad" id="dlgStuckBottle">${t('stuckBottleAd')}</button>`);
   dialog(`<h2>${t('stuckTitle')}</h2>
-    <p>${t('stuckBody')}</p>
-    <button class="btn" id="dlgUndo">${t('stuckUndo')}</button>
+    <p>${lockedLeft ? t('stuckBodyBottle') : t('stuckBody')}</p>
+    ${bottleBtn}
+    <button class="btn${lockedLeft ? ' ghost' : ''}" id="dlgUndo">${t('stuckUndo')}</button>
     <button class="btn ghost" id="dlgRestart">${t('stuckRestart')}</button>
     <button class="btn ghost" id="dlgGiveup">${t('toHome')}</button>`);
+  const bottleEl = overlay.querySelector('#dlgStuckBottle');
+  if (bottleEl) bottleEl.addEventListener('click', () => unlockBottleFromStuck(bottleEl, stock));
   overlay.querySelector('#dlgUndo').addEventListener('click', () => {
     closeDialog(); startTimer();
     document.getElementById('btnUndo').click();
@@ -2155,6 +2176,60 @@ function stuck() {
     S.finished = true; closeDialog(); show('home');
   });
   InterAd.arm(); // issue #22:结算态空闲插屏
+}
+
+// 死局弹窗里的「解锁空瓶」出口:有道具走道具(免费),没道具才看广告。
+// 解锁成功后不盲目认为局面已活:引擎禁止「整瓶单色 → 空瓶」这类无意义平移,
+// 极端残局解锁后仍可能无路可走,所以这里重新判一次,还是死就再弹一次弹窗
+// (那时锁着的空瓶已减少,出口随之变化),而不是把玩家丢回一个点不动的棋盘。
+function unlockBottleFromStuck(btn, stock) {
+  if (S.finished || S.unlockingBottle >= 0) return;
+  const target = lockedBottleIndexes()[0];
+  if (target == null) { toast(t('bottleUsed')); return; }
+  const finish = (ok) => {
+    if (!ok) return;
+    closeDialog();
+    InterAd.cancel();          // 玩家选择继续本局,别让结算态插屏打断棋盘
+    const playable = WaterEngine.legalMoves(S.tubes, S.capacity)
+      .filter((mv) => !isBottleLocked(mv[0]) && !isBottleLocked(mv[1]));
+    if (!playable.length) { toast(t('stuckStillNoMove')); stuck(); return; }
+    if (!S.finished) startTimer();
+  };
+  if (stock > 0) {
+    finish(applyBottleUnlock(WaterPowerups.unlockBottle(S.tubes, {
+      stock: Profile.state.bottles,
+      lockedBottleIndexes: S.lockedBottleSlots,
+      unlocked: S.unlockedBottles,
+      mode: 'item',
+      target,
+    }), 'bottleAdded'));
+    return;
+  }
+  btn.disabled = true;
+  btn.classList.add('busy');
+  btn.textContent = t('bottleUnlocking');
+  S.unlockingBottle = target;
+  showRewardedAd().then(() => {
+    finish(applyBottleUnlock(WaterPowerups.unlockBottle(S.tubes, {
+      stock: Profile.state.bottles,
+      lockedBottleIndexes: S.lockedBottleSlots,
+      unlocked: S.unlockedBottles,
+      mode: 'ad',
+      target,
+    }), 'bottleUnlockedAd'));
+  }, (err) => {
+    // 降级可观测:广告没看完/没拿到奖励时要能从日志看出原因,不做静默吞异常
+    console.warn('[water] stuck-unlock ad failed', err && (err.name || err.message || err));
+    toast(t('adFail'));
+  }).then(() => {
+    S.unlockingBottle = -1;
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.classList.remove('busy');
+      btn.textContent = t('stuckBottleAd');
+    }
+    render();
+  });
 }
 
 function win() {
@@ -2271,6 +2346,10 @@ function emitWaterGt() {
     locked: lockedBottleIndexes().length,
     undo: S.undo.length, undoItems: Profile.state ? (Number(Profile.state.undos) || 0) : -1,
     restartMatches: JSON.stringify(S.tubes) === JSON.stringify(S.start),
+    // 死局弹窗出口对账:弹窗是否开着、有没有「解锁空瓶」这一路、一共几个按钮
+    stuckOpen: !overlay.hidden && !!overlay.querySelector('#dlgUndo'),
+    stuckBottleBtn: !!overlay.querySelector('#dlgStuckBottle'),
+    stuckBtns: overlay.hidden ? 0 : overlay.querySelectorAll('.dialog .btn').length,
   });
   document.body.appendChild(gt);
 }
@@ -2324,8 +2403,20 @@ function boot() {
             if (/[#&]watergt/.test(location.hash)) emitWaterGt();
           }, 1500);
         }, 0);
+        // 调试入口:#stucktest 直接弹出「没有可走的了」出口弹窗(截图/自动化用,不改棋盘)。
+        // #stuckunlock 随后点击弹窗里的「解锁空瓶」按钮,验证伪死局能真的被解开。
+        if (/[#&]stucktest/.test(location.hash)) setTimeout(() => {
+          stuck();
+          if (/[#&]stuckunlock/.test(location.hash)) {
+            const b = overlay.querySelector('#dlgStuckBottle');
+            if (b) b.click();
+            setTimeout(() => { if (/[#&]watergt/.test(location.hash)) emitWaterGt(); }, 1500);
+            return;
+          }
+          if (/[#&]watergt/.test(location.hash)) emitWaterGt();
+        }, 0);
         if (/[#&]watergt/.test(location.hash) &&
-            !/[#&](?:addbottle|adunlock)/.test(location.hash)) setTimeout(emitWaterGt, 0);
+            !/[#&](?:addbottle|adunlock|stucktest)/.test(location.hash)) setTimeout(emitWaterGt, 0);
         // 调试入口:#wintest 立即进入胜利结算态(issue #22 插屏链路截图/自动化用)
         if (/[#&]wintest/.test(location.hash)) setTimeout(win, 0);
         // 调试入口:#autosolve 按求解器最优解自动走完本关(截图/回归验证用,正常玩法不受影响)

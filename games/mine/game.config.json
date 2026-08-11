@@ -1,0 +1,138 @@
+{
+  "id": "mine",
+  "reward": {
+    "eMax": 120,
+    "eCost": 15,
+    "eTickMs": 60000,
+    "eAd": 60
+  },
+  "settle": {
+    "mode": "fixed",
+    "base": 10,
+    "firstClearMult": 3,
+    "adBonus": {
+      "enabled": true,
+      "multiplier": 2,
+      "dailyCap": 10,
+      "cooldownMs": 60000
+    }
+  },
+  "powerups": [
+    {
+      "id": "toolMine",
+      "grantOn": [
+        {
+          "trigger": "levelClear",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "id": "toolSafe",
+      "grantOn": [
+        {
+          "trigger": "dailyLogin",
+          "qty": 1
+        }
+      ]
+    }
+  ],
+  "ads": {
+    "interstitial": {
+      "enabled": true,
+      "everyN": 5,
+      "minGapSec": 60
+    },
+    "geo": {
+      "CN": {
+        "rewarded": false,
+        "interstitial": false
+      }
+    },
+    "placements": {
+      "tool-refill": {
+        "format": "rewarded",
+        "onFail": "deny"
+      },
+      "fail-revive": {
+        "format": "rewarded",
+        "onFail": "retry"
+      },
+      "time-bonus": {
+        "format": "rewarded",
+        "onFail": "deny",
+        "capping": {
+          "maxPerSession": 3
+        }
+      }
+    }
+  },
+  "lifetimeStats": [
+    {
+      "key": "mines_found",
+      "event": "mine_found",
+      "agg": "count",
+      "label": "找到多少雷"
+    },
+    {
+      "key": "total_clears",
+      "event": "level_cleared",
+      "agg": "count",
+      "label": "通关数"
+    },
+    {
+      "key": "best_level",
+      "event": "level_cleared",
+      "agg": "max",
+      "field": "level",
+      "label": "最高关卡"
+    }
+  ],
+  "leaderboards": [
+    {
+      "id": "top_level",
+      "metric": "best_level",
+      "order": "desc",
+      "operator": "best",
+      "period": "none"
+    }
+  ],
+  "i18n": {
+    "default": "en",
+    "locales": {
+      "en": {
+        "play": "Play",
+        "hint": "Hint"
+      },
+      "zh": {
+        "play": "开始",
+        "hint": "提示"
+      }
+    }
+  },
+  "geoAccess": {
+    "mode": "all"
+  },
+  "screens": {
+    "home": {
+      "modules": [
+        {
+          "type": "level-select"
+        }
+      ]
+    },
+    "result": {
+      "modules": [
+        {
+          "type": "settle-summary"
+        }
+      ]
+    }
+  },
+  "host": {
+    "storagePrefix": "mine:"
+  },
+  "save": {
+    "version": 1
+  }
+}

@@ -231,7 +231,378 @@
         [], [],
       ],
     },
-  ];
+      { // 第 6 关 · basic · 4 色 2 空管 · 锁 5 · seed 600001
+      theme: 'basic', colors: 4, empty: 2,
+      minMoves: 12, minMovesLocked: 12, lockedBottleIndexes: [5],
+      layout: [
+        ['mint', 'sky', 'sky', 'coral'],
+        ['sky', 'coral', 'gold', 'mint'],
+        ['gold', 'mint', 'coral', 'gold'],
+        ['mint', 'gold', 'coral', 'sky'],
+        [],
+        [],
+      ],
+    },   // 扫 1 个盘面 / 466ms
+    { // 第 7 关 · basic · 4 色 2 空管 · 锁 5 · seed 700004
+      theme: 'basic', colors: 4, empty: 2,
+      minMoves: 14, minMovesLocked: 14, lockedBottleIndexes: [5],
+      layout: [
+        ['sky', 'mint', 'coral', 'mint'],
+        ['mint', 'coral', 'gold', 'sky'],
+        ['sky', 'coral', 'sky', 'gold'],
+        ['gold', 'mint', 'gold', 'coral'],
+        [],
+        [],
+      ],
+    },   // 扫 4 个盘面 / 525ms
+    { // 第 8 关 · basic · 5 色 2 空管 · 锁 6 · seed 800003
+      theme: 'basic', colors: 5, empty: 2,
+      minMoves: 17, minMovesLocked: 17, lockedBottleIndexes: [6],
+      layout: [
+        ['violet', 'mint', 'gold', 'coral'],
+        ['violet', 'mint', 'violet', 'sky'],
+        ['mint', 'gold', 'mint', 'coral'],
+        ['sky', 'gold', 'coral', 'sky'],
+        ['violet', 'gold', 'sky', 'coral'],
+        [],
+        [],
+      ],
+    },   // 扫 3 个盘面 / 925ms
+    { // 第 9 关 · basic · 5 色 2 空管 · 锁 6 · seed 900214
+      theme: 'basic', colors: 5, empty: 2,
+      minMoves: 17, minMovesLocked: 18, lockedBottleIndexes: [6],
+      layout: [
+        ['mint', 'gold', 'mint', 'coral'],
+        ['violet', 'coral', 'gold', 'mint'],
+        ['gold', 'violet', 'sky', 'coral'],
+        ['gold', 'violet', 'sky', 'violet'],
+        ['sky', 'coral', 'sky', 'mint'],
+        [],
+        [],
+      ],
+    },   // 扫 214 个盘面 / 42672ms
+    { // 第 10 关 · basic · 5 色 2 空管 · 锁 6 · seed 1000080 · 离带 2 步
+      theme: 'basic', colors: 5, empty: 2,
+      minMoves: 16, minMovesLocked: 17, lockedBottleIndexes: [6],
+      layout: [
+        ['mint', 'violet', 'mint', 'gold'],
+        ['sky', 'gold', 'coral', 'gold'],
+        ['sky', 'coral', 'mint', 'coral'],
+        ['mint', 'sky', 'gold', 'violet'],
+        ['violet', 'violet', 'sky', 'coral'],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 91332ms
+    { // 第 11 关 · tight · 5 色 3 空管 · 锁 6,7 · seed 1100136
+      theme: 'tight', colors: 5, empty: 3,
+      minMoves: 16, minMovesLocked: 17, lockedBottleIndexes: [6, 7],
+      layout: [
+        ['violet', 'mint', 'coral', 'gold'],
+        ['violet', 'coral', 'violet', 'sky'],
+        ['gold', 'sky', 'gold', 'mint'],
+        ['mint', 'mint', 'coral', 'sky'],
+        ['gold', 'sky', 'coral', 'violet'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 136 个盘面 / 84683ms
+    { // 第 12 关 · tight · 5 色 3 空管 · 锁 6,7 · seed 1200016 · 离带 2 步
+      theme: 'tight', colors: 5, empty: 3,
+      minMoves: 16, minMovesLocked: 17, lockedBottleIndexes: [6, 7],
+      layout: [
+        ['violet', 'sky', 'gold', 'violet'],
+        ['sky', 'violet', 'sky', 'violet'],
+        ['gold', 'coral', 'sky', 'mint'],
+        ['coral', 'gold', 'mint', 'gold'],
+        ['mint', 'coral', 'coral', 'mint'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 173110ms
+    { // 第 13 关 · tight · 6 色 3 空管 · 锁 8 · seed 1300356
+      theme: 'tight', colors: 6, empty: 3,
+      minMoves: 19, minMovesLocked: 20, lockedBottleIndexes: [8],
+      layout: [
+        ['violet', 'violet', 'amber', 'coral'],
+        ['violet', 'mint', 'mint', 'sky'],
+        ['violet', 'mint', 'gold', 'coral'],
+        ['coral', 'amber', 'gold', 'sky'],
+        ['coral', 'gold', 'amber', 'sky'],
+        ['sky', 'amber', 'gold', 'mint'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 356 个盘面 / 431113ms
+    { // 第 14 关 · tight · 6 色 3 空管 · 锁 8 · seed 1400052
+      theme: 'tight', colors: 6, empty: 3,
+      minMoves: 21, minMovesLocked: 21, lockedBottleIndexes: [8],
+      layout: [
+        ['coral', 'amber', 'gold', 'violet'],
+        ['coral', 'mint', 'coral', 'sky'],
+        ['violet', 'sky', 'gold', 'sky'],
+        ['coral', 'amber', 'violet', 'mint'],
+        ['gold', 'violet', 'amber', 'gold'],
+        ['mint', 'amber', 'sky', 'mint'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 52 个盘面 / 49264ms
+    { // 第 15 关 · tight · 6 色 3 空管 · 锁 7,8 · seed 1500410 · 离带 3 步
+      theme: 'tight', colors: 6, empty: 3,
+      minMoves: 19, minMovesLocked: 20, lockedBottleIndexes: [7, 8],
+      layout: [
+        ['gold', 'sky', 'coral', 'coral'],
+        ['gold', 'violet', 'amber', 'mint'],
+        ['violet', 'gold', 'mint', 'sky'],
+        ['violet', 'violet', 'amber', 'sky'],
+        ['coral', 'sky', 'coral', 'amber'],
+        ['mint', 'amber', 'mint', 'gold'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 54915ms
+    { // 第 16 关 · crowd · 6 色 3 空管 · 锁 7,8 · seed 1600251 · 离带 1 步
+      theme: 'crowd', colors: 6, empty: 3,
+      minMoves: 21, minMovesLocked: 22, lockedBottleIndexes: [7, 8],
+      layout: [
+        ['violet', 'coral', 'mint', 'amber'],
+        ['mint', 'gold', 'coral', 'sky'],
+        ['sky', 'amber', 'gold', 'amber'],
+        ['amber', 'sky', 'violet', 'coral'],
+        ['violet', 'gold', 'mint', 'coral'],
+        ['mint', 'violet', 'sky', 'gold'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 279938ms
+    { // 第 17 关 · crowd · 6 色 3 空管 · 锁 7,8 · seed 1700374 · 离带 3 步
+      theme: 'crowd', colors: 6, empty: 3,
+      minMoves: 20, minMovesLocked: 21, lockedBottleIndexes: [7, 8],
+      layout: [
+        ['gold', 'mint', 'sky', 'mint'],
+        ['amber', 'sky', 'coral', 'violet'],
+        ['coral', 'amber', 'violet', 'amber'],
+        ['violet', 'amber', 'sky', 'gold'],
+        ['mint', 'sky', 'violet', 'coral'],
+        ['coral', 'gold', 'mint', 'gold'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 103842ms
+    { // 第 18 关 · crowd · 6 色 3 空管 · 锁 7,8 · seed 1800026 · 离带 5 步
+      theme: 'crowd', colors: 6, empty: 3,
+      minMoves: 19, minMovesLocked: 20, lockedBottleIndexes: [7, 8],
+      layout: [
+        ['amber', 'mint', 'violet', 'coral'],
+        ['mint', 'coral', 'sky', 'coral'],
+        ['amber', 'mint', 'amber', 'violet'],
+        ['gold', 'gold', 'sky', 'coral'],
+        ['sky', 'violet', 'gold', 'mint'],
+        ['sky', 'amber', 'gold', 'violet'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 89171ms
+    { // 第 19 关 · crowd · 6 色 4 空管 · 锁 7,8,9 · seed 1900058 · 离带 6 步
+      theme: 'crowd', colors: 6, empty: 4,
+      minMoves: 18, minMovesLocked: 20, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['violet', 'sky', 'amber', 'coral'],
+        ['gold', 'coral', 'amber', 'violet'],
+        ['coral', 'gold', 'sky', 'violet'],
+        ['sky', 'amber', 'violet', 'coral'],
+        ['sky', 'mint', 'gold', 'gold'],
+        ['mint', 'mint', 'amber', 'mint'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 317743ms
+    { // 第 20 关 · crowd · 6 色 4 空管 · 锁 7,8,9 · seed 2000314 · 离带 6 步
+      theme: 'crowd', colors: 6, empty: 4,
+      minMoves: 19, minMovesLocked: 21, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['violet', 'sky', 'gold', 'amber'],
+        ['amber', 'violet', 'mint', 'mint'],
+        ['sky', 'violet', 'sky', 'gold'],
+        ['sky', 'amber', 'gold', 'coral'],
+        ['mint', 'coral', 'violet', 'gold'],
+        ['mint', 'coral', 'amber', 'coral'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 380848ms
+    { // 第 21 关 · crowd · 6 色 4 空管 · 锁 7,8,9 · seed 2100462 · 离带 6 步
+      theme: 'crowd', colors: 6, empty: 4,
+      minMoves: 19, minMovesLocked: 21, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['gold', 'mint', 'gold', 'amber'],
+        ['violet', 'mint', 'violet', 'mint'],
+        ['coral', 'sky', 'gold', 'sky'],
+        ['coral', 'amber', 'amber', 'violet'],
+        ['amber', 'coral', 'violet', 'sky'],
+        ['gold', 'mint', 'coral', 'sky'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 394965ms
+    { // 第 22 关 · crowd · 6 色 4 空管 · 锁 7,8,9 · seed 2200492 · 离带 9 步
+      theme: 'crowd', colors: 6, empty: 4,
+      minMoves: 17, minMovesLocked: 19, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['mint', 'mint', 'coral', 'amber'],
+        ['coral', 'amber', 'amber', 'gold'],
+        ['mint', 'gold', 'violet', 'mint'],
+        ['sky', 'coral', 'sky', 'amber'],
+        ['coral', 'sky', 'violet', 'violet'],
+        ['violet', 'gold', 'sky', 'gold'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 358933ms
+    { // 第 23 关 · master · 6 色 3 空管 · 锁 7,8 · seed 2300259 · 离带 5 步
+      theme: 'master', colors: 6, empty: 3,
+      minMoves: 20, minMovesLocked: 21, lockedBottleIndexes: [7, 8],
+      layout: [
+        ['coral', 'amber', 'sky', 'coral'],
+        ['violet', 'gold', 'violet', 'sky'],
+        ['mint', 'coral', 'mint', 'amber'],
+        ['coral', 'gold', 'amber', 'gold'],
+        ['violet', 'mint', 'sky', 'mint'],
+        ['sky', 'violet', 'amber', 'gold'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 93029ms
+    { // 第 24 关 · master · 6 色 3 空管 · 锁 7,8 · seed 2400025 · 离带 7 步
+      theme: 'master', colors: 6, empty: 3,
+      minMoves: 19, minMovesLocked: 20, lockedBottleIndexes: [7, 8],
+      layout: [
+        ['mint', 'amber', 'gold', 'amber'],
+        ['sky', 'gold', 'sky', 'amber'],
+        ['mint', 'violet', 'sky', 'amber'],
+        ['coral', 'violet', 'violet', 'gold'],
+        ['gold', 'sky', 'coral', 'violet'],
+        ['coral', 'mint', 'coral', 'mint'],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 78929ms
+    { // 第 25 关 · master · 6 色 4 空管 · 锁 7,8,9 · seed 2500290 · 离带 8 步
+      theme: 'master', colors: 6, empty: 4,
+      minMoves: 18, minMovesLocked: 19, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['gold', 'mint', 'coral', 'sky'],
+        ['coral', 'mint', 'mint', 'gold'],
+        ['sky', 'coral', 'gold', 'amber'],
+        ['sky', 'violet', 'gold', 'coral'],
+        ['violet', 'mint', 'sky', 'amber'],
+        ['violet', 'amber', 'amber', 'violet'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 370199ms
+    { // 第 26 关 · master · 6 色 4 空管 · 锁 7,8,9 · seed 2600055 · 离带 7 步
+      theme: 'master', colors: 6, empty: 4,
+      minMoves: 20, minMovesLocked: 21, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['coral', 'gold', 'violet', 'sky'],
+        ['gold', 'amber', 'violet', 'mint'],
+        ['coral', 'sky', 'gold', 'violet'],
+        ['amber', 'sky', 'mint', 'violet'],
+        ['mint', 'coral', 'gold', 'sky'],
+        ['amber', 'mint', 'amber', 'coral'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 344219ms
+    { // 第 27 关 · master · 6 色 4 空管 · 锁 7,8,9 · seed 2700177 · 离带 7 步
+      theme: 'master', colors: 6, empty: 4,
+      minMoves: 20, minMovesLocked: 21, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['sky', 'amber', 'mint', 'coral'],
+        ['gold', 'mint', 'violet', 'coral'],
+        ['amber', 'violet', 'gold', 'sky'],
+        ['sky', 'mint', 'gold', 'amber'],
+        ['gold', 'sky', 'amber', 'violet'],
+        ['mint', 'coral', 'violet', 'coral'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 326859ms
+    { // 第 28 关 · master · 6 色 4 空管 · 锁 7,8,9 · seed 2800352 · 离带 8 步
+      theme: 'master', colors: 6, empty: 4,
+      minMoves: 20, minMovesLocked: 21, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['gold', 'sky', 'mint', 'coral'],
+        ['mint', 'amber', 'gold', 'violet'],
+        ['mint', 'violet', 'sky', 'gold'],
+        ['coral', 'mint', 'amber', 'sky'],
+        ['amber', 'gold', 'sky', 'violet'],
+        ['coral', 'violet', 'coral', 'amber'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 251516ms
+    { // 第 29 关 · master · 6 色 4 空管 · 锁 7,8,9 · seed 2900272 · 离带 10 步
+      theme: 'master', colors: 6, empty: 4,
+      minMoves: 18, minMovesLocked: 19, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['sky', 'coral', 'gold', 'coral'],
+        ['gold', 'mint', 'coral', 'violet'],
+        ['amber', 'violet', 'gold', 'sky'],
+        ['violet', 'sky', 'sky', 'amber'],
+        ['amber', 'coral', 'mint', 'mint'],
+        ['mint', 'gold', 'amber', 'violet'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 276862ms
+    { // 第 30 关 · master · 6 色 4 空管 · 锁 7,8,9 · seed 3000255 · 离带 10 步
+      theme: 'master', colors: 6, empty: 4,
+      minMoves: 19, minMovesLocked: 20, lockedBottleIndexes: [7, 8, 9],
+      layout: [
+        ['gold', 'sky', 'coral', 'gold'],
+        ['sky', 'gold', 'coral', 'violet'],
+        ['mint', 'amber', 'amber', 'mint'],
+        ['coral', 'mint', 'amber', 'violet'],
+        ['coral', 'violet', 'gold', 'sky'],
+        ['violet', 'mint', 'sky', 'amber'],
+        [],
+        [],
+        [],
+        [],
+      ],
+    },   // 扫 500 个盘面 / 208920ms
+];
 
   // 关卡入口：1-5 固定，6+ 生成。返回的 layout 是可变副本，UI 可直接改。
   // solveFn 透传给生成器做可解性验证（浏览器侧传 WaterEngine.solve）。

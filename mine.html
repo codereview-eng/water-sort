@@ -154,10 +154,11 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny"},"fail-revive":{"format":"rewarded","onFail":"retry"},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","hint":"Hint"},"zh":{"play":"开始","hint":"提示"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"icon":"💣","text":"彩色扫雷","em":"COLOR MINES"}},{"type":"energy","props":{}},{"type":"homestats","props":{"items":[{"id":"homeLv","label":"当前进度","initial":1},{"id":"homeClears","label":"累计通关"},{"id":"homeTools","label":"道具"}]}},{"type":"start-button","props":{"label":"开始 第","small":"消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"}},{"type":"profile-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"hintline","props":{"lines":["单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","雷与雷互不相邻，先推理再动手"]}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1}}</script>
+<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny"},"fail-revive":{"format":"rewarded","onFail":"retry"},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","hint":"Hint"},"zh":{"play":"开始","hint":"提示"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"icon":"💣","text":"彩色扫雷","em":"COLOR MINES"}},{"type":"energy","props":{}},{"type":"homestats","props":{"items":[{"id":"homeLv","label":"当前进度","initial":1},{"id":"homeClears","label":"累计通关"},{"id":"homeTools","label":"道具"}]}},{"type":"start-button","props":{"label":"开始 第","small":"消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"}},{"type":"profile-row","props":{}},{"type":"account-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"hintline","props":{"lines":["单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","雷与雷互不相邻，先推理再动手"]}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"level":{"col":"level","merge":"max"},"clears":{"col":"clears","merge":"max"},"toolMine":{"col":"tool_mine","merge":"newest"},"toolSafe":{"col":"tool_safe","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
 <script src="./core/shell.js"></script>
 <script src="./core/home.js"></script>
 <script src="./core/reward.js"></script>
+<script src="./core/platform.js"></script>
 <script src="./mine-engine.js"></script>
 <script src="./mine-levels.js"></script>
 <script>
@@ -177,7 +178,7 @@
   var save = Object.assign({ level: 1, clears: 0, toolMine: 2, toolSafe: 2,
     energy: Reward.E_MAX, lastTs: Date.now(), alias: '', sfx: true }, load() || {});
   function load(){ try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
-  function persist(){ try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+  function persist(){ save.updatedMs = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} platformSync(); }
 
   /* ============ 音效（首页设置可开关） ============ */
   var AC = null;
@@ -456,6 +457,8 @@
     stopTimer();
     $('game').hidden = true; $('home').hidden = false;
     renderHome();
+    renderAccount();
+    maybePromptLogin();
   }
   function startGame() {
     renderHome();                        // 先按当前时间恢复体力再判定
@@ -486,6 +489,63 @@
     if (S && !S.done) {
       dialog('退出本关？', '本关进度不保留，下次从第 ' + S.lv + ' 关重新开始。', '退出', showHome, '继续玩', null);
     } else showHome();
+  });
+
+  /* ============ run.ceo 平台（core/platform.js，SDK §0 两行接入）：云存档 + 登录，匿名可玩优先 ============ */
+  var Plat = null, platPrompted = false;
+  function platformSync() {
+    if (!Plat || Plat.mode !== 'online' || !Plat.user) return;
+    Plat.queueSync(function () { return save; }, {
+      onAuthLost: function () { renderAccount(); toast('登录已过期，进度暂存本机'); }
+    });
+  }
+  function renderAccount() {
+    if (!$('btnAccount')) return;
+    if (!Plat || Plat.mode !== 'online') {
+      $('accountStatus').textContent = Plat ? '本地存档' : '连接中…';
+      $('accountAction').textContent = '';
+    } else if (Plat.user) {
+      $('accountStatus').textContent = '已登录 · 进度云同步';
+      $('accountAction').textContent = '退出';
+    } else {
+      $('accountStatus').textContent = '未登录 · 进度仅存本机';
+      $('accountAction').textContent = '登录';
+    }
+  }
+  /* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
+  function maybePromptLogin() {
+    if (!Plat || Plat.mode !== 'online' || Plat.user) return;
+    if (!Plat.core.shouldPromptLogin({ clears: save.clears || 0, prompted: platPrompted })) return;
+    platPrompted = true;
+    dialog('进度存到云端？', '你已通关 ' + (save.clears || 0) + ' 盘。登录 run.ceo 账号后，进度、道具、体力跨设备同步，换浏览器不丢档。',
+      '登录', function () { Plat.login(); }, '稍后', null);
+  }
+  $('btnAccount').addEventListener('click', function () {
+    if (!Plat) { toast('平台连接中…'); return; }
+    if (Plat.mode !== 'online') { toast('当前环境不支持云存档，进度保存在本机'); return; }
+    if (Plat.user) {
+      dialog('退出登录？', '本机继续保留当前进度，云端存档不受影响。', '退出', function () {
+        Plat.logout(); Plat.user = null; renderAccount(); toast('已退出，进度改存本机');
+      }, '取消', null);
+    } else Plat.login();
+  });
+  PlatformCore.connect(CFG.platform).then(function (session) {
+    Plat = session;
+    renderAccount();
+    if (session.mode !== 'online') return;
+    session.on('authexpired', function () { renderAccount(); });
+    if (!session.user) return;
+    // 登录态：拉云档 → 字段级合并（进度取大、道具/体力按时间戳取新）→ 落本地并回写云端
+    session.loadCloud().then(function (row) {
+      // localFresh：本地没有实际游玩痕迹（换设备刚打开就登录），云端优先，防默认档覆盖云档
+      var localFresh = (save.clears || 0) === 0 && save.level <= 1;
+      var merged = session.core.mergeSave(save, row, { localFresh: localFresh }).save;
+      Object.keys(merged).forEach(function (k) { save[k] = merged[k]; });
+      persist(); renderHome(); renderAccount();
+    }).catch(function () { renderAccount(); });
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && Plat && Plat.mode === 'online') Plat.flush(function () { return save; });
   });
 
   showHome();

@@ -34,6 +34,24 @@ test('screens.home 声明可被 ShellCore+HomeCore+water 扩展完整渲染且�
   }
 });
 
+test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json 实体一致，页面经 connect 消费', () => {
+  const PlatformCore = require('./core/platform.js');
+  const P = PlatformCore.create(cfg.platform);
+  assert.strictEqual(P.entity, 'Save');
+  const schema = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/water/schema.json'), 'utf8'));
+  const entity = schema.entities[cfg.platform.entity];
+  assert.ok(entity, 'games/water/schema.json 缺实体 ' + cfg.platform.entity);
+  for (const key of Object.keys(cfg.platform.fields)) {
+    const col = cfg.platform.fields[key].col;
+    assert.ok(entity.fields[col], 'schema.json 实体缺列 ' + col + '（fields.' + key + ' 映射悬空）');
+  }
+  assert.strictEqual(entity.fields.updated_ms, 'number', 'schema 必须声明 updated_ms number（云档判新列）');
+  assert.ok(html.includes('PlatformCore.connect(GAME_CFG.platform)'), '页面未经 PlatformCore 消费 platform 配置');
+  assert.ok(html.includes('<script src="./core/platform.js"></script>'), '页面未引入 core/platform.js');
+  const joined = Shell.create(Home.registry(WaterHome.extensions()), { home: cfg.screens.home }).render('home', {}).join('');
+  assert.ok(joined.includes('id="btnAccount"'), '首页缺 account-row 回填锚点');
+});
+
 test('water 扩展不与通用模块重名，且页面经 ShellCore 消费、手写首页已移除', () => {
   assert.throws(() => Home.registry(new Map([['logo', () => '']])), /重名/);
   assert.ok(html.includes('ShellCore.create(HomeCore.registry(WaterHome.extensions())'), '页面未经 ShellCore 渲染 screens.home');

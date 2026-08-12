@@ -672,9 +672,10 @@ var SudokuEngine=(function(){
 <script src="./core/reward.js"></script>
 <script src="./reward.js"></script>
 <!-- 首页统一（issue #1）：config 声明 + core 模块渲染，与 mine.html 同款装配 -->
-<script id="gameConfig" type="application/json">{"id":"water","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"undo","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"addBottle","grantOn":[{"trigger":"dailyLogin","qty":1}],"unlock":[{"type":"level","n":3}]}],"weeklyEvent":{"enabled":true,"metric":"clears","period":"weekly","rewards":{"kind":"top10","tiers":[{"coins":100},{"coins":50},{"coins":25}]}},"ads":{"interstitial":{"enabled":true,"everyN":3},"geo":{"DE":{"rewarded":false}},"placements":{"pre-level-interstitial":{"format":"interstitial","capping":{"minIntervalSec":60,"maxPerDay":10}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}}},"lifetimeStats":[{"key":"bottles_poured","event":"pour","agg":"count","label":"倒了多少瓶"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_time_ms","event":"level_cleared","agg":"min","field":"timeMs","unit":"ms"},{"key":"current_streak","event":"streak_changed","agg":"last","field":"current"}],"leaderboards":[{"id":"fastest","metric":"best_time_ms","order":"asc","operator":"best","period":"none"},{"id":"streak_now","metric":"current_streak","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","settings":"Settings","undo":"Undo"},"zh":{"play":"开始","settings":"设置"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"text":"倒水排序","em":"WATER SORT"}},{"type":"energy","props":{}},{"type":"start-button","props":{"label":"开始","small":"消耗 15 体力 · 10 分钟限时"}},{"type":"weekly-event-entry","props":{}},{"type":"leaderboard-entry","props":{"boardId":"fastest"}},{"type":"homestats","props":{"items":[{"id":"stWins","label":"已通关","initial":0},{"id":"stBottles","label":"加瓶道具","initial":2}]}},{"type":"profile-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}}]},"result":{"modules":[{"type":"settle-summary"},{"type":"ad-double-button"}]}},"host":{"storagePrefix":"water:"},"save":{"version":1},"streak":{"enabled":true,"claimMode":"ad","policy":{"resetOnLoss":true},"tiers":[{"streak":10,"reward":{"type":"coins","amount":100}}]},"cosmetics":{"catalog":[{"id":"ocean-bg","kind":"background","unlock":[{"type":"level","n":20}]},{"id":"gold-bottle","kind":"skin","price":{"coins":50}}],"themes":{"default":{"bg":"#e8f4ff","piece":"bottle.png","sfx":"pour.mp3"},"sea":{"bg":"#8fd"},"deep":{"bg":"#046"}},"progressBackgrounds":[{"fromLevel":10,"themeId":"sea"},{"fromLevel":20,"themeId":"deep"}]}}</script>
+<script id="gameConfig" type="application/json">{"id":"water","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"undo","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"addBottle","grantOn":[{"trigger":"dailyLogin","qty":1}],"unlock":[{"type":"level","n":3}]}],"weeklyEvent":{"enabled":true,"metric":"clears","period":"weekly","rewards":{"kind":"top10","tiers":[{"coins":100},{"coins":50},{"coins":25}]}},"ads":{"interstitial":{"enabled":true,"everyN":3},"geo":{"DE":{"rewarded":false}},"placements":{"pre-level-interstitial":{"format":"interstitial","capping":{"minIntervalSec":60,"maxPerDay":10}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}}},"lifetimeStats":[{"key":"bottles_poured","event":"pour","agg":"count","label":"倒了多少瓶"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_time_ms","event":"level_cleared","agg":"min","field":"timeMs","unit":"ms"},{"key":"current_streak","event":"streak_changed","agg":"last","field":"current"}],"leaderboards":[{"id":"fastest","metric":"best_time_ms","order":"asc","operator":"best","period":"none"},{"id":"streak_now","metric":"current_streak","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","settings":"Settings","undo":"Undo"},"zh":{"play":"开始","settings":"设置"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"text":"倒水排序","em":"WATER SORT"}},{"type":"energy","props":{}},{"type":"start-button","props":{"label":"开始","small":"消耗 15 体力 · 10 分钟限时"}},{"type":"weekly-event-entry","props":{}},{"type":"leaderboard-entry","props":{"boardId":"fastest"}},{"type":"homestats","props":{"items":[{"id":"stWins","label":"已通关","initial":0},{"id":"stBottles","label":"加瓶道具","initial":2}]}},{"type":"profile-row","props":{}},{"type":"account-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}}]},"result":{"modules":[{"type":"settle-summary"},{"type":"ad-double-button"}]}},"host":{"storagePrefix":"water:"},"save":{"version":1},"streak":{"enabled":true,"claimMode":"ad","policy":{"resetOnLoss":true},"tiers":[{"streak":10,"reward":{"type":"coins","amount":100}}]},"cosmetics":{"catalog":[{"id":"ocean-bg","kind":"background","unlock":[{"type":"level","n":20}]},{"id":"gold-bottle","kind":"skin","price":{"coins":50}}],"themes":{"default":{"bg":"#e8f4ff","piece":"bottle.png","sfx":"pour.mp3"},"sea":{"bg":"#8fd"},"deep":{"bg":"#046"}},"progressBackgrounds":[{"fromLevel":10,"themeId":"sea"},{"fromLevel":20,"themeId":"deep"}]},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"wins":{"col":"wins","merge":"max"},"bottles":{"col":"bottles","merge":"newest"},"undos":{"col":"undos","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
 <script src="./core/shell.js"></script>
 <script src="./core/home.js"></script>
+<script src="./core/platform.js"></script>
 <script src="./water-home.js"></script>
 <script>
 /* ====================== 前 5 关固定盘面(与 levels.js 同源,内联;issue #14/#16) ======================
@@ -1242,8 +1243,10 @@ const Profile = {
   // 所有修改同步走内存副本,快照串行异步落盘 — 不存在读改写竞态窗口
   mutate(fn) {
     fn(this.state);
+    this.state.updatedMs = Date.now();  // 云档合并判新用（core/platform.js mergeSave）
     const snapshot = JSON.stringify(this.state);
     this.flushChain = this.flushChain.then(() => { Store.set(this.key, snapshot); });
+    platformSync();
   },
   // 体力离线/在线结算
   settle() {
@@ -1541,6 +1544,8 @@ function renderHome() {
   document.getElementById('wkEntryTitle').textContent = t('wkEntry', { theme: (th[LANG] || th.en).name });
   document.getElementById('wkEntrySub').textContent = t('wkEntrySub', { n: Weekly.GRAND.energy });
   document.getElementById('wkEntryFrag').textContent = t('wkFragShort', { n: WeeklyCtl.state ? WeeklyCtl.state.frags : 0 });
+  renderAccount();
+  maybePromptLogin();
   clearInterval(homeTimer);
   if (!pages.home.hidden) homeTimer = setInterval(() => { if (!pages.home.hidden) renderHome(); }, 1000);
 }
@@ -2401,13 +2406,86 @@ function boot() {
   });
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { if (!pages.game.hidden) { stopTimer(); } }
+  if (document.hidden) {
+    if (!pages.game.hidden) { stopTimer(); }
+    if (Plat && Plat.mode === 'online') Plat.flush(() => Object.assign({}, Profile.state));
+  }
   else {
     Profile.settle();
     if (!pages.game.hidden && S.tubes && !S.finished && overlay.hidden) startTimer();
     if (!pages.home.hidden) renderHome();
   }
 });
+/* ====================== run.ceo 平台（core/platform.js，SDK §0 两行接入）：云存档 + 登录，匿名可玩优先 ====================== */
+let Plat = null, platPrompted = false;
+function platformSync() {
+  if (!Plat || Plat.mode !== 'online' || !Plat.user) return;
+  Plat.queueSync(() => Object.assign({}, Profile.state), {
+    onAuthLost: () => { renderAccount(); toast(LANG === 'zh' ? '登录已过期，进度暂存本机' : 'Login expired, progress saved locally'); }
+  });
+}
+function renderAccount() {
+  if (!document.getElementById('btnAccount')) return;
+  const status = document.getElementById('accountStatus');
+  const action = document.getElementById('accountAction');
+  if (!Plat || Plat.mode !== 'online') {
+    status.textContent = Plat ? (LANG === 'zh' ? '本地存档' : 'Local save') : (LANG === 'zh' ? '连接中…' : 'Connecting…');
+    action.textContent = '';
+  } else if (Plat.user) {
+    status.textContent = LANG === 'zh' ? '已登录 · 进度云同步' : 'Signed in · cloud sync';
+    action.textContent = LANG === 'zh' ? '退出' : 'Sign out';
+  } else {
+    status.textContent = LANG === 'zh' ? '未登录 · 进度仅存本机' : 'Signed out · local only';
+    action.textContent = LANG === 'zh' ? '登录' : 'Sign in';
+  }
+}
+/* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
+function maybePromptLogin() {
+  if (!Plat || Plat.mode !== 'online' || Plat.user || !overlay.hidden) return;
+  if (!Plat.core.shouldPromptLogin({ clears: Profile.state ? (Profile.state.wins || 0) : 0, prompted: platPrompted })) return;
+  platPrompted = true;
+  dialog(`<h2>${LANG === 'zh' ? '进度存到云端？' : 'Save progress to cloud?'}</h2>
+    <p>${LANG === 'zh' ? '登录 run.ceo 账号后，通关进度、道具、体力跨设备同步，换浏览器不丢档。' : 'Sign in with your run.ceo account to sync progress, boosters and energy across devices.'}</p>
+    <button class="btn" id="dlgPlatLogin">${LANG === 'zh' ? '登录' : 'Sign in'}</button>
+    <button class="btn ghost" id="dlgPlatLater">${LANG === 'zh' ? '稍后' : 'Later'}</button>`);
+  overlay.querySelector('#dlgPlatLogin').addEventListener('click', () => { closeDialog(); Plat.login(); });
+  overlay.querySelector('#dlgPlatLater').addEventListener('click', closeDialog);
+}
+document.getElementById('btnAccount').addEventListener('click', () => {
+  if (!Plat) { toast(LANG === 'zh' ? '平台连接中…' : 'Connecting…'); return; }
+  if (Plat.mode !== 'online') { toast(LANG === 'zh' ? '当前环境不支持云存档，进度保存在本机' : 'Cloud save unavailable here; progress stays local'); return; }
+  if (Plat.user) {
+    dialog(`<h2>${LANG === 'zh' ? '退出登录？' : 'Sign out?'}</h2>
+      <p>${LANG === 'zh' ? '本机继续保留当前进度，云端存档不受影响。' : 'Local progress stays on this device; your cloud save is unaffected.'}</p>
+      <button class="btn" id="dlgPlatOut">${LANG === 'zh' ? '退出' : 'Sign out'}</button>
+      <button class="btn ghost" id="dlgPlatKeep">${LANG === 'zh' ? '取消' : 'Cancel'}</button>`);
+    overlay.querySelector('#dlgPlatOut').addEventListener('click', () => {
+      Plat.logout(); Plat.user = null; closeDialog(); renderAccount();
+      toast(LANG === 'zh' ? '已退出，进度改存本机' : 'Signed out; progress stays local');
+    });
+    overlay.querySelector('#dlgPlatKeep').addEventListener('click', closeDialog);
+  } else Plat.login();
+});
+PlatformCore.connect(GAME_CFG.platform).then((session) => {
+  Plat = session;
+  renderAccount();
+  if (session.mode !== 'online') return;
+  session.on('authexpired', renderAccount);
+  if (!session.user) return;
+  // Profile 异步加载（TG CloudStorage 场景）就绪后再合并云档
+  const whenProfile = (fn) => { if (Profile.state) fn(); else setTimeout(() => whenProfile(fn), 100); };
+  whenProfile(() => {
+    session.loadCloud().then((row) => {
+      // localFresh：本地无实际游玩痕迹（换设备刚打开就登录），云端优先，防默认档覆盖云档
+      const localFresh = (Profile.state.wins || 0) === 0;
+      const merged = session.core.mergeSave(Profile.state, row, { localFresh }).save;
+      Profile.mutate((s) => { Object.keys(merged).forEach((k) => { if (k !== 'localId') s[k] = merged[k]; }); });
+      if (!pages.home.hidden) renderHome();
+      renderAccount();
+    }).catch(() => renderAccount());
+  });
+});
+
 boot();
 </script>
 </body>

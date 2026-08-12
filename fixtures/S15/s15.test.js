@@ -56,9 +56,9 @@ test('S15: 真实游戏 config screens 落地且组合互不相同', () => {
   const s = Shell.create(registry(), gameCfg('sudoku').screens);
   const c = Shell.create(registry(), gameCfg('mockc').screens);
   assert.deepEqual(w.modules('home'),
-    ['logo', 'energy', 'start-button', 'weekly-event-entry', 'leaderboard-entry', 'homestats', 'profile-row', 'sound-toggle', 'lang-select']);
+    ['logo', 'energy', 'start-button', 'weekly-event-entry', 'leaderboard-entry', 'homestats', 'profile-row', 'account-row', 'sound-toggle', 'lang-select']);
   assert.deepEqual(m.modules('home'),
-    ['logo', 'energy', 'homestats', 'start-button', 'profile-row', 'sound-toggle', 'hintline']);
+    ['logo', 'energy', 'homestats', 'start-button', 'profile-row', 'account-row', 'sound-toggle', 'hintline']);
   assert.deepEqual(s.modules('home'), ['level-select']);
   assert.deepEqual(c.modules('home'), ['tap-button']);
   assert.notDeepEqual(w.modules('home'), m.modules('home'), 'water 与 mine 首页组合必须不同');

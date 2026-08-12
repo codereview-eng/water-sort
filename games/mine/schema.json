@@ -1,0 +1,19 @@
+{
+  "name": "color-mines",
+  "web": {},
+  "entities": {
+    "Save": {
+      "fields": {
+        "level": "number",
+        "clears": "number",
+        "tool_mine": "number",
+        "tool_safe": "number",
+        "energy": "number",
+        "energy_ts": "number",
+        "alias": "string",
+        "sfx": "boolean",
+        "updated_ms": "number"
+      }
+    }
+  }
+}

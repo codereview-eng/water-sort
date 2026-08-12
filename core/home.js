@@ -97,6 +97,20 @@
     return '<div class="hintline">' + props.lines.map(function (l) { return esc(String(l)); }).join('<br>') + '</div>';
   }
 
+  /* run.ceo 平台账号行（core/platform.js 配套）：复用 profilerow 样式，零 CSS 改动；
+     登录状态/动作文案运行时由游戏侧按 id 回填（accountStatus/accountAction） */
+  function accountRow(props) {
+    var label = props.label !== undefined ? esc(String(props.label)) : 'run.ceo 账号';
+    return '<button class="profilerow" id="btnAccount">' +
+      '<span class="avatar" id="accountAvatar">☁</span>' +
+      '<span class="profileinfo">' +
+      '<span class="profilelabel" id="accountLabel">' + label + '</span>' +
+      '<span class="profilename" id="accountStatus">未登录</span>' +
+      '</span>' +
+      '<span class="profilesource" id="accountAction">登录</span>' +
+      '</button>';
+  }
+
   /* ---------- 注册表：通用模块 + 游戏扩展合并（重名 fail-fast） ---------- */
   var COMMON = {
     'logo': logo,
@@ -106,7 +120,8 @@
     'profile-row': profileRow,
     'sound-toggle': soundToggle,
     'lang-select': langSelect,
-    'hintline': hintline
+    'hintline': hintline,
+    'account-row': accountRow
   };
 
   function registry(extensions) {

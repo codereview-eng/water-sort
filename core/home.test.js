@@ -7,7 +7,7 @@ const Shell = require('./shell.js');
 
 test('registry: 含全部通用模块', () => {
   const reg = Home.registry();
-  for (const t of ['logo', 'energy', 'start-button', 'homestats', 'profile-row', 'sound-toggle', 'lang-select', 'hintline']) {
+  for (const t of ['logo', 'energy', 'start-button', 'homestats', 'profile-row', 'sound-toggle', 'lang-select', 'hintline', 'account-row']) {
     assert.strictEqual(typeof reg.get(t), 'function', t + ' 缺失');
   }
 });
@@ -73,6 +73,15 @@ test('hintline: 多行 <br> 拼接且逐行转义', () => {
   assert.strictEqual(html, '<div class="hintline">单击 = 标记<br>雷与雷互不相邻</div>');
   assert.ok(Home.registry().get('hintline')({ lines: ['a<b'] }).includes('a&lt;b'));
   assert.throws(() => Home.registry().get('hintline')({ lines: [] }), /非空数组/);
+});
+
+test('account-row: 平台账号行带稳定回填 id，label 可覆盖且转义', () => {
+  const html = Home.registry().get('account-row')({});
+  for (const id of ['id="btnAccount"', 'id="accountAvatar"', 'id="accountLabel"', 'id="accountStatus"', 'id="accountAction"']) {
+    assert.ok(html.includes(id), id);
+  }
+  assert.ok(html.includes('run.ceo 账号'));
+  assert.ok(Home.registry().get('account-row')({ label: '<b>x</b>' }).includes('&lt;b&gt;'));
 });
 
 test('装配: ShellCore + home registry 按 config 声明渲染 home screen', () => {

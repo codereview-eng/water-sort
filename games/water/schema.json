@@ -1,0 +1,18 @@
+{
+  "name": "water-sort",
+  "web": {},
+  "entities": {
+    "Save": {
+      "fields": {
+        "wins": "number",
+        "bottles": "number",
+        "undos": "number",
+        "energy": "number",
+        "energy_ts": "number",
+        "alias": "string",
+        "sfx": "boolean",
+        "updated_ms": "number"
+      }
+    }
+  }
+}

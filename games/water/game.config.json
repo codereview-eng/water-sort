@@ -202,6 +202,10 @@
           "props": {}
         },
         {
+          "type": "account-row",
+          "props": {}
+        },
+        {
           "type": "sound-toggle",
           "props": {}
         },
@@ -287,5 +291,39 @@
         "themeId": "deep"
       }
     ]
+  },
+  "platform": {
+    "entity": "Save",
+    "loginPromptAfterClears": 3,
+    "fields": {
+      "wins": {
+        "col": "wins",
+        "merge": "max"
+      },
+      "bottles": {
+        "col": "bottles",
+        "merge": "newest"
+      },
+      "undos": {
+        "col": "undos",
+        "merge": "newest"
+      },
+      "energy": {
+        "col": "energy",
+        "merge": "newest"
+      },
+      "lastTs": {
+        "col": "energy_ts",
+        "merge": "newest"
+      },
+      "alias": {
+        "col": "alias",
+        "merge": "newest"
+      },
+      "sfx": {
+        "col": "sfx",
+        "merge": "newest"
+      }
+    }
   }
 }

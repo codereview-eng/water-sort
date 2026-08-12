@@ -160,6 +160,10 @@
           "props": {}
         },
         {
+          "type": "account-row",
+          "props": {}
+        },
+        {
           "type": "sound-toggle",
           "props": {}
         },
@@ -180,5 +184,43 @@
   },
   "save": {
     "version": 1
+  },
+  "platform": {
+    "entity": "Save",
+    "loginPromptAfterClears": 3,
+    "fields": {
+      "level": {
+        "col": "level",
+        "merge": "max"
+      },
+      "clears": {
+        "col": "clears",
+        "merge": "max"
+      },
+      "toolMine": {
+        "col": "tool_mine",
+        "merge": "newest"
+      },
+      "toolSafe": {
+        "col": "tool_safe",
+        "merge": "newest"
+      },
+      "energy": {
+        "col": "energy",
+        "merge": "newest"
+      },
+      "lastTs": {
+        "col": "energy_ts",
+        "merge": "newest"
+      },
+      "alias": {
+        "col": "alias",
+        "merge": "newest"
+      },
+      "sfx": {
+        "col": "sfx",
+        "merge": "newest"
+      }
+    }
   }
 }

@@ -34,6 +34,24 @@ test('screens.home 声明可被 ShellCore+HomeCore 完整渲染且含全部回�
   }
 });
 
+test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json 实体一致，页面经 connect 消费', () => {
+  const PlatformCore = require('./core/platform.js');
+  const P = PlatformCore.create(cfg.platform);
+  assert.strictEqual(P.entity, 'Save');
+  const schema = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/mine/schema.json'), 'utf8'));
+  const entity = schema.entities[cfg.platform.entity];
+  assert.ok(entity, 'games/mine/schema.json 缺实体 ' + cfg.platform.entity);
+  for (const key of Object.keys(cfg.platform.fields)) {
+    const col = cfg.platform.fields[key].col;
+    assert.ok(entity.fields[col], 'schema.json 实体缺列 ' + col + '（fields.' + key + ' 映射悬空）');
+  }
+  assert.strictEqual(entity.fields.updated_ms, 'number', 'schema 必须声明 updated_ms number（云档判新列）');
+  assert.ok(html.includes('PlatformCore.connect(CFG.platform)'), '页面未经 PlatformCore 消费 platform 配置');
+  assert.ok(html.includes('<script src="./core/platform.js"></script>'), '页面未引入 core/platform.js');
+  const joined = require('./core/shell.js').create(require('./core/home.js').registry(), cfg.screens).render('home', {}).join('');
+  assert.ok(joined.includes('id="btnAccount"'), '首页缺 account-row 回填锚点');
+});
+
 test('reward 配置过 RewardCore 校验且页面经 CFG 消费、手写首页已移除', () => {
   const R = RewardCore.create(cfg.reward);
   assert.strictEqual(R.E_COST, 15);

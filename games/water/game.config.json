@@ -153,7 +153,26 @@
     "home": {
       "modules": [
         {
-          "type": "weekly-event-entry"
+          "type": "logo",
+          "props": {
+            "text": "倒水排序",
+            "em": "WATER SORT"
+          }
+        },
+        {
+          "type": "energy",
+          "props": {}
+        },
+        {
+          "type": "start-button",
+          "props": {
+            "label": "开始",
+            "small": "消耗 15 体力 · 10 分钟限时"
+          }
+        },
+        {
+          "type": "weekly-event-entry",
+          "props": {}
         },
         {
           "type": "leaderboard-entry",
@@ -162,7 +181,33 @@
           }
         },
         {
-          "type": "archive-panel"
+          "type": "homestats",
+          "props": {
+            "items": [
+              {
+                "id": "stWins",
+                "label": "已通关",
+                "initial": 0
+              },
+              {
+                "id": "stBottles",
+                "label": "加瓶道具",
+                "initial": 2
+              }
+            ]
+          }
+        },
+        {
+          "type": "profile-row",
+          "props": {}
+        },
+        {
+          "type": "sound-toggle",
+          "props": {}
+        },
+        {
+          "type": "lang-select",
+          "props": {}
         }
       ]
     },

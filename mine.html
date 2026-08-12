@@ -86,28 +86,39 @@
   .homestats{display:flex; gap:10px;}
   .homestats .st{flex:1; background:var(--surface); border:1px solid var(--edge); border-radius:12px;
     padding:10px 12px; text-align:center;}
-  .homestats .st .k{display:block; font-size:11px; color:var(--ink-3); margin-bottom:2px;}
-  .homestats .st b{font-size:20px; color:var(--ink);}
-  .homebtn{border:0; border-radius:14px; padding:16px; font-size:17px; font-weight:800; cursor:pointer;
+  .homestats .st b{display:block; font-size:20px; color:var(--ink); margin-bottom:2px;}
+  .homestats .st span{font-size:11px; color:var(--ink-3);}
+  .bigbtn{border:0; border-radius:14px; padding:16px; font-size:17px; font-weight:800; cursor:pointer;
     background:var(--accent); color:#20160a;}
-  .homebtn small{display:block; font-weight:600; font-size:11px; margin-top:3px; opacity:.75;}
+  .bigbtn small{display:block; font-weight:600; font-size:11px; margin-top:3px; opacity:.75;}
+  .energy{display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--edge);
+    border-radius:12px; padding:10px 12px;}
+  .energy .icon{font-size:22px;}
+  .energy .info{flex:1;}
+  .energy .val{font-size:15px; font-weight:800; color:var(--ink);}
+  .energy .val .max{color:var(--ink-3); font-weight:600;}
+  .energy .sub{font-size:11px; color:var(--ink-3); margin:2px 0 4px;}
+  .energy .bar{height:5px; border-radius:3px; background:rgba(255,255,255,.08); overflow:hidden;}
+  .energy .bar i{display:block; height:100%; background:var(--accent); border-radius:3px;}
+  .profilerow{display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--edge);
+    border-radius:12px; padding:10px 12px; cursor:pointer; color:var(--ink); font-size:13px; text-align:left; width:100%;}
+  .profilerow .avatar{width:32px; height:32px; border-radius:50%; background:var(--accent); color:#20160a;
+    display:flex; align-items:center; justify-content:center; font-weight:800; flex:none;}
+  .profilerow .profileinfo{flex:1; display:flex; flex-direction:column; gap:1px;}
+  .profilerow .profilelabel{font-size:11px; color:var(--ink-3);}
+  .profilerow .profilesource{font-size:11px; color:var(--ink-3);}
+  .langrow{display:flex; align-items:center; justify-content:space-between; background:var(--surface);
+    border:1px solid var(--edge); border-radius:12px; padding:10px 12px; font-size:13px; color:var(--ink-2);}
+  .sfxbtn{border:1px solid var(--edge); background:transparent; color:var(--ink); border-radius:8px;
+    padding:4px 14px; cursor:pointer; font-size:13px;}
   .backbtn{background:transparent; border:0; color:var(--ink-2); font-size:13px; cursor:pointer; padding:4px 6px; flex:none;}
   .game{display:flex; flex-direction:column; gap:10px;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <!-- ============ 首页 ============ -->
-  <div class="home" id="home">
-    <div class="logo">💣 彩色扫雷<em>COLOR MINES</em></div>
-    <div class="homestats">
-      <div class="st"><span class="k">当前进度</span><b id="homeLv">1</b></div>
-      <div class="st"><span class="k">累计通关</span><b id="homeClears">0</b></div>
-      <div class="st"><span class="k">道具</span><b id="homeTools">4</b></div>
-    </div>
-    <button class="homebtn" id="btnStart">开始 第 <span id="homeStartLv">1</span> 关<small>每种颜色 / 每行 / 每列恰好一颗雷</small></button>
-    <div class="hintline">单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开<br>雷与雷互不相邻，先推理再动手</div>
-  </div>
+  <!-- ============ 首页：由 core/home.js 模块按 gameConfig screens.home 声明渲染 ============ -->
+  <div class="home" id="home"></div>
 
   <!-- ============ 游戏页 ============ -->
   <div class="game" id="game" hidden>
@@ -143,6 +154,10 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny"},"fail-revive":{"format":"rewarded","onFail":"retry"},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","hint":"Hint"},"zh":{"play":"开始","hint":"提示"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"icon":"💣","text":"彩色扫雷","em":"COLOR MINES"}},{"type":"energy","props":{}},{"type":"homestats","props":{"items":[{"id":"homeLv","label":"当前进度","initial":1},{"id":"homeClears","label":"累计通关"},{"id":"homeTools","label":"道具"}]}},{"type":"start-button","props":{"label":"开始 第","small":"消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"}},{"type":"profile-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"hintline","props":{"lines":["单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","雷与雷互不相邻，先推理再动手"]}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1}}</script>
+<script src="./core/shell.js"></script>
+<script src="./core/home.js"></script>
+<script src="./core/reward.js"></script>
 <script src="./mine-engine.js"></script>
 <script src="./mine-levels.js"></script>
 <script>
@@ -155,9 +170,29 @@
                 '#f09db8','#a8d36d','#f0a56d','#8f8ff0','#6df0d8'];  // 11 色恰好覆盖 11×11
   var AD_TOOL_GRANT = 1;               // 看广告补 1 个道具（演示：模拟播放）
   var AD_TIME_BONUS = 60;              // 看广告加 60 秒
-  var save = load() || { level: 1, clears: 0, toolMine: 2, toolSafe: 2 };
+  /* GameConfig 内嵌：与 games/mine/game.config.json 逐字段一致（mine-config.test.js 校验）；
+     reward 参数经 RewardCore fail-fast 校验，screens.home 声明驱动首页渲染 */
+  var CFG = JSON.parse(document.getElementById('gameConfig').textContent);
+  var Reward = RewardCore.create(CFG.reward);
+  var save = Object.assign({ level: 1, clears: 0, toolMine: 2, toolSafe: 2,
+    energy: Reward.E_MAX, lastTs: Date.now(), alias: '', sfx: true }, load() || {});
   function load(){ try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function persist(){ try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+
+  /* ============ 音效（首页设置可开关） ============ */
+  var AC = null;
+  function blip(freq, dur) {
+    if (!save.sfx) return;
+    try {
+      AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+      var o = AC.createOscillator(), g = AC.createGain();
+      o.type = 'triangle'; o.frequency.value = freq;
+      g.gain.setValueAtTime(.08, AC.currentTime);
+      g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + dur);
+      o.connect(g); g.connect(AC.destination);
+      o.start(); o.stop(AC.currentTime + dur);
+    } catch (e) {}
+  }
 
   /* ============ 运行时状态 ============ */
   var S = null;        // 当前关：{lv,size,board,mines:Set,found:Set,marks:Set,opened:Set,lives,remain,timerId,done}
@@ -290,7 +325,7 @@
     if (S.done || S.found.has(idx) || S.opened.has(idx)) return;
     var el = cellEl(idx);
     if (S.marks.has(idx)) { S.marks.delete(idx); el.classList.remove('safe', 'hintsafe'); }
-    else { S.marks.add(idx); el.classList.add('safe'); }
+    else { S.marks.add(idx); el.classList.add('safe'); blip(660, .06); }
   }
 
   function dig(idx) {
@@ -299,12 +334,14 @@
       S.found.add(idx); S.marks.delete(idx);
       el.classList.remove('safe', 'hintsafe');
       el.classList.add('mine', 'pop');
+      blip(880, .12);
       renderHud();
       if (S.found.size === S.size) return onWin();
     } else {                                // 挖错 → 扣血
       S.opened.add(idx); S.marks.delete(idx);
       el.classList.remove('safe', 'hintsafe');
       el.classList.add('opened', 'boom');
+      blip(140, .25);
       S.lives -= 1; renderHud();
       if (S.lives <= 0) return onDead();
       toast('不是雷！剩余 ' + S.lives + ' 条命');
@@ -395,12 +432,25 @@
     home: function () { showHome(); }, start: function () { startGame(); }
   };
 
-  /* ============ 首页 / 页面切换（与 water.html 同款 home→game 流转） ============ */
+  /* ============ 首页：ShellCore + HomeCore 按 gameConfig screens.home 声明渲染 ============ */
+  $('home').innerHTML = ShellCore.create(HomeCore.registry(), CFG.screens).render('home', {}).join('');
+
   function renderHome() {
+    var r = Reward.restore(save.energy, save.lastTs, Date.now());
+    if (r.energy !== save.energy || r.lastTs !== save.lastTs) { save.energy = r.energy; save.lastTs = r.lastTs; persist(); }
     $('homeLv').textContent = save.level;
-    $('homeStartLv').textContent = save.level;
+    $('startLv').textContent = save.level;
     $('homeClears').textContent = save.clears || 0;
     $('homeTools').textContent = save.toolMine + save.toolSafe;
+    $('enVal').textContent = save.energy;
+    document.querySelector('.energy .max').textContent = ' / ' + Reward.E_MAX;
+    $('enBar').style.width = Math.min(100, Math.round(save.energy / Reward.E_MAX * 100)) + '%';
+    $('enSub').textContent = save.energy >= Reward.E_MAX ? '体力已满'
+      : '+1 体力 ' + Math.max(0, Math.ceil((Reward.E_TICK - (Date.now() - save.lastTs)) / 1000)) + ' 秒后';
+    $('profileName').textContent = save.alias || '玩家';
+    $('profileAvatar').textContent = (save.alias || '玩').slice(0, 1);
+    $('sfxToggle').textContent = save.sfx ? '开' : '关';
+    $('sfxToggle').setAttribute('aria-pressed', String(!!save.sfx));
   }
   function showHome() {
     stopTimer();
@@ -408,10 +458,30 @@
     renderHome();
   }
   function startGame() {
+    renderHome();                        // 先按当前时间恢复体力再判定
+    if (save.energy < Reward.E_COST) {
+      dialog('体力不足', '当前体力 ' + save.energy + '，进关需要 ' + Reward.E_COST + '。看一段广告补 ' + Reward.E_AD + ' 体力。',
+        '看广告 +' + Reward.E_AD, function () {
+          save.energy += Reward.E_AD;    // 广告补体力可超上限（与 water 同规则，issue #7）
+          if (save.energy >= Reward.E_MAX) save.lastTs = Date.now();
+          persist(); renderHome(); toast('已补充体力');
+        }, '取消', null);
+      return;
+    }
+    save.energy -= Reward.E_COST;
+    if (save.energy + Reward.E_COST >= Reward.E_MAX) save.lastTs = Date.now();
+    persist();
     $('home').hidden = true; $('game').hidden = false;
     startLevel(save.level);
   }
   $('btnStart').addEventListener('click', startGame);
+  $('btnProfile').addEventListener('click', function () {
+    var name = window.prompt('玩家名称（仅保存在本机）', save.alias || '');
+    if (name === null) return;
+    save.alias = name.trim().slice(0, 12); persist(); renderHome();
+  });
+  $('sfxToggle').addEventListener('click', function () { save.sfx = !save.sfx; persist(); renderHome(); });
+  setInterval(function () { if (!$('home').hidden) renderHome(); }, 1000);
   $('btnBack').addEventListener('click', function () {
     if (S && !S.done) {
       dialog('退出本关？', '本关进度不保留，下次从第 ' + S.lv + ' 关重新开始。', '退出', showHome, '继续玩', null);

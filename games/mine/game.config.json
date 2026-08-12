@@ -117,14 +117,60 @@
     "home": {
       "modules": [
         {
-          "type": "level-select"
-        }
-      ]
-    },
-    "result": {
-      "modules": [
+          "type": "logo",
+          "props": {
+            "icon": "💣",
+            "text": "彩色扫雷",
+            "em": "COLOR MINES"
+          }
+        },
         {
-          "type": "settle-summary"
+          "type": "energy",
+          "props": {}
+        },
+        {
+          "type": "homestats",
+          "props": {
+            "items": [
+              {
+                "id": "homeLv",
+                "label": "当前进度",
+                "initial": 1
+              },
+              {
+                "id": "homeClears",
+                "label": "累计通关"
+              },
+              {
+                "id": "homeTools",
+                "label": "道具"
+              }
+            ]
+          }
+        },
+        {
+          "type": "start-button",
+          "props": {
+            "label": "开始 第",
+            "small": "消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"
+          }
+        },
+        {
+          "type": "profile-row",
+          "props": {}
+        },
+        {
+          "type": "sound-toggle",
+          "props": {}
+        },
+        {
+          "type": "hintline",
+          "props": {
+            "lines": [
+              "单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开",
+              "雷与雷互不相邻，先推理再动手"
+            ]
+          }
         }
       ]
     }

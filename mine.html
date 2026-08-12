@@ -77,11 +77,42 @@
     background:#0d1420; border:1px solid var(--edge); color:var(--ink); border-radius:10px;
     padding:8px 14px; font-size:13px; opacity:0; transition:.25s; pointer-events:none; z-index:40; white-space:nowrap;}
   .toast.show{opacity:1; transform:translateX(-50%);}
+
+  /* ---------- 首页（与 water.html home 同款布局） ---------- */
+  [hidden]{display:none !important;}
+  .home{display:flex; flex-direction:column; gap:14px; padding-top:26px;}
+  .home .logo{text-align:center; font-size:30px; font-weight:700; letter-spacing:.08em; color:var(--ink);}
+  .home .logo em{display:block; font-style:normal; color:var(--accent); font-size:13px; letter-spacing:.3em; margin-top:4px;}
+  .homestats{display:flex; gap:10px;}
+  .homestats .st{flex:1; background:var(--surface); border:1px solid var(--edge); border-radius:12px;
+    padding:10px 12px; text-align:center;}
+  .homestats .st .k{display:block; font-size:11px; color:var(--ink-3); margin-bottom:2px;}
+  .homestats .st b{font-size:20px; color:var(--ink);}
+  .homebtn{border:0; border-radius:14px; padding:16px; font-size:17px; font-weight:800; cursor:pointer;
+    background:var(--accent); color:#20160a;}
+  .homebtn small{display:block; font-weight:600; font-size:11px; margin-top:3px; opacity:.75;}
+  .backbtn{background:transparent; border:0; color:var(--ink-2); font-size:13px; cursor:pointer; padding:4px 6px; flex:none;}
+  .game{display:flex; flex-direction:column; gap:10px;}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <!-- ============ 首页 ============ -->
+  <div class="home" id="home">
+    <div class="logo">💣 彩色扫雷<em>COLOR MINES</em></div>
+    <div class="homestats">
+      <div class="st"><span class="k">当前进度</span><b id="homeLv">1</b></div>
+      <div class="st"><span class="k">累计通关</span><b id="homeClears">0</b></div>
+      <div class="st"><span class="k">道具</span><b id="homeTools">4</b></div>
+    </div>
+    <button class="homebtn" id="btnStart">开始 第 <span id="homeStartLv">1</span> 关<small>每种颜色 / 每行 / 每列恰好一颗雷</small></button>
+    <div class="hintline">单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开<br>雷与雷互不相邻，先推理再动手</div>
+  </div>
+
+  <!-- ============ 游戏页 ============ -->
+  <div class="game" id="game" hidden>
   <div class="topbar">
+    <button class="backbtn" id="btnBack">‹ 返回</button>
     <div class="title">彩色扫雷 <em>COLOR MINES</em></div>
     <div class="hearts" id="hearts"></div>
   </div>
@@ -99,6 +130,7 @@
     <button class="tool" id="toolSafe">🛡 排一个安全格 <span class="cnt" id="cntSafe">0</span></button>
   </div>
   <div class="hintline">单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开 · 每种颜色 / 每行 / 每列恰好一颗雷，雷与雷互不相邻</div>
+  </div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -123,7 +155,7 @@
                 '#f09db8','#a8d36d','#f0a56d','#8f8ff0','#6df0d8'];  // 11 色恰好覆盖 11×11
   var AD_TOOL_GRANT = 1;               // 看广告补 1 个道具（演示：模拟播放）
   var AD_TIME_BONUS = 60;              // 看广告加 60 秒
-  var save = load() || { level: 1, toolMine: 2, toolSafe: 2 };
+  var save = load() || { level: 1, clears: 0, toolMine: 2, toolSafe: 2 };
   function load(){ try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function persist(){ try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
 
@@ -318,9 +350,9 @@
   /* ============ 结算 ============ */
   function onWin() {
     S.done = true; stopTimer();
-    save.level = S.lv + 1; persist();
+    save.level = S.lv + 1; save.clears = (save.clears || 0) + 1; persist();
     dialog('🎉 第 ' + S.lv + ' 关通过！', '全部 ' + S.size + ' 颗雷都找到了。',
-      '下一关', function () { startLevel(save.level); }, null, null);
+      '下一关', function () { startLevel(save.level); }, '返回首页', showHome);
   }
   function onDead() {
     S.done = true; stopTimer();
@@ -359,10 +391,34 @@
   window.__mine = {
     state: function () { return S && { lv: S.lv, size: S.size, found: Array.from(S.found), lives: S.lives, remain: S.remain, done: S.done }; },
     dig: dig, mark: toggleMark,
-    solve: function () { S.mines.forEach(function (i) { if (!S.found.has(i)) dig(i); }); }
+    solve: function () { S.mines.forEach(function (i) { if (!S.found.has(i)) dig(i); }); },
+    home: function () { showHome(); }, start: function () { startGame(); }
   };
 
-  startLevel(save.level);
+  /* ============ 首页 / 页面切换（与 water.html 同款 home→game 流转） ============ */
+  function renderHome() {
+    $('homeLv').textContent = save.level;
+    $('homeStartLv').textContent = save.level;
+    $('homeClears').textContent = save.clears || 0;
+    $('homeTools').textContent = save.toolMine + save.toolSafe;
+  }
+  function showHome() {
+    stopTimer();
+    $('game').hidden = true; $('home').hidden = false;
+    renderHome();
+  }
+  function startGame() {
+    $('home').hidden = true; $('game').hidden = false;
+    startLevel(save.level);
+  }
+  $('btnStart').addEventListener('click', startGame);
+  $('btnBack').addEventListener('click', function () {
+    if (S && !S.done) {
+      dialog('退出本关？', '本关进度不保留，下次从第 ' + S.lv + ' 关重新开始。', '退出', showHome, '继续玩', null);
+    } else showHome();
+  });
+
+  showHome();
 })();
 </script>
 </body>

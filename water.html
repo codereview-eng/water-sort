@@ -501,48 +501,8 @@ body:has(#gamePage:not([hidden])){
 </style>
 </head>
 <body>
-  <!-- ============ 首页 ============ -->
-  <div class="home" id="home">
-    <div class="logo">倒水排序<em>WATER SORT</em></div>
-    <div class="energy">
-      <span class="icon">⚡</span>
-      <div class="info">
-        <div class="val"><span class="mono" id="enVal">120</span><span class="max mono"> / 120</span></div>
-        <div class="sub" id="enSub">体力已满</div>
-        <div class="bar"><i id="enBar" style="width:100%"></i></div>
-      </div>
-    </div>
-    <button class="bigbtn" id="btnStart">开始 <span class="mono" id="startLv">1</span><small>消耗 15 体力 · 10 分钟限时</small></button>
-    <button class="eventbtn" id="btnWeekly">
-      <span class="badge" id="wkBadge">本周</span>
-      <span class="left">
-        <span class="ic" id="wkIcHome">✦</span>
-        <span class="t"><b id="wkEntryTitle">每周活动</b><span id="wkEntrySub"></span></span>
-      </span>
-      <span class="frag mono" id="wkEntryFrag"></span>
-    </button>
-    <button class="homebtn" id="btnLb"><span>🏆 排行榜</span><span>›</span></button>
-    <div class="homestats">
-      <div class="st"><b class="mono" id="stWins">0</b><span>已通关</span></div>
-      <div class="st"><b class="mono" id="stBottles">2</b><span>加瓶道具</span></div>
-    </div>
-    <button class="profilerow" id="btnProfile">
-      <span class="avatar" id="profileAvatar">玩</span>
-      <span class="profileinfo">
-        <span class="profilelabel" id="profileLabel">玩家名称</span>
-        <span class="profilename" id="profileName">玩家</span>
-      </span>
-      <span class="profilesource" id="profileSource">网页本地</span>
-    </button>
-    <div class="langrow">
-      <label for="sfxToggle" id="sfxLabel">音效</label>
-      <button id="sfxToggle" class="sfxbtn" aria-pressed="true">开</button>
-    </div>
-    <div class="langrow">
-      <label for="langSel" id="langLabel">语言</label>
-      <select id="langSel" aria-label="语言"></select>
-    </div>
-  </div>
+  <!-- ============ 首页：由 core/home.js 模块按 gameConfig screens.home 声明渲染（issue #1 首页统一） ============ -->
+  <div class="home" id="home"></div>
 
   <!-- ============ 每周活动(issue #30) ============ -->
   <div class="weekly" id="weeklyPage" hidden>
@@ -711,6 +671,11 @@ var SudokuEngine=(function(){
 <!-- 激励循环已下沉 core/reward.js + reward.js（构建时内联；issue #1 M3/S1/S2/S19） -->
 <script src="./core/reward.js"></script>
 <script src="./reward.js"></script>
+<!-- 首页统一（issue #1）：config 声明 + core 模块渲染，与 mine.html 同款装配 -->
+<script id="gameConfig" type="application/json">{"id":"water","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"undo","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"addBottle","grantOn":[{"trigger":"dailyLogin","qty":1}],"unlock":[{"type":"level","n":3}]}],"weeklyEvent":{"enabled":true,"metric":"clears","period":"weekly","rewards":{"kind":"top10","tiers":[{"coins":100},{"coins":50},{"coins":25}]}},"ads":{"interstitial":{"enabled":true,"everyN":3},"geo":{"DE":{"rewarded":false}},"placements":{"pre-level-interstitial":{"format":"interstitial","capping":{"minIntervalSec":60,"maxPerDay":10}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}}},"lifetimeStats":[{"key":"bottles_poured","event":"pour","agg":"count","label":"倒了多少瓶"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_time_ms","event":"level_cleared","agg":"min","field":"timeMs","unit":"ms"},{"key":"current_streak","event":"streak_changed","agg":"last","field":"current"}],"leaderboards":[{"id":"fastest","metric":"best_time_ms","order":"asc","operator":"best","period":"none"},{"id":"streak_now","metric":"current_streak","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","settings":"Settings","undo":"Undo"},"zh":{"play":"开始","settings":"设置"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"text":"倒水排序","em":"WATER SORT"}},{"type":"energy","props":{}},{"type":"start-button","props":{"label":"开始","small":"消耗 15 体力 · 10 分钟限时"}},{"type":"weekly-event-entry","props":{}},{"type":"leaderboard-entry","props":{"boardId":"fastest"}},{"type":"homestats","props":{"items":[{"id":"stWins","label":"已通关","initial":0},{"id":"stBottles","label":"加瓶道具","initial":2}]}},{"type":"profile-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}}]},"result":{"modules":[{"type":"settle-summary"},{"type":"ad-double-button"}]}},"host":{"storagePrefix":"water:"},"save":{"version":1},"streak":{"enabled":true,"claimMode":"ad","policy":{"resetOnLoss":true},"tiers":[{"streak":10,"reward":{"type":"coins","amount":100}}]},"cosmetics":{"catalog":[{"id":"ocean-bg","kind":"background","unlock":[{"type":"level","n":20}]},{"id":"gold-bottle","kind":"skin","price":{"coins":50}}],"themes":{"default":{"bg":"#e8f4ff","piece":"bottle.png","sfx":"pour.mp3"},"sea":{"bg":"#8fd"},"deep":{"bg":"#046"}},"progressBackgrounds":[{"fromLevel":10,"themeId":"sea"},{"fromLevel":20,"themeId":"deep"}]}}</script>
+<script src="./core/shell.js"></script>
+<script src="./core/home.js"></script>
+<script src="./water-home.js"></script>
 <script>
 /* ====================== 前 5 关固定盘面(与 levels.js 同源,内联;issue #14/#16) ======================
    由 engine.js 离线生成(自定义 givens 档,seed 1065/1060/1055/1050/1045),给定数 65→60→55→50→45 递减爬坡,全网同题;
@@ -1005,6 +970,12 @@ function applyLang(lang) {
     if (!pages.lb.hidden) renderLb();
   }
 }
+/* ====================== 首页装配：ShellCore + HomeCore 按 gameConfig screens.home 声明渲染（issue #1 首页统一）
+   必须先于 applyStaticI18n()——静态文案回填的目标节点（#home .logo 等）由本装配产出 ====================== */
+const GAME_CFG = JSON.parse(document.getElementById('gameConfig').textContent);
+document.getElementById('home').innerHTML =
+  ShellCore.create(HomeCore.registry(WaterHome.extensions()), { home: GAME_CFG.screens.home }).render('home', {}).join('');
+
 document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
 document.title = t('title');
 applyStaticI18n();
@@ -1516,7 +1487,6 @@ document.getElementById('sfxToggle').addEventListener('click', () => {
   if (next) { WaterAudio.unlock(); WaterAudio.play('pick'); }   // 打开时立刻出个声,让人知道生效了
   haptic('light');
 });
-
 /* ====================== 页面路由 ====================== */
 const pages = { home: document.getElementById('home'), lb: document.getElementById('lbPage'), game: document.getElementById('gamePage'), weekly: document.getElementById('weeklyPage') };
 function show(page) {
@@ -1547,6 +1517,7 @@ function renderHome() {
   Profile.settle();
   const p = Profile.state;
   document.getElementById('enVal').textContent = p.energy;
+  document.querySelector('.energy .max').textContent = ' / ' + Reward.E_MAX;
   document.getElementById('enBar').style.width = Math.min(100, Math.round(p.energy / Reward.E_MAX * 100)) + '%';
   const sub = document.getElementById('enSub');
   if (p.energy >= Reward.E_MAX) sub.textContent = t('energyFull');

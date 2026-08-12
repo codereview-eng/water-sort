@@ -47,10 +47,19 @@ test('S15: 引用未注册模块 type → 加载期拒绝（无静默跳过）',
 });
 
 test('S15: 真实游戏 config screens 落地且组合互不相同', () => {
-  const w = Shell.create(registry(), gameCfg('water').screens);
+  // 首页统一（issue #1）后，water/mine 的 home 走 core/home.js 通用模块 + 各自扩展，
+  // 组合仍由 config 声明；sudoku/mockc 维持自有模块，stub 注册表即可承载。
+  const Home = require('../../core/home.js');
+  const WaterHome = require('../../water-home.js');
+  const w = Shell.create(Home.registry(WaterHome.extensions()), { home: gameCfg('water').screens.home });
+  const m = Shell.create(Home.registry(), { home: gameCfg('mine').screens.home });
   const s = Shell.create(registry(), gameCfg('sudoku').screens);
   const c = Shell.create(registry(), gameCfg('mockc').screens);
-  assert.deepEqual(w.modules('home'), ['weekly-event-entry', 'leaderboard-entry', 'archive-panel']);
+  assert.deepEqual(w.modules('home'),
+    ['logo', 'energy', 'start-button', 'weekly-event-entry', 'leaderboard-entry', 'homestats', 'profile-row', 'sound-toggle', 'lang-select']);
+  assert.deepEqual(m.modules('home'),
+    ['logo', 'energy', 'homestats', 'start-button', 'profile-row', 'sound-toggle', 'hintline']);
   assert.deepEqual(s.modules('home'), ['level-select']);
   assert.deepEqual(c.modules('home'), ['tap-button']);
+  assert.notDeepEqual(w.modules('home'), m.modules('home'), 'water 与 mine 首页组合必须不同');
 });

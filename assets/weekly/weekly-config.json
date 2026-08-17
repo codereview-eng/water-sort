@@ -1,27 +1,13 @@
 {
-  "_note": "周主题服务器端预配置示意:客户端按当前 UTC 周号取当周主题,下周主题到期自动切换;图片按主题目录提前部署。",
-  "2026-W31": {
-    "theme": "starry",
-    "title": "星空周",
-    "images": [
-      "assets/weekly/starry/1.webp",
-      "assets/weekly/starry/2.webp",
-      "assets/weekly/starry/3.webp",
-      "assets/weekly/starry/4.webp",
-      "assets/weekly/starry/5.webp",
-      "assets/weekly/starry/6.webp"
-    ]
-  },
-  "2026-W32": {
-    "theme": "worldcup",
-    "title": "世界杯周",
-    "images": [
-      "assets/weekly/worldcup/1.webp",
-      "assets/weekly/worldcup/2.webp",
-      "assets/weekly/worldcup/3.webp",
-      "assets/weekly/worldcup/4.webp",
-      "assets/weekly/worldcup/5.webp",
-      "assets/weekly/worldcup/6.webp"
-    ]
-  }
+  "_note": "按当前 UTC ISO 周 key 取当周条目；banner 为该周专属活动图；未命中周 key 时客户端回退内置主题轮换。",
+  "2026-W34": { "theme": "starry", "title": "星空周", "titleEn": "Starry Week", "banner": "assets/weekly/banners/2026-W34.webp" },
+  "2026-W35": { "theme": "deepsea", "title": "深海周", "titleEn": "Deep Sea Week", "banner": "assets/weekly/banners/2026-W35.webp" },
+  "2026-W36": { "theme": "forest", "title": "森林周", "titleEn": "Forest Week", "banner": "assets/weekly/banners/2026-W36.webp" },
+  "2026-W37": { "theme": "lantern", "title": "灯火周", "titleEn": "Lantern Week", "banner": "assets/weekly/banners/2026-W37.webp" },
+  "2026-W38": { "theme": "desert", "title": "沙漠周", "titleEn": "Desert Week", "banner": "assets/weekly/banners/2026-W38.webp" },
+  "2026-W39": { "theme": "aurora", "title": "极光周", "titleEn": "Aurora Week", "banner": "assets/weekly/banners/2026-W39.webp" },
+  "2026-W40": { "theme": "sakura", "title": "樱花周", "titleEn": "Sakura Week", "banner": "assets/weekly/banners/2026-W40.webp" },
+  "2026-W41": { "theme": "candy", "title": "糖果周", "titleEn": "Candy Week", "banner": "assets/weekly/banners/2026-W41.webp" },
+  "2026-W42": { "theme": "volcano", "title": "火山周", "titleEn": "Volcano Week", "banner": "assets/weekly/banners/2026-W42.webp" },
+  "2026-W43": { "theme": "ice", "title": "冰雪周", "titleEn": "Ice Week", "banner": "assets/weekly/banners/2026-W43.webp" }
 }

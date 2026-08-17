@@ -62,7 +62,7 @@
 /* 瓶身由 Blender 渲染的素材承担（白瓶口环/透明塑料/圆角底都是真渲染出来的，
    不再用 CSS 描边模拟）；液体 = 纯色块 + 该层遮罩，因此任意配色都能复用同一套素材。 */
 .tube{
-  width:58px; aspect-ratio:250/800; position:relative; cursor:pointer;
+  width:58px; aspect-ratio:250/400; position:relative; cursor:pointer;   /* Q版矮胖瓶:画幅同步 blender-bottles.py 的 RES */
   transition:transform .16s ease, filter .16s ease;
 }
 .tube .layer{
@@ -204,6 +204,14 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
 .pic.lock .lockov{position:absolute; inset:10px 10px auto 10px; height:88px; border-radius:6px; background:var(--overlay); display:flex; align-items:center; justify-content:center; font-size:22px}
 .pic .prog{height:4px; background:var(--elevated); border-radius:2px; overflow:hidden}
 .pic .prog i{display:block; height:100%; background:var(--warn)}
+.claimbtn{border:0; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:700; background:var(--accent); color:#0B1410; cursor:pointer}
+.pic .claimbtn{width:100%; padding:6px 0}
+.pic.claimable{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset}
+.pic.claimable .tag{background:var(--cell-same); color:var(--ok)}
+.grand .st.ready{border:0; padding:0}
+.grand .st.ready .claimbtn{background:var(--podium)}
+.themecard .banner{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.26; pointer-events:none}
+.themecard .t,.themecard .cd{position:relative}
 .grand{border:1px dashed var(--podium); border-radius:12px; background:var(--surface); padding:13px 16px; display:flex; align-items:center; gap:12px}
 .grand .ic{font-size:26px}
 .grand .t{flex:1}
@@ -378,8 +386,7 @@ body:has(#gamePage:not([hidden])){
   content:""; position:absolute; inset:11% 3% 9%; z-index:0; pointer-events:none;
   border-radius:22px;
   background:
-    linear-gradient(180deg,transparent 47%,rgba(16,21,40,.34) 47.5% 50%,rgba(255,255,255,.08) 50% 50.7%,transparent 51.2%),
-    radial-gradient(ellipse at 50% 98%,rgba(9,13,28,.42),transparent 58%);
+    radial-gradient(ellipse at 50% 98%,rgba(9,13,28,.42),transparent 58%); /* issue:去掉中部横杆分隔线,瓶区不分上下 */
 }
 #gamePage .tubes .row{gap:7px;position:relative;z-index:1}
 #gamePage .tubes .row:first-child{transform:translateY(12px)}
@@ -392,7 +399,7 @@ body:has(#gamePage:not([hidden])){
 }
 #gamePage .tube::before{
   content:"";position:absolute;inset:15% 9% 3%;z-index:0;pointer-events:none;
-  clip-path:polygon(25% 0,75% 0,75% 13%,94% 24%,98% 31%,98% 93%,91% 100%,9% 100%,2% 93%,2% 31%,6% 24%,25% 13%);
+  clip-path:polygon(25% 0,75% 0,75% 8%,94% 19%,98% 26%,98% 93%,91% 100%,9% 100%,2% 93%,2% 26%,6% 19%,25% 8%);   /* Q版:肩部收颈段整体上移 */
   border-radius:10px 10px 18px 18px;
   background:
     linear-gradient(90deg,rgba(216,235,255,.34),rgba(150,181,218,.1) 42%,rgba(93,119,159,.18) 76%,rgba(227,241,255,.26)),
@@ -490,8 +497,9 @@ body:has(#gamePage:not([hidden])){
 @media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
 
   /* ---------- 真实瓶口(#1):剪掉素材顶部的白盖,叠画敲口玻璃口沿+内孔 ---------- */
-  .tube .glass{clip-path:inset(11.6% 0 0 0)}
-  .tube .mouth{position:absolute; left:50%; top:2.4%; width:56%; height:11.4%; transform:translateX(-50%); z-index:3; pointer-events:none}
+  /* Q版画幅(250x400):白环占顶部 2.1%~13.4%,裁剪线/瓶口罩层按此重调 */
+  .tube .glass{clip-path:inset(14% 0 0 0)}
+  .tube .mouth{position:absolute; left:50%; top:2.4%; width:59%; height:14.2%; transform:translateX(-50%); z-index:3; pointer-events:none}
   .tube .mouth .neck{position:absolute; inset:24% 5% 0; border-radius:14% 14% 30% 30%/20% 20% 48% 48%;
     background:linear-gradient(102deg, rgba(191,206,230,.9) 3%, rgba(255,255,255,.96) 20%, rgba(226,235,248,.6) 46%, rgba(172,189,218,.55) 72%, rgba(238,244,252,.92) 97%);
     box-shadow:inset 0 -3px 5px rgba(35,53,87,.3), inset 0 2px 2px rgba(255,255,255,.8)}
@@ -512,6 +520,7 @@ body:has(#gamePage:not([hidden])){
       <span class="mono" id="wkNo" style="font-size:11px"></span>
     </div>
     <div class="themecard">
+      <img class="banner" id="wkBanner" alt="" hidden>
       <div class="deco" id="wkDeco">✦</div>
       <div class="t"><b id="wkTheme"></b><div class="sub" id="wkThemeSub"></div></div>
       <div class="cd"><b class="mono" id="wkCd"></b><span id="wkCdSub"></span></div>
@@ -816,12 +825,14 @@ const I18N = {
     wkEntry: '每周活动 · {theme}', wkEntrySub: '集碎片开 6 图 · 大奖体力+{n}', wkBadge: '本周', wkFragShort: '碎片 {n}',
     wkTitle: '每周活动 <em>WEEKLY</em>', wkNo: '第 {n} 周', wkThemeSub: '本周主题 · 集碎片点亮 6 幅图',
     wkCd: '剩余 {d} 天 {t}', wkCdSub: '周日 24:00 重置(UTC)', wkFragLab: '我的碎片', wkCarry: '含上周结转 +{n}',
-    wkOpen: '已解锁 · 已领 {r}', wkCur: '进行中 {a}/{b}', wkLock: '{n} 碎片解锁',
+    wkOpen: '已领取 {r}', wkCur: '进行中 {a}/{b}', wkLock: '{n} 碎片解锁',
+    wkClaimable: '已解锁 · 待领取', wkClaimBtn: '领取', wkClaimToast: '🎁 已领取 {r}', wkClaimN: '可领 {n}',
     wkRewardEnergy: '+{n} 体力', wkRewardHints: '+{n} 加瓶',
     wkGrandTitle: '本周大奖 · 集齐 {n} 碎片', wkGrandBody: '体力 +{e} · 加瓶道具 +{h}',
     wkGrandNo: '未达成 {a}/{b}', wkGrandYes: '已达成 ✓',
     wkAd: '看一段广告 +{n} 碎片', wkNote1: '每盘胜利 +{n} 碎片', wkNote2: '超过 {n} 的碎片自动结转下周,下周从结转值起算',
-    wkGotFrags: '+{n} 碎片', wkUnlockToast: '🖼 点亮「{pic}」!奖励 {r}', wkGrandToast: '🏆 本周大奖达成!体力 +{e} · 加瓶 +{h}',
+    wkGotFrags: '+{n} 碎片', wkUnlockToast: '🖼 点亮「{pic}」!奖励待领取,去活动页领', wkGrandToast: '🏆 大奖达成!去活动页领取',
+    wkGrandGot: '🏆 已领取大奖:体力 +{e} · 加瓶 +{h}',
   },
   en: {
     title: 'Water Sort', logoMain: 'Water Sort', logoSub: 'COLOR PUZZLE',
@@ -882,12 +893,14 @@ const I18N = {
     wkEntry: 'Weekly Event · {theme}', wkEntrySub: 'Collect shards, light 6 pics · grand +{n} energy', wkBadge: 'NEW', wkFragShort: 'Shards {n}',
     wkTitle: 'Weekly Event <em>WEEKLY</em>', wkNo: 'Week {n}', wkThemeSub: 'This week · collect shards to light 6 pictures',
     wkCd: '{d}d {t} left', wkCdSub: 'Resets Sunday 24:00 (UTC)', wkFragLab: 'My shards', wkCarry: 'Includes +{n} carried over',
-    wkOpen: 'Unlocked · got {r}', wkCur: 'In progress {a}/{b}', wkLock: 'Unlock at {n}',
+    wkOpen: 'Claimed {r}', wkCur: 'In progress {a}/{b}', wkLock: 'Unlock at {n}',
+    wkClaimable: 'Unlocked · claim ready', wkClaimBtn: 'Claim', wkClaimToast: '🎁 Claimed {r}', wkClaimN: 'Claim {n}',
     wkRewardEnergy: '+{n} energy', wkRewardHints: '+{n} extra bottles',
     wkGrandTitle: 'Grand prize · reach {n} shards', wkGrandBody: '+{e} energy · +{h} extra bottles',
     wkGrandNo: 'Not yet {a}/{b}', wkGrandYes: 'Done ✓',
     wkAd: 'Watch ad · +{n} shards', wkNote1: 'Each win: +{n} shards', wkNote2: 'Shards above {n} carry over to next week',
-    wkGotFrags: '+{n} shards', wkUnlockToast: '🖼 "{pic}" lit! Reward: {r}', wkGrandToast: '🏆 Grand prize! +{e} energy · +{h} extra bottles',
+    wkGotFrags: '+{n} shards', wkUnlockToast: '🖼 "{pic}" lit! Reward ready — claim it on the event page', wkGrandToast: '🏆 Grand prize unlocked! Claim it on the event page',
+    wkGrandGot: '🏆 Grand prize claimed: +{e} energy · +{h} extra bottles',
   },
 };
 /* 语言检测(与 i18n.js 同源):?lang= 调试参数(最高优先) → Telegram language_code → navigator.language → 默认 en;zh* 归 zh */
@@ -1150,6 +1163,90 @@ const Weekly = (function () {
     weekIndex, weekKey, weekEnd, themeFor, unlockedCount, newlyUnlocked, rollReward, carry, blank, normalize };
 })();
 
+/* ====================== 每周活动领取核心(与 core/weekly.js 同源,内联;issue #1 手动领取) ======================
+   解锁 ≠ 领取:碎片达阈值只进 claimable,用户点击才 claimed;大奖同口径。claim 不可变,返回新 state。 */
+const WeeklyCore = (function () {
+  const DAY = 86400000;
+  const THRESHOLDS = [100, 200, 300, 400, 500, 600];
+  const GOAL = 600;
+  const GRAND = { energy: 60, hints: 5 };
+  const fail = (m) => { throw new Error('weekly-core: ' + m); };
+  function assertState(st) {
+    if (!st || typeof st !== 'object') fail('state 必须是对象');
+    if (typeof st.frags !== 'number' || !isFinite(st.frags) || st.frags < 0) fail('state.frags 必须是 >=0 的数');
+    if (!Array.isArray(st.claimed) || st.claimed.length !== THRESHOLDS.length) fail('state.claimed 必须是长度 6 的数组');
+  }
+  function picStatus(st, i) {
+    assertState(st);
+    if (!Number.isInteger(i) || i < 0 || i >= THRESHOLDS.length) fail('图索引必须是 0..5 的整数');
+    if (st.claimed[i]) return 'claimed';
+    return st.frags >= THRESHOLDS[i] ? 'claimable' : 'locked';
+  }
+  function claimable(st) {
+    const out = [];
+    for (let i = 0; i < THRESHOLDS.length; i++) if (picStatus(st, i) === 'claimable') out.push(i);
+    return out;
+  }
+  function claimableCount(st) { return claimable(st).length + (grandStatus(st) === 'claimable' ? 1 : 0); }
+  function claim(st, i, rollFn) {
+    const s = picStatus(st, i);
+    if (s === 'claimed') fail('图 ' + (i + 1) + ' 已领取，不能重复领');
+    if (s === 'locked') fail('图 ' + (i + 1) + ' 未解锁，不能领取');
+    const reward = rollFn();
+    if (!reward || (reward.type !== 'energy' && reward.type !== 'hints') || !Number.isInteger(reward.n) || reward.n <= 0) fail('rollFn 非法');
+    const next = Object.assign({}, st, { claimed: st.claimed.slice() });
+    next.claimed[i] = true;
+    next['r' + i] = reward;
+    return { state: next, reward };
+  }
+  function grandStatus(st) {
+    assertState(st);
+    if (st.grand) return 'claimed';
+    return st.frags >= GOAL ? 'claimable' : 'locked';
+  }
+  function claimGrand(st) {
+    const s = grandStatus(st);
+    if (s === 'claimed') fail('大奖已领取，不能重复领');
+    if (s === 'locked') fail('大奖未解锁，不能领取');
+    const next = Object.assign({}, st, { claimed: st.claimed.slice(), grand: true });
+    return { state: next, reward: { energy: GRAND.energy, hints: GRAND.hints } };
+  }
+  function isoWeekKey(now) {
+    const d = new Date(now);
+    const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    const y = t.getUTCFullYear();
+    const wk = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / DAY + 1) / 7);
+    return y + '-W' + (wk < 10 ? '0' + wk : wk);
+  }
+  function resolveWeek(config, now) {
+    if (!config || typeof config !== 'object') return null;
+    const e = config[isoWeekKey(now)];
+    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+    return e;
+  }
+  return { THRESHOLDS, GOAL, GRAND, picStatus, claimable, claimableCount, claim, grandStatus, claimGrand, isoWeekKey, resolveWeek };
+})();
+
+/* 周图配置加载(assets/weekly/weekly-config.json,issue #2 每周专属 webp 横幅):
+   按 ISO 周 key 命中当周条目;fetch 失败或未命中一律回退内置主题轮换(fail-open,不阻塞活动页)。 */
+const WeeklyCfg = {
+  data: null, tried: false,
+  load(cb) {
+    if (this.tried) { cb && cb(); return; }
+    this.tried = true;
+    fetch('assets/weekly/weekly-config.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { this.data = j; cb && cb(); })
+      .catch(() => { cb && cb(); });
+  },
+  weekName(now) {
+    const e = WeeklyCore.resolveWeek(this.data, now);
+    if (!e) return null;
+    return (LANG === 'zh' ? e.title : e.titleEn) || e.title || null;
+  },
+};
+
 /* 每周活动控制器(issue #30):状态持久化 sudoku_weekly(CloudStorage 优先 + localStorage 镜像,
    走 Store 同一通道);内存权威副本 + 快照串行 flush,与 Profile 同模式。
    奖励发放:体力走 Profile(可超 120 持久保留,issue #7),道具走 Profile.bottles。 */
@@ -1176,31 +1273,41 @@ const WeeklyCtl = {
     const n = Weekly.normalize(this.state, wk);
     if (n !== this.state) { this.state = n; this.flush(); }
   },
-  // 加碎片 + 发放解锁奖励(幂等:claimed/grand 标记);返回 toast 文案数组
-  addFrags(n, randFn) {
+  // 加碎片(issue #1 手动领取):解锁只进「可领取」,不自动发奖;返回 toast 文案数组
+  addFrags(n) {
     this.settle();
     const st = this.state;
-    const rnd = randFn || Math.random;
     const before = st.frags;
     st.frags += n;
     const msgs = [];
     for (const i of Weekly.newlyUnlocked(before, st.frags)) {
       if (st.claimed[i]) continue;
-      const r = Weekly.rollReward(rnd(), rnd());
-      st.claimed[i] = true;
-      if (r.type === 'energy') Profile.mutate((s) => { s.energy += r.n; });
-      else Profile.mutate((s) => { s.bottles += r.n; });
-      st['r' + i] = r; // 记录已领奖励,活动页展示用
-      const rTxt = t(r.type === 'energy' ? 'wkRewardEnergy' : 'wkRewardHints', { n: r.n });
-      msgs.push(t('wkUnlockToast', { pic: themePics()[i], r: rTxt }));
+      msgs.push(t('wkUnlockToast', { pic: themePics()[i] }));
     }
-    if (st.frags >= Weekly.GOAL && !st.grand) {
-      st.grand = true;
-      Profile.mutate((s) => { s.energy += Weekly.GRAND.energy; s.bottles += Weekly.GRAND.hints; });
-      msgs.push(t('wkGrandToast', { e: Weekly.GRAND.energy, h: Weekly.GRAND.hints }));
-    }
+    if (before < Weekly.GOAL && st.frags >= Weekly.GOAL && !st.grand) msgs.push(t('wkGrandToast'));
     this.flush();
     return msgs;
+  },
+  // 领取第 i 张图奖励:core 状态机把关(仅 claimable 可领),奖励入账后落盘
+  claim(i, randFn) {
+    this.settle();
+    const rnd = randFn || Math.random;
+    const res = WeeklyCore.claim(this.state, i, () => Weekly.rollReward(rnd(), rnd()));
+    this.state = res.state;
+    const r = res.reward;
+    if (r.type === 'energy') Profile.mutate((s) => { s.energy += r.n; });
+    else Profile.mutate((s) => { s.bottles += r.n; });
+    this.flush();
+    return r;
+  },
+  // 领取大奖(固定内容),同样必须用户点击
+  claimGrand() {
+    this.settle();
+    const res = WeeklyCore.claimGrand(this.state);
+    this.state = res.state;
+    Profile.mutate((s) => { s.energy += res.reward.energy; s.bottles += res.reward.hints; });
+    this.flush();
+    return res.reward;
   },
 };
 function themePics() {
@@ -1540,8 +1647,10 @@ function renderHome() {
   // issue #30:每周活动入口(角标 + 主题名 + 碎片数)
   WeeklyCtl.settle();
   const th = Weekly.themeFor(Date.now());
-  document.getElementById('wkBadge').textContent = t('wkBadge');
-  document.getElementById('wkEntryTitle').textContent = t('wkEntry', { theme: (th[LANG] || th.en).name });
+  if (!WeeklyCfg.tried) WeeklyCfg.load(() => { if (!pages.home.hidden) renderHome(); });
+  const wkCc = WeeklyCtl.state ? WeeklyCore.claimableCount(WeeklyCtl.state) : 0;
+  document.getElementById('wkBadge').textContent = wkCc > 0 ? t('wkClaimN', { n: wkCc }) : t('wkBadge');
+  document.getElementById('wkEntryTitle').textContent = t('wkEntry', { theme: WeeklyCfg.weekName(Date.now()) || (th[LANG] || th.en).name });
   document.getElementById('wkEntrySub').textContent = t('wkEntrySub', { n: Weekly.GRAND.energy });
   document.getElementById('wkEntryFrag').textContent = t('wkFragShort', { n: WeeklyCtl.state ? WeeklyCtl.state.frags : 0 });
   renderAccount();
@@ -1559,12 +1668,21 @@ function renderWeekly() {
   const now = Date.now();
   const th = Weekly.themeFor(now);
   const L = th[LANG] || th.en;
+  // 周专属配置(issue #2):命中则用当周标题+webp 横幅;未命中回退内置轮换主题
+  if (!WeeklyCfg.tried) WeeklyCfg.load(() => { if (!pages.weekly.hidden) renderWeekly(); });
+  const wkCfgEntry = WeeklyCore.resolveWeek(WeeklyCfg.data, now);
   document.getElementById('wkTitle').innerHTML = t('wkTitle');
   // 展示用年内周数(第 N 周);内部 weekKey 仍用绝对周序号,跨年结转不受影响
   const yearWeek = Weekly.weekIndex(now) - Weekly.weekIndex(Date.UTC(new Date(now).getUTCFullYear(), 0, 1)) + 1;
   document.getElementById('wkNo').textContent = t('wkNo', { n: yearWeek });
-  document.getElementById('wkTheme').textContent = L.name;
+  document.getElementById('wkTheme').textContent = WeeklyCfg.weekName(now) || L.name;
   document.getElementById('wkThemeSub').textContent = t('wkThemeSub');
+  const wkBanEl = document.getElementById('wkBanner');
+  if (wkCfgEntry && wkCfgEntry.banner) {
+    if (wkBanEl.getAttribute('src') !== wkCfgEntry.banner) wkBanEl.src = wkCfgEntry.banner;
+    wkBanEl.hidden = false;
+    wkBanEl.onerror = () => { wkBanEl.hidden = true; };  // 图缺失回退纯主题卡,不留破图
+  } else wkBanEl.hidden = true;
   // 倒计时:剩余 d 天 hh:mm(每分钟刷)
   const left = Math.max(0, Weekly.weekEnd(now) - now);
   const days = Math.floor(left / Weekly.DAY);
@@ -1587,14 +1705,17 @@ function renderWeekly() {
   const nums = ['①', '②', '③', '④', '⑤', '⑥'];
   for (let i = 0; i < 6; i++) {
     const d = document.createElement('div');
-    const unlocked = st.claimed[i];
-    const cur = !unlocked && i === nextIdx;
-    d.className = 'pic ' + (unlocked ? 'open' : cur ? 'cur' : 'lock');
+    const ps = WeeklyCore.picStatus(st, i); // 'locked'|'claimable'|'claimed'(issue #1:解锁≠领取)
+    const cur = ps === 'locked' && i === nextIdx;
+    d.className = 'pic ' + (ps === 'claimed' ? 'open' : ps === 'claimable' ? 'claimable' : cur ? 'cur' : 'lock');
     let tag, extra = '';
-    if (unlocked) {
+    if (ps === 'claimed') {
       const r = st['r' + i];
       const rTxt = r ? t(r.type === 'energy' ? 'wkRewardEnergy' : 'wkRewardHints', { n: r.n }) : '✓';
       tag = t('wkOpen', { r: rTxt });
+    } else if (ps === 'claimable') {
+      tag = t('wkClaimable');
+      extra = '<button class="claimbtn" data-claim="' + i + '">' + t('wkClaimBtn') + '</button>';
     } else if (cur) {
       tag = t('wkCur', { a: st.frags, b: Weekly.THRESHOLDS[i] });
       const prev = i === 0 ? 0 : Weekly.THRESHOLDS[i - 1];
@@ -1604,15 +1725,19 @@ function renderWeekly() {
       tag = t('wkLock', { n: Weekly.THRESHOLDS[i] });
     }
     d.innerHTML = wkSvg(i, th) +
-      (unlocked || cur ? '' : '<div class="lockov">🔒</div>') +
+      (ps !== 'locked' || cur ? '' : '<div class="lockov">🔒</div>') +
       '<div class="cap"><b>' + nums[i] + ' ' + themePics()[i] + '</b><span class="tag">' + tag + '</span></div>' + extra;
     grid.appendChild(d);
   }
   // 大奖卡
-  document.getElementById('wkGrand').className = 'grand' + (st.grand ? ' done' : '');
+  const gs = WeeklyCore.grandStatus(st); // 'locked'|'claimable'|'claimed'(issue #1:达标≠发放)
+  document.getElementById('wkGrand').className = 'grand' + (gs === 'claimed' ? ' done' : '');
   document.getElementById('wkGrandTitle').textContent = t('wkGrandTitle', { n: Weekly.GOAL });
   document.getElementById('wkGrandBody').textContent = t('wkGrandBody', { e: Weekly.GRAND.energy, h: Weekly.GRAND.hints });
-  document.getElementById('wkGrandSt').textContent = st.grand ? t('wkGrandYes') : t('wkGrandNo', { a: st.frags, b: Weekly.GOAL });
+  const gstEl = document.getElementById('wkGrandSt');
+  gstEl.classList.toggle('ready', gs === 'claimable');
+  if (gs === 'claimable') gstEl.innerHTML = '<button class="claimbtn" id="btnWkGrandClaim">' + t('wkClaimBtn') + '</button>';
+  else gstEl.textContent = gs === 'claimed' ? t('wkGrandYes') : t('wkGrandNo', { a: st.frags, b: Weekly.GOAL });
   // 操作区
   document.getElementById('wkAdText').innerHTML = t('wkAd', { n: Weekly.FRAG_AD }).replace(/(\+\d+[^<]*)/, '<b>$1</b>');
   document.getElementById('wkNote1').textContent = t('wkNote1', { n: Weekly.FRAG_WIN });
@@ -1622,6 +1747,22 @@ function renderWeekly() {
 }
 document.getElementById('btnWeekly').addEventListener('click', () => show('weekly'));
 document.getElementById('btnWkBack').addEventListener('click', () => show('home'));
+// 领取交互(issue #1):图奖励/大奖都必须用户点击领取,core 状态机把关
+document.getElementById('wkGrid').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-claim]');
+  if (!b) return;
+  const r = WeeklyCtl.claim(+b.dataset.claim);
+  haptic('success');
+  toast(t('wkClaimToast', { r: t(r.type === 'energy' ? 'wkRewardEnergy' : 'wkRewardHints', { n: r.n }) }));
+  renderWeekly();
+});
+document.getElementById('wkGrand').addEventListener('click', (e) => {
+  if (!e.target.closest('#btnWkGrandClaim')) return;
+  const r = WeeklyCtl.claimGrand();
+  haptic('success');
+  toast(t('wkGrandGot', { e: r.energy, h: r.hints }));
+  renderWeekly();
+});
 // 挂点:看广告 +10 碎片(现有 Monetag 激励路径,演示模式兜底)
 document.getElementById('btnWkAd').addEventListener('click', () => {
   showRewardedAd().then(() => {
@@ -1906,7 +2047,7 @@ function animatePour(from, to, color, amount, done) {
   // 管口转完后的坐标(旋转矩阵):水柱从管口出发,垂直落到目标管当前液面。
   const mouthY = ay + arm + dy - arm * Math.cos(th);
   const filled = S.tubes[to].length / S.capacity;
-  const surfaceY = by + ah * (0.07 + (1 - filled) * 0.86);
+  const surfaceY = by + ah * (0.20 + (1 - filled) * 0.72);   // Q版矮瓶:液面区间约 37%~98%,保留少量上浮偏置
   const streamTop = Math.min(mouthY + 2, surfaceY - 14);
   const streamX = bx + bw / 2;
   const stream = document.createElement('div');
@@ -2284,9 +2425,12 @@ function newGame(level) {
   S.par = (() => {   // 一次一格玩法:把求解器整段最优路径换算成格数;生成关(minMoves=null)仍不显示
     if (lv.minMoves == null) return null;
     try {
-      const r = WaterEngine.solve(S.start, { capacity: S.capacity });
+      // 公平口径:按「不解锁空瓶」的可玩盘面求最优——锁瓶只是可选辅助,
+      // 显示的「最少 N 步」必须是零广告玩家真实可达的(L9/L10 全开盘面会少 1 步,误导人)。
+      const base = S.start.filter((_, ti) => !S.lockedBottleSlots.includes(ti));
+      const r = WaterEngine.solve(base, { capacity: S.capacity });
       if (!r.solvable) return lv.minMoves;
-      let sim = S.start.map((tt) => tt.slice()), units = 0;
+      let sim = base.map((tt) => tt.slice()), units = 0;
       for (const mv of r.moves) {
         const pr = WaterEngine.pour(sim, mv[0], mv[1], S.capacity);
         if (!pr) return lv.minMoves;
@@ -2347,15 +2491,17 @@ function boot() {
   Profile.load(() => {
     Store.del('sudoku_save'); // 清掉旧版遗留对局快照:刷新一律回首页(issue #6)
     WeeklyCtl.load(() => {
-      // 调试入口:#wkfrags=N 造数(截图/自动化用,只改内存不发奖励)
+      // 调试入口:#wkfrags=N 造数(截图/自动化用,只改内存不发奖励)。
+      // 手动领取语义(issue #1):默认停在「可领取」;加 #wkclaimed 才标记为已领取。
       const wf = location.hash.match(/wkfrags=(\d+)/);
       if (wf) {
         WeeklyCtl.state.frags = +wf[1];
-        for (let i = 0; i < 6; i++) if (WeeklyCtl.state.frags >= Weekly.THRESHOLDS[i]) {
+        const wclaim = /wkclaimed/.test(location.hash);
+        for (let i = 0; i < 6; i++) if (wclaim && WeeklyCtl.state.frags >= Weekly.THRESHOLDS[i]) {
           WeeklyCtl.state.claimed[i] = true;
           WeeklyCtl.state['r' + i] = i % 2 === 0 ? { type: 'energy', n: 35 } : { type: 'hints', n: 2 };
         }
-        if (WeeklyCtl.state.frags >= Weekly.GOAL) WeeklyCtl.state.grand = true;
+        if (wclaim && WeeklyCtl.state.frags >= Weekly.GOAL) WeeklyCtl.state.grand = true;
         const wc = location.hash.match(/wkcarry=(\d+)/);
         if (wc) WeeklyCtl.state.carried = +wc[1];
       }

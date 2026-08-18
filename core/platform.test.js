@@ -193,6 +193,25 @@ test('accountPresentation: 清除危险格式字符，纯不可见 nickname 回�
   );
 });
 
+test('accountPresentation: 保留合法 subdivision flag tag 字素，清除孤立 tag 字符', () => {
+  const P = Platform.create(CFG);
+  const england = '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}';
+  const scotland = '\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}';
+  const wales = '\u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F}';
+  for (const flag of [england, scotland, wales]) {
+    const name = flag + '队长';
+    assert.deepStrictEqual(P.accountPresentation({ name }), {
+      avatar: flag,
+      name
+    });
+  }
+  assert.deepStrictEqual(
+    P.accountPresentation({ name: 'A\u{E0067}\u{E0062}\u{E007F}B' }),
+    { avatar: 'A', name: 'AB' },
+    '脱离合法旗帜字素的 tag 字符必须过滤'
+  );
+});
+
 test('accountPresentation: 无 Intl.Segmenter 时头像安全回退，不伪造不完整字素', () => {
   const P = Platform.create(CFG);
   const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
@@ -235,4 +254,85 @@ test('connect: SDK 不可用 → local 降级会话（mode/reason/core 在位）
   assert.strictEqual(s.reason, 'SDK_UNAVAILABLE');
   assert.strictEqual(s.user, null);
   assert.strictEqual(typeof s.core.mergeSave, 'function');
+});
+
+test('connect: 登录按顶层跳转终止旧会话，回跳新会话恢复用户/云同步，失效与退出自行清空', async () => {
+  const oldWindow = global.window;
+  const oldDocument = global.document;
+  let loginCalls = 0;
+  const createdRows = [];
+  const table = {
+    list() { return Promise.resolve([]); },
+    create(row) {
+      createdRows.push(row);
+      return Promise.resolve({ id: 'row-1' });
+    },
+    update() { return Promise.resolve(); }
+  };
+  const pendingLogin = new Promise(function () {});
+  const anonymousPlay = {
+    user: null,
+    db: { Save: table },
+    login() {
+      loginCalls += 1;
+      return pendingLogin;
+    },
+    logout() {
+      this.user = null;
+      return undefined;
+    },
+    on() {
+      return function () {};
+    }
+  };
+  let activePlay = anonymousPlay;
+  global.window = {
+    Play: { init() { return Promise.resolve(activePlay); } },
+    location: { protocol: 'https:' }
+  };
+  global.document = {};
+  try {
+    const anonymousSession = await Platform.connect(CFG, { syncDebounceMs: 1 });
+    assert.strictEqual(anonymousSession.user, null);
+    assert.strictEqual(anonymousSession.login(), pendingLogin,
+      'login 必须原样返回 SDK 的永不 resolve 跳转 Promise');
+    assert.strictEqual(loginCalls, 1);
+    assert.strictEqual(anonymousSession.user, null,
+      '旧页面不得等待 login continuation 伪造同运行时登录态');
+
+    const authExpiredHandlers = [];
+    activePlay = {
+      user: { name: 'Alice' },
+      db: { Save: table },
+      login() { return pendingLogin; },
+      logout() { this.user = null; },
+      on(event, fn) {
+        if (event === 'authexpired') authExpiredHandlers.push(fn);
+        return function () {};
+      }
+    };
+    const session = await Platform.connect(CFG, { syncDebounceMs: 1 });
+    assert.deepStrictEqual(session.user, { name: 'Alice' },
+      '登录回跳后的新页面必须从 Play.init() 恢复用户');
+    session.queueSync(() => ({ level: 2, updatedMs: 100 }));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.strictEqual(createdRows.length, 1, '回跳新页面必须允许首次同步真正写云端');
+    assert.strictEqual(createdRows[0].level, 2);
+
+    activePlay.user = null;
+    authExpiredHandlers[0]();
+    assert.strictEqual(session.user, null,
+      '即使业务方未注册监听，认证失效也必须清空 session.user');
+
+    activePlay.user = { name: 'Alice' };
+    const logoutSession = await Platform.connect(CFG);
+    logoutSession.logout();
+    assert.strictEqual(session.user, null, '退出后必须清空 session.user');
+    assert.strictEqual(logoutSession.user, null, '退出后必须清空当前新会话的 session.user');
+  } finally {
+    if (oldWindow === undefined) delete global.window;
+    else global.window = oldWindow;
+    if (oldDocument === undefined) delete global.document;
+    else global.document = oldDocument;
+  }
 });

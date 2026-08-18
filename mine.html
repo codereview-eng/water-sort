@@ -262,6 +262,7 @@
 
   /* ============ 开关 ============ */
   function startLevel(lv) {
+    resetGestureState();
     var data = MineLevels.get(lv);
     if (!data) { toast(t('levelFailed')); return; }
     var mines = new Set();
@@ -347,6 +348,12 @@
 
   function resetTapChain() {
     lastTap = { idx: -1, t: 0 };
+  }
+
+  function resetGestureState() {
+    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+    resetTapChain();
+    drag = null;
   }
 
   function samePointer(ev, press) {
@@ -496,18 +503,21 @@
 
   /* ============ 结算 ============ */
   function onWin() {
+    resetGestureState();
     S.done = true; stopTimer();
     save.level = S.lv + 1; save.clears = (save.clears || 0) + 1; persist();
     dialog(t('winTitle', { level: S.lv }), t('winBody', { count: S.size }),
       t('nextLevel'), function () { startLevel(save.level); }, t('home'), showHome);
   }
   function onDead() {
+    resetGestureState();
     S.done = true; stopTimer();
     dialog(t('deadTitle'), t('deadBody'),
       t('revive'), function () { S.done = false; S.lives = 1; renderHud(); if (S.remain != null) startTimer(); },
       t('restart'), function () { startLevel(S.lv); });
   }
   function onTimeUp() {
+    resetGestureState();
     S.done = true;
     dialog(t('timeUpTitle'), t('timeUpBody', { seconds: AD_TIME_BONUS }),
       t('watchAdSeconds', { seconds: AD_TIME_BONUS }), function () { S.done = false; S.remain = AD_TIME_BONUS; renderHud(); startTimer(); },
@@ -615,6 +625,7 @@
     $('sfxToggle').setAttribute('aria-pressed', String(!!save.sfx));
   }
   function showHome() {
+    resetGestureState();
     stopTimer();
     $('game').hidden = true; $('home').hidden = false;
     renderHome();
@@ -664,6 +675,23 @@
       onAuthLost: function () { renderAccount(); toast(t('authExpired')); }
     });
   }
+  function loadPlatformCloud(session) {
+    if (!session || session.mode !== 'online' || !session.user) {
+      renderAccount();
+      return Promise.resolve();
+    }
+    return session.loadCloud().then(function (row) {
+      // localFresh：本地没有实际游玩痕迹（换设备刚打开就登录），云端优先，防默认档覆盖云档
+      var localFresh = (save.clears || 0) === 0 && save.level <= 1;
+      var merged = session.core.mergeSave(save, row, { localFresh: localFresh }).save;
+      Object.keys(merged).forEach(function (k) { save[k] = merged[k]; });
+      persist(); renderHome(); renderAccount();
+    }).catch(function () { renderAccount(); });
+  }
+  function loginPlatform() {
+    if (!Plat || Plat.mode !== 'online') return;
+    Plat.login(); // SDK 顶层跳转；本页终止，回跳后的新页面由 connect() 恢复用户与云档
+  }
   function renderAccount() {
     if (!$('btnAccount')) return;
     var view = { avatar: '☁', status: t('connecting'), title: t('connecting'), action: '' };
@@ -693,31 +721,23 @@
     if (!Plat.core.shouldPromptLogin({ clears: save.clears || 0, prompted: platPrompted })) return;
     platPrompted = true;
     dialog(t('cloudPromptTitle'), t('cloudPromptBody', { clears: save.clears || 0 }),
-      t('login'), function () { Plat.login(); }, t('later'), null);
+      t('login'), loginPlatform, t('later'), null);
   }
   $('btnAccount').addEventListener('click', function () {
     if (!Plat) { toast(t('platformConnecting')); return; }
     if (Plat.mode !== 'online') { toast(t('localOnly')); return; }
     if (Plat.user) {
       dialog(t('logoutTitle'), t('logoutBody'), t('logout'), function () {
-        Plat.logout(); Plat.user = null; renderAccount(); toast(t('loggedOutToast'));
+        Plat.logout(); renderAccount(); toast(t('loggedOutToast'));
       }, t('cancel'), null);
-    } else Plat.login();
+    } else loginPlatform();
   });
   PlatformCore.connect(CFG.platform).then(function (session) {
     Plat = session;
     renderAccount();
     if (session.mode !== 'online') return;
     session.on('authexpired', function () { renderAccount(); });
-    if (!session.user) return;
-    // 登录态：拉云档 → 字段级合并（进度取大、道具/体力按时间戳取新）→ 落本地并回写云端
-    session.loadCloud().then(function (row) {
-      // localFresh：本地没有实际游玩痕迹（换设备刚打开就登录），云端优先，防默认档覆盖云档
-      var localFresh = (save.clears || 0) === 0 && save.level <= 1;
-      var merged = session.core.mergeSave(save, row, { localFresh: localFresh }).save;
-      Object.keys(merged).forEach(function (k) { save[k] = merged[k]; });
-      persist(); renderHome(); renderAccount();
-    }).catch(function () { renderAccount(); });
+    loadPlatformCloud(session);
   });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden' && Plat && Plat.mode === 'online') Plat.flush(function () { return save; });

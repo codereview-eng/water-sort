@@ -17,16 +17,6 @@ const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/mine/game.con
 const html = fs.readFileSync(path.join(__dirname, 'mine.html'), 'utf8');
 const I18n = LocaleCore.createI18n(cfg.i18n);
 
-function translateZh(key, vars) {
-  let text = I18n.t('zh', key);
-  if (vars) {
-    for (const name of Object.keys(vars)) {
-      text = text.split('{' + name + '}').join(String(vars[name]));
-    }
-  }
-  return text;
-}
-
 function embedded() {
   const m = html.match(/<script id="gameConfig" type="application\/json">([\s\S]*?)<\/script>/);
   assert.ok(m, 'mine.html 缺内嵌 gameConfig JSON 块');
@@ -55,6 +45,155 @@ function htmlClickHandler(id) {
   return 'function clickHandler() {' + html.slice(bodyStart, end) + '\n}';
 }
 
+function htmlDebugSolve() {
+  const m = html.match(/solve: function \(\) \{([\s\S]*?)\},\n\s*home:/);
+  assert.ok(m, 'mine.html 缺调试 solve 实现');
+  return 'function debugSolve() {' + m[1] + '\n}';
+}
+
+function renderAccountInBothLocales(name) {
+  const elements = {};
+  for (const id of ['btnAccount', 'accountAvatar', 'accountStatus', 'accountAction']) {
+    elements[id] = {
+      textContent: '',
+      title: '',
+      attributes: {},
+      setAttribute(key, value) { this.attributes[key] = String(value); }
+    };
+  }
+  const sandbox = {
+    I18n,
+    LANG: 'en',
+    Plat: {
+      mode: 'online',
+      user: { name },
+      core: {
+        accountPresentation(user) {
+          assert.strictEqual(user.name, name, 'renderAccount 未把当前 SDK user 交给 PlatformCore');
+          return { avatar: '👩‍💻', name };
+        }
+      }
+    },
+    $(id) { return elements[id]; }
+  };
+  const source = [
+    htmlFunction('t'),
+    htmlFunction('renderAccount'),
+    'renderAccount();',
+    'var enSnapshot = {',
+    "  avatar: $('accountAvatar').textContent,",
+    "  status: $('accountStatus').textContent,",
+    "  title: $('accountStatus').title,",
+    "  action: $('accountAction').textContent,",
+    "  aria: $('btnAccount').attributes['aria-label']",
+    '};',
+    "LANG = 'zh';",
+    'renderAccount();',
+    'JSON.stringify({ en: enSnapshot, zh: {',
+    "  avatar: $('accountAvatar').textContent,",
+    "  status: $('accountStatus').textContent,",
+    "  title: $('accountStatus').title,",
+    "  action: $('accountAction').textContent,",
+    "  aria: $('btnAccount').attributes['aria-label']",
+    '} });'
+  ].join('\n');
+  return JSON.parse(vm.runInNewContext(source, sandbox));
+}
+
+function createPointerHarness(options) {
+  options = options || {};
+  let now = 1000;
+  let nextTimer = 1;
+  const timers = new Map();
+  const vibrations = [];
+  const cells = new Map();
+  const sandbox = {
+    S: {
+      done: false,
+      size: 5,
+      mines: new Set(options.mines || [3]),
+      found: new Set(),
+      marks: new Set(),
+      opened: new Set(),
+      lives: 3
+    },
+    lastTap: { idx: -1, t: 0 },
+    DBL_MS: 320,
+    drag: null,
+    clickTimer: null,
+    Date: { now() { return now; } },
+    setTimeout(fn) {
+      const id = nextTimer++;
+      timers.set(id, fn);
+      return id;
+    },
+    clearTimeout(id) { timers.delete(id); },
+    cellEl(idx) {
+      if (!cells.has(idx)) {
+        const classes = new Set();
+        cells.set(idx, {
+          classList: {
+            add(...names) { names.forEach(name => classes.add(name)); },
+            remove(...names) { names.forEach(name => classes.delete(name)); }
+          }
+        });
+      }
+      return cells.get(idx);
+    },
+    blip() {},
+    renderHud() {},
+    onWin() {},
+    onDead() {},
+    toast() {},
+    t(key) { return I18n.t('zh', key); }
+  };
+  if (Object.prototype.hasOwnProperty.call(options, 'navigator')) {
+    if (options.navigator !== undefined) sandbox.navigator = options.navigator;
+  } else {
+    sandbox.navigator = {
+      vibrate(ms) {
+        vibrations.push(ms);
+        return true;
+      }
+    };
+  }
+  vm.runInNewContext([
+    htmlFunction('vibrateCorrectMine'),
+    htmlFunction('toggleMark'),
+    htmlFunction('dig'),
+    htmlFunction('onTap'),
+    htmlDebugSolve()
+  ].join('\n'), sandbox);
+
+  function cellTarget(idx) {
+    const cell = { dataset: { idx: String(idx) } };
+    cell.closest = selector => selector === '.cell' ? cell : null;
+    return cell;
+  }
+
+  return {
+    sandbox,
+    vibrations,
+    advance(ms) { now += ms; },
+    pendingTimers() { return timers.size; },
+    flushTimers() {
+      const callbacks = Array.from(timers.values());
+      timers.clear();
+      callbacks.forEach(fn => fn());
+    },
+    tap(idx, event) {
+      sandbox.onTap(Object.assign({
+        isPrimary: true,
+        pointerType: 'mouse',
+        button: 0,
+        target: cellTarget(idx)
+      }, event));
+    },
+    dig(idx) { return sandbox.dig(idx); },
+    solve() { return sandbox.debugSolve(); }
+  };
+}
+
 test('mine.html 内嵌 GameConfig 与 games/mine/game.config.json 逐字段一致', () => {
   assert.deepStrictEqual(embedded(), cfg);
 });
@@ -78,7 +217,8 @@ test('i18n 配置覆盖顾客可见核心文案，且 en/zh 均有完整值', ()
     'profileSource', 'sfxLabel', 'sfxOn', 'sfxOff', 'langLabel',
     'homeHint1', 'homeHint2', 'back', 'hudLevel', 'hudMines', 'hudTime',
     'boardAria', 'toolMine', 'toolSafe', 'gameHint', 'energyFull',
-    'energyRefill', 'notMine', 'safeHint'
+    'energyRefill', 'notMine', 'safeHint', 'accountLabel', 'loggedIn',
+    'loggedInNamed', 'loggedOut', 'login', 'logout'
   ];
   for (const locale of ['en', 'zh']) {
     for (const key of required) {
@@ -131,11 +271,27 @@ test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json �
   assert.strictEqual(entity.fields.updated_ms, 'number', 'schema 必须声明 updated_ms number（云档判新列）');
   assert.ok(html.includes('PlatformCore.connect(CFG.platform)'), '页面未经 PlatformCore 消费 platform 配置');
   assert.ok(html.includes('<script src="./core/platform.js"></script>'), '页面未引入 core/platform.js');
-  assert.ok(html.includes('Plat.core.accountPresentation(Plat.user)'), '登录账号行未消费 SDK user.name 展示昵称');
-  assert.ok(html.includes("$('accountAvatar').textContent = view.avatar"), '登录账号行未按昵称首字更新头像');
-  assert.match(html, /\.profilerow \.profilename\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/, '长昵称未配置单行省略');
   const joined = require('./core/shell.js').create(require('./core/home.js').registry(), cfg.screens).render('home', {}).join('');
   assert.ok(joined.includes('id="btnAccount"'), '首页缺 account-row 回填锚点');
+});
+
+test('登录账号行真实消费完整 SDK nickname，并随当前语言重渲染状态', () => {
+  const name = '👩‍💻-' + 'A'.repeat(72);
+  const view = renderAccountInBothLocales(name);
+  assert.strictEqual(view.en.avatar, '👩‍💻', '账号头像必须使用 PlatformCore 给出的完整字素');
+  assert.strictEqual(view.zh.avatar, '👩‍💻', '切换语言不得改变账号头像');
+  assert.strictEqual(view.en.status, name + ' · cloud sync on', '英文登录态未用 loggedInNamed 插入完整昵称');
+  assert.strictEqual(view.zh.status, name + ' · 进度云同步', '中文登录态未用 loggedInNamed 插入完整昵称');
+  assert.strictEqual(view.en.title, name, '英文账号 title 不得截断昵称');
+  assert.strictEqual(view.zh.title, name, '中文账号 title 不得截断昵称');
+  assert.strictEqual(view.en.action, 'Sign out');
+  assert.strictEqual(view.zh.action, '退出');
+  assert.ok(view.en.aria.includes(view.en.status) && view.en.aria.includes(view.en.action),
+    '英文账号 aria-label 未包含可见状态与操作');
+  assert.ok(view.zh.aria.includes(view.zh.status) && view.zh.aria.includes(view.zh.action),
+    '中文账号 aria-label 未包含可见状态与操作');
+  assert.match(html, /\.profilerow \.profilename\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/,
+    '长昵称只能由 CSS 单行视觉省略，DOM 文本必须保持完整');
 });
 
 test('reward 配置过 RewardCore 校验且页面经 CFG 消费、手写首页已移除', () => {
@@ -161,40 +317,64 @@ test('叉号与雷按格子宽度响应式缩放，小格同步缩小且不再�
     '桌面说明和次级标签缺少可读性增强');
 });
 
-test('正确双击翻开雷仅在支持设备轻震，缺 API 或调用失败时安全降级', () => {
-  const fn = htmlFunction('vibrateCorrectMine');
-  const calls = [];
-  vm.runInNewContext(fn + '\nvibrateCorrectMine();', {
-    navigator: { vibrate(ms) { calls.push(ms); return true; } }
-  });
-  assert.deepStrictEqual(calls, [18], '正确雷轻震应为单次 18ms');
-  assert.doesNotThrow(() => vm.runInNewContext(fn + '\nvibrateCorrectMine();', {}),
-    '无 Vibration API 时不应报错');
-  assert.doesNotThrow(() => vm.runInNewContext(fn + '\nvibrateCorrectMine();', {
-    navigator: { vibrate() { throw new Error('blocked'); } }
-  }), '浏览器拒绝震动时不应阻断游戏');
-  const dig = htmlFunction('dig');
-  function runDig(isMine) {
-    const vibrations = [];
-    const sandbox = {
-      navigator: { vibrate(ms) { vibrations.push(ms); return true; } },
-      S: {
-        done: false, size: 5, mines: new Set(isMine ? [3] : []),
-        found: new Set(), marks: new Set([3]), opened: new Set(), lives: 3
-      },
-      cellEl() { return { classList: { add() {}, remove() {} } }; },
-      blip() {}, renderHud() {}, onWin() {}, onDead() {}, toast() {},
-      t: translateZh
-    };
-    vm.runInNewContext(fn + '\n' + dig + '\ndig(3);', sandbox);
-    return vibrations;
-  }
-  assert.deepStrictEqual(runDig(true), [18], '正确雷路径必须精确触发一次 18ms 轻震');
-  assert.deepStrictEqual(runDig(false), [], '错误格路径不得触发震动');
+test('仅主指针左键同格双击正确雷时挖开并轻震一次 18ms', () => {
+  const correct = createPointerHarness({ mines: [3] });
+  correct.tap(3);
+  assert.strictEqual(correct.pendingTimers(), 1, '首次主指针点击应等待双击窗口');
+  assert.deepStrictEqual(correct.vibrations, [], '首次点击不得震动');
+  correct.advance(100);
+  correct.tap(3);
+  assert.strictEqual(correct.sandbox.S.found.has(3), true, '同格双击未执行真实 dig');
+  assert.strictEqual(correct.pendingTimers(), 0, '完成双击后必须取消单击标记计时器');
+  assert.deepStrictEqual(correct.vibrations, [18], '正确雷双击必须精确触发一次 18ms 轻震');
+
+  const secondary = createPointerHarness({ mines: [3] });
+  secondary.tap(3, { isPrimary: false });
+  secondary.advance(100);
+  secondary.tap(3, { isPrimary: false });
+  assert.strictEqual(secondary.sandbox.S.found.size, 0, '非主指针不得挖格');
+  assert.strictEqual(secondary.pendingTimers(), 0, '非主指针不得启动单击计时器');
+  assert.deepStrictEqual(secondary.vibrations, [], '非主指针不得震动');
+
+  const rightButton = createPointerHarness({ mines: [3] });
+  rightButton.tap(3, { button: 2 });
+  rightButton.advance(100);
+  rightButton.tap(3, { button: 2 });
+  assert.strictEqual(rightButton.sandbox.S.found.size, 0, '右键不得挖格');
+  assert.strictEqual(rightButton.pendingTimers(), 0, '右键不得启动单击计时器');
+  assert.deepStrictEqual(rightButton.vibrations, [], '右键不得震动');
+});
+
+test('单击、错误格、道具和调试入口均不震，Vibration API 缺失或失败安全降级', () => {
+  const single = createPointerHarness({ mines: [3] });
+  single.tap(4);
+  assert.deepStrictEqual(single.vibrations, [], '单击等待阶段不得震动');
+  single.flushTimers();
+  assert.strictEqual(single.sandbox.S.marks.has(4), true, '单击计时完成后应执行真实 toggleMark');
+  assert.deepStrictEqual(single.vibrations, [], '单击标记安全格不得震动');
+
+  const wrong = createPointerHarness({ mines: [3] });
+  wrong.tap(4);
+  wrong.advance(100);
+  wrong.tap(4);
+  assert.strictEqual(wrong.sandbox.S.opened.has(4), true, '错误格双击未执行真实 dig');
+  assert.strictEqual(wrong.sandbox.S.lives, 2, '错误格双击应扣一次生命');
+  assert.deepStrictEqual(wrong.vibrations, [], '错误格双击不得震动');
+
+  const direct = createPointerHarness({ mines: [3] });
+  assert.strictEqual(direct.dig(3), true, '程序化 dig 应返回命中雷结果');
+  assert.strictEqual(direct.sandbox.S.found.has(3), true, '程序化 dig 未完成找雷');
+  assert.deepStrictEqual(direct.vibrations, [], 'window.__mine.dig 程序化入口不得震动');
+
+  const solved = createPointerHarness({ mines: [1, 3] });
+  solved.solve();
+  assert.deepStrictEqual(Array.from(solved.sandbox.S.found).sort(), [1, 3],
+    'window.__mine.solve 未通过页面真实 dig 找完雷');
+  assert.deepStrictEqual(solved.vibrations, [], 'window.__mine.solve 程序化入口不得震动');
 
   const toolCalls = [];
   const toolHandler = htmlClickHandler('toolMine');
-  vm.runInNewContext(fn + '\n' + toolHandler + '\nclickHandler();', {
+  vm.runInNewContext(toolHandler + '\nclickHandler();', {
     navigator: { vibrate(ms) { toolCalls.push(ms); return true; } },
     S: { done: false, size: 5, board: {}, found: new Set(), marks: new Set() },
     save: { toolMine: 1 },
@@ -205,27 +385,22 @@ test('正确双击翻开雷仅在支持设备轻震，缺 API 或调用失败时
   });
   assert.deepStrictEqual(toolCalls, [], '找雷道具路径不得触发震动');
 
-  const toggleMark = htmlFunction('toggleMark');
-  function runToggleMark(initiallyMarked) {
-    const vibrations = [];
-    const sandbox = {
-      navigator: { vibrate(ms) { vibrations.push(ms); return true; } },
-      S: {
-        done: false, found: new Set(), opened: new Set(),
-        marks: new Set(initiallyMarked ? [4] : [])
-      },
-      cellEl() { return { classList: { add() {}, remove() {} } }; },
-      blip() {}
-    };
-    vm.runInNewContext(fn + '\n' + toggleMark + '\ntoggleMark(4);', sandbox);
-    return { vibrations, marked: sandbox.S.marks.has(4) };
-  }
-  const marked = runToggleMark(false);
-  assert.strictEqual(marked.marked, true, '单击未标记格应完成标记');
-  assert.deepStrictEqual(marked.vibrations, [], '单击标记安全格不得触发震动');
-  const unmarked = runToggleMark(true);
-  assert.strictEqual(unmarked.marked, false, '单击已标记格应完成取消标记');
-  assert.deepStrictEqual(unmarked.vibrations, [], '单击取消标记不得触发震动');
+  const missingApi = createPointerHarness({ mines: [3], navigator: undefined });
+  assert.doesNotThrow(() => {
+    missingApi.tap(3);
+    missingApi.advance(100);
+    missingApi.tap(3);
+  }, '无 Vibration API 时正确雷双击不应报错');
+
+  const rejectedApi = createPointerHarness({
+    mines: [3],
+    navigator: { vibrate() { throw new Error('blocked'); } }
+  });
+  assert.doesNotThrow(() => {
+    rejectedApi.tap(3);
+    rejectedApi.advance(100);
+    rejectedApi.tap(3);
+  }, '浏览器拒绝震动时不应阻断正确雷双击');
 });
 
 test('每种颜色配置唯一淡色底纹，覆盖离散纹理族并由渲染完整消费', () => {
@@ -298,7 +473,7 @@ test('通关保持游戏页并弹出下一关或返回主页二选一', () => {
     dialog(...values) { args = values; },
     startLevel(level) { nextLevel = level; },
     showHome() { wentHome = true; },
-    t: translateZh
+    t(key) { return I18n.t('zh', key); }
   };
   vm.runInNewContext(onWin + '\nonWin();', sandbox);
   assert.strictEqual(wentHome, false, '通关弹窗出现前不应自动返回主页');

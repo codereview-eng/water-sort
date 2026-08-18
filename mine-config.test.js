@@ -15,6 +15,17 @@ const LocaleCore = require('./core/locale.js');
 
 const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/mine/game.config.json'), 'utf8'));
 const html = fs.readFileSync(path.join(__dirname, 'mine.html'), 'utf8');
+const I18n = LocaleCore.createI18n(cfg.i18n);
+
+function translateZh(key, vars) {
+  let text = I18n.t('zh', key);
+  if (vars) {
+    for (const name of Object.keys(vars)) {
+      text = text.split('{' + name + '}').join(String(vars[name]));
+    }
+  }
+  return text;
+}
 
 function embedded() {
   const m = html.match(/<script id="gameConfig" type="application\/json">([\s\S]*?)<\/script>/);
@@ -172,7 +183,8 @@ test('正确双击翻开雷仅在支持设备轻震，缺 API 或调用失败时
         found: new Set(), marks: new Set([3]), opened: new Set(), lives: 3
       },
       cellEl() { return { classList: { add() {}, remove() {} } }; },
-      blip() {}, renderHud() {}, onWin() {}, onDead() {}, toast() {}
+      blip() {}, renderHud() {}, onWin() {}, onDead() {}, toast() {},
+      t: translateZh
     };
     vm.runInNewContext(fn + '\n' + dig + '\ndig(3);', sandbox);
     return vibrations;
@@ -285,7 +297,8 @@ test('通关保持游戏页并弹出下一关或返回主页二选一', () => {
     persist() {},
     dialog(...values) { args = values; },
     startLevel(level) { nextLevel = level; },
-    showHome() { wentHome = true; }
+    showHome() { wentHome = true; },
+    t: translateZh
   };
   vm.runInNewContext(onWin + '\nonWin();', sandbox);
   assert.strictEqual(wentHome, false, '通关弹窗出现前不应自动返回主页');

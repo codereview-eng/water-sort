@@ -121,23 +121,63 @@ test('shouldPromptLogin: 满 N 盘且未提示过才提示；0 = 永不', () => 
   assert.throws(() => P.shouldPromptLogin(null), /state/);
 });
 
-test('accountPresentation: SDK user.name 驱动账号昵称/头像，空值安全回退', () => {
+test('accountPresentation: 仅返回 SDK nickname/字素头像，非字符串与空值安全回退', () => {
   const P = Platform.create(CFG);
   assert.deepStrictEqual(P.accountPresentation({ name: ' Player-7H9K2M4Q8C ' }), {
     avatar: 'P',
-    status: 'Player-7H9K2M4Q8C · 进度云同步',
-    title: 'Player-7H9K2M4Q8C'
+    name: 'Player-7H9K2M4Q8C'
   });
-  assert.deepStrictEqual(P.accountPresentation({ name: '   ' }), {
-    avatar: '☁',
-    status: '已登录 · 进度云同步',
-    title: '已登录'
+  assert.deepStrictEqual(P.accountPresentation({ name: '   ' }), { avatar: '☁', name: '' });
+  assert.deepStrictEqual(P.accountPresentation({ name: 12345 }), { avatar: '☁', name: '' });
+  assert.deepStrictEqual(P.accountPresentation(null), { avatar: '☁', name: '' });
+});
+
+test('accountPresentation: 超长 nickname 不截断，emoji ZWJ 保持完整首字素', () => {
+  const P = Platform.create(CFG);
+  const longName = `Player-${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(4)}-完整尾部`;
+  assert.deepStrictEqual(P.accountPresentation({ name: longName }), {
+    avatar: 'P',
+    name: longName
   });
-  assert.deepStrictEqual(P.accountPresentation(null), {
-    avatar: '☁',
-    status: '已登录 · 进度云同步',
-    title: '已登录'
+  assert.deepStrictEqual(P.accountPresentation({ name: '👩‍💻研发者' }), {
+    avatar: '👩‍💻',
+    name: '👩‍💻研发者'
   });
+});
+
+test('accountPresentation: 清除危险格式字符，纯不可见 nickname 回退', () => {
+  const P = Platform.create(CFG);
+  assert.deepStrictEqual(P.accountPresentation({ name: 'Ali\u202Ece\u200B' }), {
+    avatar: 'A',
+    name: 'Alice'
+  });
+  assert.deepStrictEqual(
+    P.accountPresentation({ name: '\u200B\u200C\u200D\u2060\uFEFF\u202E' }),
+    { avatar: '☁', name: '' }
+  );
+});
+
+test('accountPresentation: 无 Intl.Segmenter 时仍保留 emoji ZWJ 首字素', () => {
+  const P = Platform.create(CFG);
+  const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
+  Object.defineProperty(Intl, 'Segmenter', { configurable: true, value: undefined });
+  try {
+    assert.deepStrictEqual(P.accountPresentation({ name: '👨‍👩‍👧‍👦家庭' }), {
+      avatar: '👨‍👩‍👧‍👦',
+      name: '👨‍👩‍👧‍👦家庭'
+    });
+  } finally {
+    if (descriptor) Object.defineProperty(Intl, 'Segmenter', descriptor);
+    else delete Intl.Segmenter;
+  }
+});
+
+test('accountPresentation: 结果不携带 SDK id/token 等敏感字段', () => {
+  const P = Platform.create(CFG);
+  const sentinel = 'SDK_SECRET_SENTINEL';
+  const view = P.accountPresentation({ name: 'Alice', id: sentinel, token: sentinel });
+  assert.deepStrictEqual(Object.keys(view).sort(), ['avatar', 'name']);
+  assert.strictEqual(JSON.stringify(view).includes(sentinel), false);
 });
 
 test('loadSdk: Node 环境（无 window）安全返回 null，永不 reject', async () => {

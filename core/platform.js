@@ -19,6 +19,81 @@
 
   function fail(msg) { throw new Error('platform config: ' + msg); }
 
+  /* 账号 nickname 仅作为文本展示：去掉控制/双向欺骗/视觉空白格式符，
+     保留合法 ZWJ/variation selector 组合，并用 NFC 统一等价字形。 */
+  var UNSAFE_NAME_CHARS = /[\u0000-\u001F\u007F-\u009F\u00AD\u061C\u115F\u1160\u17B4\u17B5\u180E\u200B\u200E\u200F\u2028-\u202E\u2060-\u206F\u3164\uFEFF\uFFA0\uFFF9-\uFFFB]/g;
+  var UNICODE_MARK = null;
+  try { UNICODE_MARK = new RegExp('\\p{Mark}', 'u'); } catch (err) {}
+
+  function isGraphemeExtend(ch) {
+    var cp = ch.codePointAt(0);
+    return (UNICODE_MARK && UNICODE_MARK.test(ch)) ||
+      (cp >= 0x0300 && cp <= 0x036F) ||
+      (cp >= 0x1AB0 && cp <= 0x1AFF) ||
+      (cp >= 0x1DC0 && cp <= 0x1DFF) ||
+      (cp >= 0x20D0 && cp <= 0x20FF) ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      (cp >= 0xFE20 && cp <= 0xFE2F) ||
+      (cp >= 0x1F3FB && cp <= 0x1F3FF) ||
+      (cp >= 0xE0020 && cp <= 0xE007F) ||
+      (cp >= 0xE0100 && cp <= 0xE01EF);
+  }
+
+  function isStandaloneInvisible(ch) {
+    var cp = ch.codePointAt(0);
+    return /\s/.test(ch) || cp === 0x200C || cp === 0x200D || cp === 0x2800 || isGraphemeExtend(ch);
+  }
+
+  function normalizeAccountName(value) {
+    if (typeof value !== 'string') return '';
+    var name = value.replace(UNSAFE_NAME_CHARS, '').trim();
+    if (name && typeof name.normalize === 'function') name = name.normalize('NFC');
+    var chars = Array.from(name);
+    while (chars.length && isStandaloneInvisible(chars[0])) chars.shift();
+    while (chars.length && (chars[chars.length - 1] === '\u200C' || chars[chars.length - 1] === '\u200D')) chars.pop();
+    name = chars.join('').trim();
+    if (!name) return '';
+    for (var i = 0; i < chars.length; i += 1) {
+      if (!isStandaloneInvisible(chars[i])) return name;
+    }
+    return '';
+  }
+
+  function firstGrapheme(name) {
+    if (!name) return '';
+    try {
+      if (typeof Intl === 'object' && typeof Intl.Segmenter === 'function') {
+        var segments = new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(name);
+        var first = segments[Symbol.iterator]().next();
+        if (!first.done && first.value && first.value.segment) return first.value.segment;
+      }
+    } catch (err) {}
+
+    /* Segmenter 缺失时覆盖常见组合：combining mark、肤色、旗帜、keycap 与 emoji ZWJ 链。 */
+    var chars = Array.from(name);
+    var out = chars[0] || '';
+    var firstCp = out ? out.codePointAt(0) : 0;
+    var i = 1;
+    if (firstCp >= 0x1F1E6 && firstCp <= 0x1F1FF && chars[i]) {
+      var nextCp = chars[i].codePointAt(0);
+      if (nextCp >= 0x1F1E6 && nextCp <= 0x1F1FF) out += chars[i++];
+    }
+    while (i < chars.length) {
+      var ch = chars[i];
+      var cp = ch.codePointAt(0);
+      if (isGraphemeExtend(ch) || cp === 0x200C) {
+        out += ch;
+        i += 1;
+      } else if (cp === 0x200D && i + 1 < chars.length) {
+        out += ch + chars[i + 1];
+        i += 2;
+      } else {
+        break;
+      }
+    }
+    return out;
+  }
+
   /* ---------- 纯函数层 ---------- */
 
   function create(cfg) {
@@ -104,14 +179,12 @@
       return (state.clears || 0) >= promptAfter;
     }
 
-    /* 登录账号展示：昵称来自 SDK user.name；缺失时保留通用登录态。 */
+    /* 登录账号展示契约：只暴露安全 nickname 与首字素头像，本地化由消费方负责。 */
     function accountPresentation(user) {
-      var chars = user && typeof user.name === 'string' ? Array.from(user.name.trim()).slice(0, 64) : [];
-      var name = chars.join('');
+      var name = normalizeAccountName(user && user.name);
       return {
-        avatar: chars[0] || '☁',
-        status: name ? name + ' · 进度云同步' : '已登录 · 进度云同步',
-        title: name || '已登录'
+        avatar: firstGrapheme(name) || '☁',
+        name: name
       };
     }
 

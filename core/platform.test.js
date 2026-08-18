@@ -132,7 +132,7 @@ test('accountPresentation: 仅返回 SDK nickname/字素头像，非字符串与
   assert.deepStrictEqual(P.accountPresentation(null), { avatar: '☁', name: '' });
 });
 
-test('accountPresentation: 超长 nickname 不截断，emoji ZWJ 保持完整首字素', () => {
+test('accountPresentation: 超长 nickname 不截断，标准 Segmenter 返回完整首字素', () => {
   const P = Platform.create(CFG);
   const longName = `Player-${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.repeat(4)}-完整尾部`;
   assert.deepStrictEqual(P.accountPresentation({ name: longName }), {
@@ -143,6 +143,22 @@ test('accountPresentation: 超长 nickname 不截断，emoji ZWJ 保持完整首
     avatar: '👩‍💻',
     name: '👩‍💻研发者'
   });
+  assert.deepStrictEqual(P.accountPresentation({ name: 'A\u200DB' }), {
+    avatar: 'A\u200D',
+    name: 'A\u200DB'
+  }, '普通字符间 ZWJ 不得把后一字符并入首字素');
+  assert.deepStrictEqual(P.accountPresentation({ name: 'क्षेत्र' }), {
+    avatar: 'क्षे',
+    name: 'क्षेत्र'
+  }, 'Indic 连写与元音标记保持完整');
+  assert.deepStrictEqual(P.accountPresentation({ name: '🇺🇳代表' }), {
+    avatar: '🇺🇳',
+    name: '🇺🇳代表'
+  });
+  assert.deepStrictEqual(P.accountPresentation({ name: '1️⃣号' }), {
+    avatar: '1️⃣',
+    name: '1️⃣号'
+  });
 });
 
 test('accountPresentation: 清除危险格式字符，纯不可见 nickname 回退', () => {
@@ -151,20 +167,40 @@ test('accountPresentation: 清除危险格式字符，纯不可见 nickname 回�
     avatar: 'A',
     name: 'Alice'
   });
+  assert.deepStrictEqual(P.accountPresentation({ name: 'Alice\u2800' }), {
+    avatar: 'A',
+    name: 'Alice'
+  }, 'Braille Blank 不得形成视觉同名后缀');
+  assert.deepStrictEqual(P.accountPresentation({ name: 'A\u{E0001}lice' }), {
+    avatar: 'A',
+    name: 'Alice'
+  }, 'Default_Ignorable 不得穿透可见昵称');
+  assert.deepStrictEqual(
+    P.accountPresentation({ name: '\u{E0001}' }),
+    { avatar: '☁', name: '' }
+  );
   assert.deepStrictEqual(
     P.accountPresentation({ name: '\u200B\u200C\u200D\u2060\uFEFF\u202E' }),
     { avatar: '☁', name: '' }
   );
 });
 
-test('accountPresentation: 无 Intl.Segmenter 时仍保留 emoji ZWJ 首字素', () => {
+test('accountPresentation: 无 Intl.Segmenter 时头像安全回退，不伪造不完整字素', () => {
   const P = Platform.create(CFG);
   const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
   Object.defineProperty(Intl, 'Segmenter', { configurable: true, value: undefined });
   try {
     assert.deepStrictEqual(P.accountPresentation({ name: '👨‍👩‍👧‍👦家庭' }), {
-      avatar: '👨‍👩‍👧‍👦',
+      avatar: '☁',
       name: '👨‍👩‍👧‍👦家庭'
+    });
+    assert.deepStrictEqual(P.accountPresentation({ name: 'A\u200DB' }), {
+      avatar: '☁',
+      name: 'A\u200DB'
+    });
+    assert.deepStrictEqual(P.accountPresentation({ name: 'क्षेत्र' }), {
+      avatar: '☁',
+      name: 'क्षेत्र'
     });
   } finally {
     if (descriptor) Object.defineProperty(Intl, 'Segmenter', descriptor);

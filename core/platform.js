@@ -19,11 +19,12 @@
 
   function fail(msg) { throw new Error('platform config: ' + msg); }
 
-  /* 账号 nickname 仅作为文本展示：去掉控制/双向欺骗/视觉空白格式符，
-     保留合法 ZWJ/variation selector 组合，并用 NFC 统一等价字形。 */
-  var UNSAFE_NAME_CHARS = /[\u0000-\u001F\u007F-\u009F\u00AD\u061C\u115F\u1160\u17B4\u17B5\u180E\u200B\u200E\u200F\u2028-\u202E\u2060-\u206F\u3164\uFEFF\uFFA0\uFFF9-\uFFFB]/g;
+  /* 账号 nickname 仅作为文本展示：去掉控制/双向欺骗/default-ignorable/视觉空白，
+     保留可见名称内部合法的 ZWJ/ZWNJ/variation selector，并用 NFC 统一等价字形。 */
   var UNICODE_MARK = null;
+  var DEFAULT_IGNORABLE = null;
   try { UNICODE_MARK = new RegExp('\\p{Mark}', 'u'); } catch (err) {}
+  try { DEFAULT_IGNORABLE = new RegExp('\\p{Default_Ignorable_Code_Point}', 'u'); } catch (err) {}
 
   function isGraphemeExtend(ch) {
     var cp = ch.codePointAt(0);
@@ -39,22 +40,58 @@
       (cp >= 0xE0100 && cp <= 0xE01EF);
   }
 
-  function isStandaloneInvisible(ch) {
+  function isAllowedNameFormat(cp) {
+    return cp === 0x200C || cp === 0x200D ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      (cp >= 0xE0100 && cp <= 0xE01EF);
+  }
+
+  function isDefaultIgnorable(ch) {
     var cp = ch.codePointAt(0);
-    return /\s/.test(ch) || cp === 0x200C || cp === 0x200D || cp === 0x2800 || isGraphemeExtend(ch);
+    if (DEFAULT_IGNORABLE) return DEFAULT_IGNORABLE.test(ch);
+    return cp === 0x00AD || cp === 0x034F || cp === 0x061C ||
+      (cp >= 0x115F && cp <= 0x1160) ||
+      (cp >= 0x17B4 && cp <= 0x17B5) ||
+      (cp >= 0x180B && cp <= 0x180F) ||
+      (cp >= 0x200B && cp <= 0x200F) ||
+      (cp >= 0x202A && cp <= 0x202E) ||
+      (cp >= 0x2060 && cp <= 0x206F) ||
+      cp === 0x3164 ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      cp === 0xFEFF || cp === 0xFFA0 ||
+      (cp >= 0xFFF0 && cp <= 0xFFF8) ||
+      (cp >= 0x1BCA0 && cp <= 0x1BCA3) ||
+      (cp >= 0x1D173 && cp <= 0x1D17A) ||
+      (cp >= 0xE0000 && cp <= 0xE0FFF);
+  }
+
+  function isUnsafeNameCodePoint(cp) {
+    return (cp >= 0x0000 && cp <= 0x001F) ||
+      (cp >= 0x007F && cp <= 0x009F) ||
+      cp === 0x2028 || cp === 0x2029 || cp === 0x2800 ||
+      (cp >= 0xFFF9 && cp <= 0xFFFB);
+  }
+
+  function isBoundaryInvisible(ch) {
+    var cp = ch.codePointAt(0);
+    return /\s/.test(ch) || isAllowedNameFormat(cp) || isGraphemeExtend(ch);
   }
 
   function normalizeAccountName(value) {
     if (typeof value !== 'string') return '';
-    var name = value.replace(UNSAFE_NAME_CHARS, '').trim();
+    var name = value;
     if (name && typeof name.normalize === 'function') name = name.normalize('NFC');
-    var chars = Array.from(name);
-    while (chars.length && isStandaloneInvisible(chars[0])) chars.shift();
+    var chars = Array.from(name).filter(function (ch) {
+      var cp = ch.codePointAt(0);
+      if (isUnsafeNameCodePoint(cp)) return false;
+      return !isDefaultIgnorable(ch) || isAllowedNameFormat(cp);
+    });
+    while (chars.length && isBoundaryInvisible(chars[0])) chars.shift();
     while (chars.length && (chars[chars.length - 1] === '\u200C' || chars[chars.length - 1] === '\u200D')) chars.pop();
     name = chars.join('').trim();
     if (!name) return '';
     for (var i = 0; i < chars.length; i += 1) {
-      if (!isStandaloneInvisible(chars[i])) return name;
+      if (!isBoundaryInvisible(chars[i])) return name;
     }
     return '';
   }
@@ -68,30 +105,7 @@
         if (!first.done && first.value && first.value.segment) return first.value.segment;
       }
     } catch (err) {}
-
-    /* Segmenter 缺失时覆盖常见组合：combining mark、肤色、旗帜、keycap 与 emoji ZWJ 链。 */
-    var chars = Array.from(name);
-    var out = chars[0] || '';
-    var firstCp = out ? out.codePointAt(0) : 0;
-    var i = 1;
-    if (firstCp >= 0x1F1E6 && firstCp <= 0x1F1FF && chars[i]) {
-      var nextCp = chars[i].codePointAt(0);
-      if (nextCp >= 0x1F1E6 && nextCp <= 0x1F1FF) out += chars[i++];
-    }
-    while (i < chars.length) {
-      var ch = chars[i];
-      var cp = ch.codePointAt(0);
-      if (isGraphemeExtend(ch) || cp === 0x200C) {
-        out += ch;
-        i += 1;
-      } else if (cp === 0x200D && i + 1 < chars.length) {
-        out += ch + chars[i + 1];
-        i += 2;
-      } else {
-        break;
-      }
-    }
-    return out;
+    return '';
   }
 
   /* ---------- 纯函数层 ---------- */

@@ -121,6 +121,25 @@ test('shouldPromptLogin: 满 N 盘且未提示过才提示；0 = 永不', () => 
   assert.throws(() => P.shouldPromptLogin(null), /state/);
 });
 
+test('accountPresentation: SDK user.name 驱动账号昵称/头像，空值安全回退', () => {
+  const P = Platform.create(CFG);
+  assert.deepStrictEqual(P.accountPresentation({ name: ' Player-7H9K2M4Q8C ' }), {
+    avatar: 'P',
+    status: 'Player-7H9K2M4Q8C · 进度云同步',
+    title: 'Player-7H9K2M4Q8C'
+  });
+  assert.deepStrictEqual(P.accountPresentation({ name: '   ' }), {
+    avatar: '☁',
+    status: '已登录 · 进度云同步',
+    title: '已登录'
+  });
+  assert.deepStrictEqual(P.accountPresentation(null), {
+    avatar: '☁',
+    status: '已登录 · 进度云同步',
+    title: '已登录'
+  });
+});
+
 test('loadSdk: Node 环境（无 window）安全返回 null，永不 reject', async () => {
   const v = await Platform.loadSdk();
   assert.strictEqual(v, null);

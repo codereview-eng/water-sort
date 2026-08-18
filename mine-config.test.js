@@ -48,6 +48,9 @@ test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json �
   assert.strictEqual(entity.fields.updated_ms, 'number', 'schema 必须声明 updated_ms number（云档判新列）');
   assert.ok(html.includes('PlatformCore.connect(CFG.platform)'), '页面未经 PlatformCore 消费 platform 配置');
   assert.ok(html.includes('<script src="./core/platform.js"></script>'), '页面未引入 core/platform.js');
+  assert.ok(html.includes('Plat.core.accountPresentation(Plat.user)'), '登录账号行未消费 SDK user.name 展示昵称');
+  assert.ok(html.includes("$('accountAvatar').textContent = view.avatar"), '登录账号行未按昵称首字更新头像');
+  assert.match(html, /\.profilerow \.profilename\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/, '长昵称未配置单行省略');
   const joined = require('./core/shell.js').create(require('./core/home.js').registry(), cfg.screens).render('home', {}).join('');
   assert.ok(joined.includes('id="btnAccount"'), '首页缺 account-row 回填锚点');
 });

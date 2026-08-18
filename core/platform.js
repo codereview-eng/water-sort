@@ -104,13 +104,25 @@
       return (state.clears || 0) >= promptAfter;
     }
 
+    /* 登录账号展示：昵称来自 SDK user.name；缺失时保留通用登录态。 */
+    function accountPresentation(user) {
+      var chars = user && typeof user.name === 'string' ? Array.from(user.name.trim()).slice(0, 64) : [];
+      var name = chars.join('');
+      return {
+        avatar: chars[0] || '☁',
+        status: name ? name + ' · 进度云同步' : '已登录 · 进度云同步',
+        title: name || '已登录'
+      };
+    }
+
     return {
       entity: cfg.entity,
       loginPromptAfterClears: promptAfter,
       toRow: toRow,
       fromRow: fromRow,
       mergeSave: mergeSave,
-      shouldPromptLogin: shouldPromptLogin
+      shouldPromptLogin: shouldPromptLogin,
+      accountPresentation: accountPresentation
     };
   }
 

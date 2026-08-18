@@ -97,7 +97,7 @@
     return '<div class="hintline">' + props.lines.map(function (l) { return esc(String(l)); }).join('<br>') + '</div>';
   }
 
-  /* run.ceo 平台账号行（core/platform.js 配套）：复用 profilerow 样式，零 CSS 改动；
+  /* run.ceo 平台账号行（core/platform.js 配套）：复用 profilerow 结构；
      登录状态/动作文案运行时由游戏侧按 id 回填（accountStatus/accountAction） */
   function accountRow(props) {
     var label = props.label !== undefined ? esc(String(props.label)) : 'run.ceo 账号';

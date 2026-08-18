@@ -266,17 +266,36 @@ async function createPageRuntime(options) {
   const timeouts = new Map();
   const intervals = new Map();
   const windowListeners = new Map();
+  const sessionListeners = new Map();
+  const hasInitialUser = Object.prototype.hasOwnProperty.call(options, 'user');
   const session = {
     mode: 'online',
-    user: { name: options.name || 'Alice' },
+    user: hasInitialUser ? options.user : { name: options.name || 'Alice' },
     core: null,
-    loadCloud() { return Promise.resolve(null); },
+    loadCloudCalls: 0,
+    syncCalls: [],
+    loadCloud() {
+      this.loadCloudCalls += 1;
+      return Promise.resolve(options.cloudRow || null);
+    },
     saveCloud() { return Promise.resolve(); },
-    queueSync() {},
+    queueSync(getSave) { this.syncCalls.push(getSave()); },
     flush() {},
-    on() {},
-    login() { return Promise.resolve(); },
-    logout() { this.user = null; return Promise.resolve(); }
+    on(event, fn) {
+      sessionListeners.set(event, fn);
+      return function () { sessionListeners.delete(event); };
+    },
+    loginCalls: 0,
+    login() {
+      this.loginCalls += 1;
+      return new Promise(function () {});
+    },
+    logout() { this.user = null; },
+    emit(event, payload) {
+      if (event === 'authexpired') this.user = null;
+      const fn = sessionListeners.get(event);
+      if (fn) fn(payload);
+    }
   };
   class FakeDate extends Date {
     static now() { return now; }
@@ -549,6 +568,32 @@ test('登录账号行经真实页面启动消费 PlatformCore nickname，并随�
     '长昵称只能由 CSS 单行视觉省略，DOM 文本必须保持完整');
 });
 
+test('登录跳转终止旧页面；回跳后的新页面从 SDK nickname 恢复云档与同步', async () => {
+  const anonymous = await createPageRuntime({ user: null });
+  assert.strictEqual(anonymous.account().status, 'Not signed in · progress stays on this device');
+  assert.strictEqual(anonymous.account().action, 'Sign in');
+  anonymous.elements.btnAccount.dispatch('click');
+  assert.strictEqual(anonymous.session.loginCalls, 1, '匿名页必须发起一次 SDK 顶层登录跳转');
+  assert.strictEqual(anonymous.account().status, 'Not signed in · progress stays on this device',
+    '旧页面不得依赖永不 resolve 的 login Promise 伪造登录态');
+  assert.strictEqual(anonymous.session.loadCloudCalls, 0,
+    '旧页面终止前不得提前拉取登录用户云档');
+
+  const returned = await createPageRuntime({ user: { name: 'Alice' } });
+  assert.strictEqual(returned.account().status, 'Alice · cloud sync on',
+    '登录回跳后的新页面必须立即展示 SDK nickname');
+  assert.strictEqual(returned.account().title, 'Alice');
+  assert.strictEqual(returned.account().action, 'Sign out');
+  assert.strictEqual(returned.session.loadCloudCalls, 1,
+    '回跳后的新页面必须拉取一次云档');
+  assert.strictEqual(returned.session.syncCalls.length, 1,
+    '云档合并落本地后必须触发一次回写同步');
+
+  returned.session.emit('authexpired');
+  assert.strictEqual(returned.account().status, 'Not signed in · progress stays on this device',
+    '认证失效后账号行必须立即回到退出状态');
+});
+
 test('reward 配置过 RewardCore 校验且页面经 CFG 消费、手写首页已移除', () => {
   const R = RewardCore.create(cfg.reward);
   assert.strictEqual(R.E_COST, 15);
@@ -660,14 +705,53 @@ test('真实事件接线仅在第二次有效 pointerup 后挖正确雷并轻震
     '未发生 pointermove 的错格 pointerup 不得提交挖格');
   assert.deepStrictEqual(wrongCellRelease.vibrations, [],
     '未发生 pointermove 的错格 pointerup 不得触发震动');
-  wrongCellRelease.pointer('pointerdown', safe);
-  wrongCellRelease.pointer('pointerup', safe);
+  wrongCellRelease.pointer('pointerdown', mine);
+  wrongCellRelease.pointer('pointerup', mine);
   assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [],
-    '错格抬起后复击同一格不得误完成陈旧双击');
+    '错格抬起后首次复击原雷格不得误完成陈旧双击');
   assert.strictEqual(wrongCellRelease.state().lives, 3,
-    '错格抬起后复击同一安全格不得误扣生命');
+    '错格抬起后首次复击原雷格不得误扣生命');
   assert.deepStrictEqual(wrongCellRelease.vibrations, [],
-    '错格抬起后复击同一格不得触发震动');
+    '错格抬起后首次复击原雷格不得触发震动');
+  wrongCellRelease.advance(100);
+  wrongCellRelease.pointer('pointerdown', mine);
+  wrongCellRelease.pointer('pointerup', mine);
+  assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [mine],
+    '清除陈旧 tap chain 后，新的第二次合法点击应正常挖雷');
+  assert.deepStrictEqual(wrongCellRelease.vibrations, [18],
+    '新的合法双击只应震动一次');
+});
+
+test('未完成单击与 tap chain 不得跨重开操作新的棋盘', async () => {
+  const data = MineLevels.get(1);
+  const mines = [];
+  data.board.mines.forEach((col, row) => mines.push(row * data.size + col));
+  const mine = mines[0];
+  const safe = Array.from({ length: data.size * data.size }, (_, idx) => idx)
+    .find(idx => !mines.includes(idx));
+
+  const pendingSingle = await createPageRuntime();
+  pendingSingle.start();
+  pendingSingle.pointer('pointerdown', safe);
+  pendingSingle.pointer('pointerup', safe);
+  pendingSingle.context.window.__mine.start();
+  pendingSingle.flushTimeouts();
+  assert.strictEqual(pendingSingle.elements.board.children[safe].classList.contains('safe'), false,
+    '旧棋盘未完成的单击计时器不得在新棋盘补标记');
+
+  const staleChain = await createPageRuntime();
+  staleChain.start();
+  staleChain.pointer('pointerdown', mine);
+  staleChain.pointer('pointerup', mine);
+  staleChain.context.window.__mine.home();
+  staleChain.context.window.__mine.start();
+  staleChain.advance(100);
+  staleChain.pointer('pointerdown', mine);
+  staleChain.pointer('pointerup', mine);
+  assert.deepStrictEqual(Array.from(staleChain.state().found), [],
+    '重开后的第一次同格点击不得接续旧棋盘 tap chain');
+  assert.deepStrictEqual(staleChain.vibrations, [],
+    '重开后的第一次同格点击不得震动');
 });
 
 test('真实页面 move/cancel、单击、错误格、两类道具与 window.__mine 均不误震', async () => {
@@ -821,9 +905,11 @@ test('通关保持游戏页并弹出下一关或返回主页二选一', () => {
   let args = null;
   let nextLevel = null;
   let wentHome = false;
+  let gestureResets = 0;
   const sandbox = {
     S: { done: false, lv: 7, size: 9 },
     save: { level: 7, clears: 2 },
+    resetGestureState() { gestureResets += 1; },
     stopTimer() {},
     persist() {},
     dialog(...values) { args = values; },
@@ -832,6 +918,7 @@ test('通关保持游戏页并弹出下一关或返回主页二选一', () => {
     t(key) { return I18n.t('zh', key); }
   };
   vm.runInNewContext(onWin + '\nonWin();', sandbox);
+  assert.strictEqual(gestureResets, 1, '通关时必须清除未完成手势状态');
   assert.strictEqual(wentHome, false, '通关弹窗出现前不应自动返回主页');
   assert.strictEqual(sandbox.S.done, true);
   assert.strictEqual(sandbox.save.level, 8);

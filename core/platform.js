@@ -23,6 +23,11 @@
      保留可见名称内部合法的 ZWJ/ZWNJ/variation selector，并用 NFC 统一等价字形。 */
   var UNICODE_MARK = null;
   var DEFAULT_IGNORABLE = null;
+  var SUBDIVISION_FLAG_TAGS = [
+    [0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067, 0xE007F], // England
+    [0xE0067, 0xE0062, 0xE0073, 0xE0063, 0xE0074, 0xE007F], // Scotland
+    [0xE0067, 0xE0062, 0xE0077, 0xE006C, 0xE0073, 0xE007F]  // Wales
+  ];
   try { UNICODE_MARK = new RegExp('\\p{Mark}', 'u'); } catch (err) {}
   try { DEFAULT_IGNORABLE = new RegExp('\\p{Default_Ignorable_Code_Point}', 'u'); } catch (err) {}
 
@@ -77,14 +82,37 @@
     return /\s/.test(ch) || isAllowedNameFormat(cp) || isGraphemeExtend(ch);
   }
 
+  function allowedEmojiTagIndexes(chars) {
+    var allowed = {};
+    for (var i = 0; i < chars.length; i += 1) {
+      if (chars[i].codePointAt(0) !== 0x1F3F4) continue;
+      for (var s = 0; s < SUBDIVISION_FLAG_TAGS.length; s += 1) {
+        var seq = SUBDIVISION_FLAG_TAGS[s];
+        var matches = true;
+        for (var j = 0; j < seq.length; j += 1) {
+          if (!chars[i + j + 1] || chars[i + j + 1].codePointAt(0) !== seq[j]) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) continue;
+        for (var k = 0; k < seq.length; k += 1) allowed[i + k + 1] = true;
+        break;
+      }
+    }
+    return allowed;
+  }
+
   function normalizeAccountName(value) {
     if (typeof value !== 'string') return '';
     var name = value;
     if (name && typeof name.normalize === 'function') name = name.normalize('NFC');
-    var chars = Array.from(name).filter(function (ch) {
+    var rawChars = Array.from(name);
+    var allowedTags = allowedEmojiTagIndexes(rawChars);
+    var chars = rawChars.filter(function (ch, index) {
       var cp = ch.codePointAt(0);
       if (isUnsafeNameCodePoint(cp)) return false;
-      return !isDefaultIgnorable(ch) || isAllowedNameFormat(cp);
+      return !isDefaultIgnorable(ch) || isAllowedNameFormat(cp) || allowedTags[index];
     });
     while (chars.length && isBoundaryInvisible(chars[0])) chars.shift();
     while (chars.length) {
@@ -252,15 +280,41 @@
         if (!table) return local('ENTITY_UNDECLARED', play.user);
         var rowId = null;
         var timer = null;
+        var currentUser = play.user || null;
+        var authExpiredListeners = [];
+        function setUser(user) {
+          currentUser = user || null;
+          return currentUser;
+        }
+        function emitAuthExpired(payload) {
+          authExpiredListeners.slice().forEach(function (fn) { fn(payload); });
+        }
+        if (typeof play.on === 'function') {
+          play.on('authexpired', function (payload) {
+            setUser(null);
+            emitAuthExpired(payload);
+          });
+        }
         var session = {
           mode: 'online',
           reason: null,
           core: P,
-          user: play.user,
           play: play,
           login: function () { return play.login(); },
-          logout: function () { play.logout(); },
-          on: function (ev, fn) { return play.on(ev, fn); },
+          logout: function () {
+            var result = play.logout();
+            setUser(null);
+            return result;
+          },
+          on: function (ev, fn) {
+            if (ev !== 'authexpired') return play.on(ev, fn);
+            if (typeof fn !== 'function') return function () {};
+            authExpiredListeners.push(fn);
+            return function () {
+              var index = authExpiredListeners.indexOf(fn);
+              if (index !== -1) authExpiredListeners.splice(index, 1);
+            };
+          },
           /* 拉取本玩家最新云档行（owner 隔离由服务端裁决） */
           loadCloud: function () {
             return table.list('-updated_ms', 1).then(function (rows) {
@@ -303,6 +357,11 @@
             Promise.resolve().then(function () { return session.saveCloud(getSave()); }).catch(function () {});
           }
         };
+        Object.defineProperty(session, 'user', {
+          enumerable: true,
+          get: function () { return currentUser; },
+          set: function (user) { setUser(user); }
+        });
         return session;
       }).catch(function (err) {
         return local((err && err.code) || 'INIT_FAILED');

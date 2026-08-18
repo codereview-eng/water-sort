@@ -87,7 +87,11 @@
       return !isDefaultIgnorable(ch) || isAllowedNameFormat(cp);
     });
     while (chars.length && isBoundaryInvisible(chars[0])) chars.shift();
-    while (chars.length && (chars[chars.length - 1] === '\u200C' || chars[chars.length - 1] === '\u200D')) chars.pop();
+    while (chars.length) {
+      var tail = chars[chars.length - 1];
+      if (/\s/.test(tail) || tail === '\u200C' || tail === '\u200D') chars.pop();
+      else break;
+    }
     name = chars.join('').trim();
     if (!name) return '';
     for (var i = 0; i < chars.length; i += 1) {

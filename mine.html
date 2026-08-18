@@ -350,7 +350,7 @@
   }
 
   function samePointer(ev, press) {
-    return press.pointerId == null || ev.pointerId == null || ev.pointerId === press.pointerId;
+    return ev.pointerId === press.pointerId;
   }
 
   function commitTap(idx) {
@@ -388,7 +388,8 @@
     if (!drag || !samePointer(ev, drag)) return;
     var press = drag;
     drag = null;
-    if (ev.type === 'pointercancel') {
+    if (ev.type === 'pointercancel' || ev.isPrimary === false ||
+        (typeof ev.button === 'number' && ev.button !== 0)) {
       resetTapChain();
       return;
     }

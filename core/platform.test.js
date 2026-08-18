@@ -171,6 +171,14 @@ test('accountPresentation: 清除危险格式字符，纯不可见 nickname 回�
     avatar: 'A',
     name: 'Alice'
   }, 'Braille Blank 不得形成视觉同名后缀');
+  assert.deepStrictEqual(P.accountPresentation({ name: 'Alice\u200D ' }), {
+    avatar: 'A',
+    name: 'Alice'
+  }, '尾随空白不得让 ZWJ 绕过昵称边界清理');
+  assert.deepStrictEqual(P.accountPresentation({ name: 'Alice\u200C\t' }), {
+    avatar: 'A',
+    name: 'Alice'
+  }, '尾随空白不得让 ZWNJ 绕过昵称边界清理');
   assert.deepStrictEqual(P.accountPresentation({ name: 'A\u{E0001}lice' }), {
     avatar: 'A',
     name: 'Alice'

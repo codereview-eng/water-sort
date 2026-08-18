@@ -38,11 +38,17 @@ function htmlArray(name) {
   return vm.runInNewContext(m[1]);
 }
 
-function mainInlineScript() {
-  const scripts = Array.from(html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g), match => match[1]);
-  const source = scripts.find(script => script.includes('window.__mine = {') && script.includes('boardEl.onpointerdown = onTap'));
-  assert.ok(source, 'mine.html 缺真实主 inline IIFE');
-  return source;
+function pageScripts() {
+  return Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g), match => {
+    const attrs = match[1];
+    const src = attrs.match(/\bsrc=(["'])(.*?)\1/);
+    const type = attrs.match(/\btype=(["'])(.*?)\1/);
+    return {
+      src: src ? src[2] : '',
+      type: type ? type[2] : '',
+      source: match[2]
+    };
+  });
 }
 
 class FakeClassList {
@@ -97,9 +103,10 @@ class FakeElement {
   }
   set innerHTML(value) {
     this._innerHTML = String(value);
-    if (value === '') {
-      this.children = [];
-      this.childNodes = [];
+    this.children = [];
+    this.childNodes = [];
+    if (this._innerHTML && this.ownerDocument) {
+      this.ownerDocument.mountMarkup(this, this._innerHTML);
     }
   }
   get innerHTML() { return this._innerHTML; }
@@ -157,6 +164,49 @@ class FakeDocument {
     if (element.id) this.byId.set(element.id, element);
     return element;
   }
+  mountMarkup(owner, markup) {
+    const tagRe = /<([a-z][\w-]*)\b([^>]*)>/gi;
+    let match;
+    while ((match = tagRe.exec(markup))) {
+      const attrs = match[2];
+      const id = attrs.match(/\bid=(["'])(.*?)\1/);
+      if (!id) continue;
+      const element = new FakeElement(match[1], id[2], this);
+      const className = attrs.match(/\bclass=(["'])(.*?)\1/);
+      if (className) element.className = className[2];
+      owner.appendChild(element);
+    }
+
+    if (owner.id === 'home') {
+      const logo = new FakeElement('div', '', this);
+      const logoEm = new FakeElement('em', '', this);
+      logo.childNodes.push({ nodeValue: '' });
+      logo.appendChild(logoEm);
+      logo.setQuery('em', logoEm);
+      if (/class=(["'])logo\1/.test(markup)) this.queries.set('#home .logo', logo);
+
+      if (/class=(["'])hintline\1/.test(markup)) {
+        this.queries.set('#home .hintline', new FakeElement('div', '', this));
+      }
+      if (/class=(["'])max mono\1/.test(markup)) {
+        this.queries.set('.energy .max', new FakeElement('span', '', this));
+      }
+      const labels = Array.from(markup.matchAll(/<div class=(["'])st\1>[\s\S]*?<span>([\s\S]*?)<\/span><\/div>/g));
+      this.queryLists.set('#home .homestats .st span',
+        labels.map(() => new FakeElement('span', '', this)));
+    }
+
+    if (owner.id === 'btnStart') {
+      const leading = markup.split(/<span\b/i)[0].replace(/<[^>]+>/g, '');
+      owner.childNodes.unshift({ nodeValue: leading });
+      const smallMatch = markup.match(/<small>([\s\S]*?)<\/small>/i);
+      if (smallMatch) {
+        const small = new FakeElement('small', '', this);
+        small.textContent = smallMatch[1];
+        owner.setQuery('small', small);
+      }
+    }
+  }
   createElement(tagName) { return new FakeElement(tagName, '', this); }
   getElementById(id) { return this.byId.get(id) || null; }
   querySelector(selector) { return this.queries.get(selector) || null; }
@@ -179,11 +229,7 @@ function makePageDocument() {
     'gameConfig',
     'home', 'game', 'btnBack', 'hearts', 'hudLv', 'hudLeft', 'hudTime', 'board',
     'toolMine', 'cntMine', 'toolSafe', 'cntSafe', 'toast', 'overlay', 'dlgTitle',
-    'dlgBody', 'dlgMain', 'dlgSub', 'btnStart', 'startLv', 'enVal', 'enBar',
-    'enSub', 'homeLv', 'homeClears', 'homeTools', 'btnProfile', 'profileLabel',
-    'profileAvatar', 'profileName', 'profileSource', 'btnAccount', 'accountLabel',
-    'accountAvatar', 'accountStatus', 'accountAction', 'sfxLabel', 'sfxToggle',
-    'langLabel', 'langSel'
+    'dlgBody', 'dlgMain', 'dlgSub'
   ];
   const elements = {};
   for (const id of ids) elements[id] = document.register(new FakeElement('div', id, document));
@@ -201,13 +247,8 @@ function makePageDocument() {
     document.queries.set(selector, root);
     return root;
   }
-  decorated('#home .logo');
   decorated('#game .title');
-  document.queries.set('#home .hintline', new FakeElement('div', '', document));
   document.queries.set('#game .hintline', new FakeElement('div', '', document));
-  document.queries.set('.energy .max', new FakeElement('span', '', document));
-  document.queryLists.set('#home .homestats .st span',
-    [0, 1, 2].map(() => new FakeElement('span', '', document)));
   document.queryLists.set('#game .hud .box .k',
     [0, 1, 2].map(() => new FakeElement('span', '', document)));
   elements.toolMine.childNodes.push(textNode(''));
@@ -225,11 +266,10 @@ async function createPageRuntime(options) {
   const timeouts = new Map();
   const intervals = new Map();
   const windowListeners = new Map();
-  const realPlatform = PlatformCore.create(cfg.platform);
   const session = {
     mode: 'online',
     user: { name: options.name || 'Alice' },
-    core: realPlatform,
+    core: null,
     loadCloud() { return Promise.resolve(null); },
     saveCloud() { return Promise.resolve(); },
     queueSync() {},
@@ -238,9 +278,6 @@ async function createPageRuntime(options) {
     login() { return Promise.resolve(); },
     logout() { this.user = null; return Promise.resolve(); }
   };
-  const platformRuntime = Object.assign({}, PlatformCore, {
-    connect() { return Promise.resolve(session); }
-  });
   class FakeDate extends Date {
     static now() { return now; }
   }
@@ -272,13 +309,6 @@ async function createPageRuntime(options) {
       getItem(key) { return storage.has(key) ? storage.get(key) : null; },
       setItem(key, value) { storage.set(key, String(value)); }
     },
-    ShellCore: Shell,
-    HomeCore: Home,
-    RewardCore,
-    LocaleCore,
-    PlatformCore: platformRuntime,
-    MineEngine,
-    MineLevels,
     Date: FakeDate,
     AudioContext: FakeAudioContext,
     webkitAudioContext: FakeAudioContext,
@@ -304,7 +334,34 @@ async function createPageRuntime(options) {
   sandbox.self = sandbox;
   sandbox.globalThis = sandbox;
   const context = vm.createContext(sandbox);
-  vm.runInContext(mainInlineScript(), context, { filename: 'mine.html:inline' });
+  const loadedScripts = [];
+  let mainScripts = 0;
+  for (const script of pageScripts()) {
+    if (script.type === 'application/json') continue;
+    if (script.src) {
+      assert.match(script.src, /^\.\//, 'mine.html 外部脚本必须使用仓内相对路径: ' + script.src);
+      const filename = path.resolve(__dirname, script.src);
+      assert.ok(filename.startsWith(__dirname + path.sep), 'mine.html 外部脚本越出仓根: ' + script.src);
+      vm.runInContext(fs.readFileSync(filename, 'utf8'), context, { filename: script.src });
+      loadedScripts.push(script.src);
+      if (!session.core && context.PlatformCore && typeof context.PlatformCore.create === 'function') {
+        const browserPlatform = context.PlatformCore;
+        session.core = browserPlatform.create(cfg.platform);
+        context.PlatformCore = Object.assign({}, browserPlatform, {
+          connect() { return Promise.resolve(session); }
+        });
+      }
+      continue;
+    }
+    if (!script.source.trim()) continue;
+    if (script.source.includes('window.__mine = {') && script.source.includes('boardEl.onpointerdown = onTap')) {
+      mainScripts += 1;
+    }
+    vm.runInContext(script.source, context, { filename: 'mine.html:inline' });
+  }
+  assert.strictEqual(mainScripts, 1, 'mine.html 必须且只能有一个真实主 inline IIFE');
+  assert.ok(session.core, 'mine.html 的真实脚本链未加载 PlatformCore');
+  for (const [id, element] of document.byId) elements[id] = element;
   await new Promise(resolve => setImmediate(resolve));
   await Promise.resolve();
 
@@ -332,6 +389,7 @@ async function createPageRuntime(options) {
     context,
     document,
     elements,
+    loadedScripts,
     vibrations,
     session,
     advance(ms) { now += ms; },
@@ -407,6 +465,27 @@ test('mine.html 消费 LocaleCore 并接通语言选择、即时切换和本地�
   assert.ok(html.includes('function populateLangSel()'), '页面未从配置生成语言选项');
   assert.ok(html.includes('function applyLang(lang)'), '页面未实现即时整页语言切换');
   assert.ok(html.includes('document.documentElement.lang'), '切换语言未同步 html lang');
+});
+
+test('真实 HTML 按 script 标签顺序加载，首页锚点只能由 ShellCore 渲染结果生成', async () => {
+  const page = await createPageRuntime();
+  assert.deepStrictEqual(page.loadedScripts, [
+    './core/shell.js',
+    './core/home.js',
+    './core/reward.js',
+    './core/locale.js',
+    './core/platform.js',
+    './mine-engine.js',
+    './mine-levels.js'
+  ]);
+  for (const id of [
+    'btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears',
+    'homeTools', 'btnProfile', 'profileLabel', 'profileAvatar', 'profileName',
+    'profileSource', 'btnAccount', 'accountLabel', 'accountAvatar', 'accountStatus',
+    'accountAction', 'sfxLabel', 'sfxToggle', 'langLabel', 'langSel'
+  ]) {
+    assert.ok(page.document.getElementById(id), 'ShellCore 首页渲染缺入口锚点 ' + id);
+  }
 });
 
 test('初始语言解析：无效 URL 参数继续回退到已保存语言和浏览器语言', () => {
@@ -531,6 +610,23 @@ test('真实事件接线仅在第二次有效 pointerup 后挖正确雷并轻震
   rightButton.pointer('pointerup', mine, { button: 2 });
   assert.deepStrictEqual(Array.from(rightButton.state().found), [], '右键不得挖格');
   assert.deepStrictEqual(rightButton.vibrations, [], '右键不得震动');
+
+  for (const invalidRelease of [
+    { isPrimary: false, label: '非主指针抬起' },
+    { button: 2, label: '右键抬起' }
+  ]) {
+    const release = await createPageRuntime();
+    release.start();
+    release.pointer('pointerdown', mine);
+    release.pointer('pointerup', mine);
+    release.advance(100);
+    release.pointer('pointerdown', mine);
+    release.pointer('pointerup', mine, invalidRelease);
+    assert.deepStrictEqual(Array.from(release.state().found), [],
+      invalidRelease.label + '不得提交第二次挖格');
+    assert.deepStrictEqual(release.vibrations, [],
+      invalidRelease.label + '不得触发震动');
+  }
 });
 
 test('真实页面 move/cancel、单击、错误格、两类道具与 window.__mine 均不误震', async () => {

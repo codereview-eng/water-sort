@@ -322,7 +322,7 @@
   }
 
   /* ============ 点击：单击标记 / 双击挖开 / 拖动批量标记 ============ */
-  var drag = null;   // {startIdx, mode:'mark'|'erase', moved}
+  var drag = null;   // {pointerId,startIdx,lastIdx,mode:'mark'|'erase',moved}
 
   function canPaint(idx) { return !(S.found.has(idx) || S.opened.has(idx)); }
 
@@ -345,21 +345,61 @@
     return (cell && boardEl.contains(cell)) ? Number(cell.dataset.idx) : -1;
   }
 
+  function resetTapChain() {
+    lastTap = { idx: -1, t: 0 };
+  }
+
+  function samePointer(ev, press) {
+    return press.pointerId == null || ev.pointerId == null || ev.pointerId === press.pointerId;
+  }
+
+  function commitTap(idx) {
+    var now = Date.now();
+    if (lastTap.idx === idx && now - lastTap.t < DBL_MS) {
+      resetTapChain();
+      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+      if (dig(idx)) vibrateCorrectMine();
+      return;
+    }
+    lastTap = { idx: idx, t: now };
+    if (clickTimer) clearTimeout(clickTimer);
+    clickTimer = setTimeout(function () {
+      clickTimer = null;
+      resetTapChain();
+      toggleMark(idx);
+    }, DBL_MS);
+  }
+
   function onDragMove(ev) {
-    if (!drag || S.done) return;
+    if (!drag || S.done || !samePointer(ev, drag)) return;
     var idx = cellIdxFromPoint(ev);
-    if (idx < 0) return;
-    if (!drag.moved) {
-      if (idx === drag.startIdx) return;
+    if (!drag.moved && idx !== drag.startIdx) {
       drag.moved = true;                       // 进入拖动：取消单击/双击判定
       if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-      lastTap = { idx: -1, t: 0 };
+      resetTapChain();
       applyMark(drag.startIdx, drag.mode);     // 起点按拖动模式生效
     }
+    if (idx < 0 || !drag.moved || idx === drag.lastIdx) return;
+    drag.lastIdx = idx;
     applyMark(idx, drag.mode);
   }
 
-  function onDragEnd() { drag = null; }
+  function onDragEnd(ev) {
+    if (!drag || !samePointer(ev, drag)) return;
+    var press = drag;
+    drag = null;
+    if (ev.type === 'pointercancel') {
+      resetTapChain();
+      return;
+    }
+    if (S.done || press.moved) return;
+    var idx = cellIdxFromPoint(ev);
+    if (idx !== press.startIdx) {
+      resetTapChain();
+      return;
+    }
+    commitTap(press.startIdx);
+  }
   document.addEventListener('pointermove', onDragMove, { passive: true });
   document.addEventListener('pointerup', onDragEnd);
   document.addEventListener('pointercancel', onDragEnd);
@@ -371,18 +411,15 @@
     if (!cell) return;
     var idx = Number(cell.dataset.idx);
     if (S.found.has(idx) || S.opened.has(idx)) return;
+    if (drag) return;
     // 记录拖动起点：起点已标记 → 本次拖动取消标记；未标记 → 本次拖动补标记
-    drag = { startIdx: idx, mode: S.marks.has(idx) ? 'erase' : 'mark', moved: false };
-    var now = Date.now();
-    if (lastTap.idx === idx && now - lastTap.t < DBL_MS) {   // 双击 → 挖开
-      lastTap = { idx: -1, t: 0 };
-      if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-      if (dig(idx)) vibrateCorrectMine();
-      return;
-    }
-    lastTap = { idx: idx, t: now };
-    if (clickTimer) clearTimeout(clickTimer);
-    clickTimer = setTimeout(function () { clickTimer = null; toggleMark(idx); }, DBL_MS);
+    drag = {
+      pointerId: ev.pointerId,
+      startIdx: idx,
+      lastIdx: idx,
+      mode: S.marks.has(idx) ? 'erase' : 'mark',
+      moved: false
+    };
   }
 
   function toggleMark(idx) {

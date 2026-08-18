@@ -12,6 +12,9 @@ const Shell = require('./core/shell.js');
 const Home = require('./core/home.js');
 const RewardCore = require('./core/reward.js');
 const LocaleCore = require('./core/locale.js');
+const PlatformCore = require('./core/platform.js');
+const MineEngine = require('./mine-engine.js');
+const MineLevels = require('./mine-levels.js');
 
 const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/mine/game.config.json'), 'utf8'));
 const html = fs.readFileSync(path.join(__dirname, 'mine.html'), 'utf8');
@@ -35,162 +38,330 @@ function htmlArray(name) {
   return vm.runInNewContext(m[1]);
 }
 
-function htmlClickHandler(id) {
-  const marker = "$('" + id + "').addEventListener('click', function () {";
-  const start = html.indexOf(marker);
-  assert.ok(start >= 0, 'mine.html 缺点击处理 ' + id);
-  const bodyStart = start + marker.length;
-  const end = html.indexOf('\n  });', bodyStart);
-  assert.ok(end >= 0, 'mine.html 点击处理未闭合 ' + id);
-  return 'function clickHandler() {' + html.slice(bodyStart, end) + '\n}';
+function mainInlineScript() {
+  const scripts = Array.from(html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g), match => match[1]);
+  const source = scripts.find(script => script.includes('window.__mine = {') && script.includes('boardEl.onpointerdown = onTap'));
+  assert.ok(source, 'mine.html 缺真实主 inline IIFE');
+  return source;
 }
 
-function htmlDebugSolve() {
-  const m = html.match(/solve: function \(\) \{([\s\S]*?)\},\n\s*home:/);
-  assert.ok(m, 'mine.html 缺调试 solve 实现');
-  return 'function debugSolve() {' + m[1] + '\n}';
-}
-
-function renderAccountInBothLocales(name) {
-  const elements = {};
-  for (const id of ['btnAccount', 'accountAvatar', 'accountStatus', 'accountAction']) {
-    elements[id] = {
-      textContent: '',
-      title: '',
-      attributes: {},
-      setAttribute(key, value) { this.attributes[key] = String(value); }
-    };
+class FakeClassList {
+  constructor(owner) { this.owner = owner; }
+  tokens() { return new Set(String(this.owner.className || '').split(/\s+/).filter(Boolean)); }
+  write(tokens) { this.owner.className = Array.from(tokens).join(' '); }
+  add(...names) {
+    const tokens = this.tokens();
+    names.forEach(name => tokens.add(name));
+    this.write(tokens);
   }
-  const sandbox = {
-    I18n,
-    LANG: 'en',
-    Plat: {
-      mode: 'online',
-      user: { name },
-      core: {
-        accountPresentation(user) {
-          assert.strictEqual(user.name, name, 'renderAccount 未把当前 SDK user 交给 PlatformCore');
-          return { avatar: '👩‍💻', name };
-        }
-      }
-    },
-    $(id) { return elements[id]; }
-  };
-  const source = [
-    htmlFunction('t'),
-    htmlFunction('renderAccount'),
-    'renderAccount();',
-    'var enSnapshot = {',
-    "  avatar: $('accountAvatar').textContent,",
-    "  status: $('accountStatus').textContent,",
-    "  title: $('accountStatus').title,",
-    "  action: $('accountAction').textContent,",
-    "  aria: $('btnAccount').attributes['aria-label']",
-    '};',
-    "LANG = 'zh';",
-    'renderAccount();',
-    'JSON.stringify({ en: enSnapshot, zh: {',
-    "  avatar: $('accountAvatar').textContent,",
-    "  status: $('accountStatus').textContent,",
-    "  title: $('accountStatus').title,",
-    "  action: $('accountAction').textContent,",
-    "  aria: $('btnAccount').attributes['aria-label']",
-    '} });'
-  ].join('\n');
-  return JSON.parse(vm.runInNewContext(source, sandbox));
+  remove(...names) {
+    const tokens = this.tokens();
+    names.forEach(name => tokens.delete(name));
+    this.write(tokens);
+  }
+  toggle(name, force) {
+    const tokens = this.tokens();
+    const add = force === undefined ? !tokens.has(name) : !!force;
+    if (add) tokens.add(name);
+    else tokens.delete(name);
+    this.write(tokens);
+    return add;
+  }
+  contains(name) { return this.tokens().has(name); }
 }
 
-function createPointerHarness(options) {
+class FakeElement {
+  constructor(tagName, id, document) {
+    this.tagName = String(tagName || 'div').toUpperCase();
+    this.id = id || '';
+    this.ownerDocument = document;
+    this.className = '';
+    this.classList = new FakeClassList(this);
+    this.dataset = {};
+    this.style = {};
+    this.attributes = {};
+    this.children = [];
+    this.childNodes = [];
+    this.listeners = new Map();
+    this.parentNode = null;
+    this.textContent = '';
+    this.title = '';
+    this.hidden = false;
+    this.disabled = false;
+    this.value = '';
+    this.selected = false;
+    this.onclick = null;
+    this.onpointerdown = null;
+    this.queries = new Map();
+    this._innerHTML = '';
+  }
+  set innerHTML(value) {
+    this._innerHTML = String(value);
+    if (value === '') {
+      this.children = [];
+      this.childNodes = [];
+    }
+  }
+  get innerHTML() { return this._innerHTML; }
+  appendChild(child) {
+    child.parentNode = this;
+    this.children.push(child);
+    this.childNodes.push(child);
+    if (child.id) this.ownerDocument.register(child);
+    return child;
+  }
+  contains(node) {
+    if (node === this) return true;
+    return this.children.some(child => child.contains && child.contains(node));
+  }
+  closest(selector) {
+    for (let node = this; node; node = node.parentNode) {
+      if (selector === '.cell' && node.classList && node.classList.contains('cell')) return node;
+    }
+    return null;
+  }
+  querySelector(selector) { return this.queries.get(selector) || null; }
+  setQuery(selector, value) { this.queries.set(selector, value); }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) { return this.attributes[name]; }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  dispatch(type, init) {
+    const event = Object.assign({
+      type,
+      target: this,
+      currentTarget: this,
+      preventDefault() {}
+    }, init || {});
+    const property = this['on' + type];
+    if (typeof property === 'function') property.call(this, event);
+    for (const fn of this.listeners.get(type) || []) fn.call(this, event);
+    return event;
+  }
+}
+
+class FakeDocument {
+  constructor() {
+    this.byId = new Map();
+    this.listeners = new Map();
+    this.queries = new Map();
+    this.queryLists = new Map();
+    this.documentElement = { lang: '' };
+    this.title = '';
+    this.hidden = false;
+    this.pointElement = null;
+  }
+  register(element) {
+    if (element.id) this.byId.set(element.id, element);
+    return element;
+  }
+  createElement(tagName) { return new FakeElement(tagName, '', this); }
+  getElementById(id) { return this.byId.get(id) || null; }
+  querySelector(selector) { return this.queries.get(selector) || null; }
+  querySelectorAll(selector) { return this.queryLists.get(selector) || []; }
+  elementFromPoint() { return this.pointElement; }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  dispatch(type, init) {
+    const event = Object.assign({ type, target: this }, init || {});
+    for (const fn of this.listeners.get(type) || []) fn.call(this, event);
+    return event;
+  }
+}
+
+function makePageDocument() {
+  const document = new FakeDocument();
+  const ids = [
+    'gameConfig',
+    'home', 'game', 'btnBack', 'hearts', 'hudLv', 'hudLeft', 'hudTime', 'board',
+    'toolMine', 'cntMine', 'toolSafe', 'cntSafe', 'toast', 'overlay', 'dlgTitle',
+    'dlgBody', 'dlgMain', 'dlgSub', 'btnStart', 'startLv', 'enVal', 'enBar',
+    'enSub', 'homeLv', 'homeClears', 'homeTools', 'btnProfile', 'profileLabel',
+    'profileAvatar', 'profileName', 'profileSource', 'btnAccount', 'accountLabel',
+    'accountAvatar', 'accountStatus', 'accountAction', 'sfxLabel', 'sfxToggle',
+    'langLabel', 'langSel'
+  ];
+  const elements = {};
+  for (const id of ids) elements[id] = document.register(new FakeElement('div', id, document));
+  elements.gameConfig.textContent = JSON.stringify(cfg);
+  elements.home.hidden = false;
+  elements.game.hidden = true;
+
+  function textNode(value) { return { nodeValue: value || '' }; }
+  function decorated(selector) {
+    const root = new FakeElement('div', '', document);
+    const em = new FakeElement('em', '', document);
+    root.childNodes.push(textNode(''));
+    root.appendChild(em);
+    root.setQuery('em', em);
+    document.queries.set(selector, root);
+    return root;
+  }
+  decorated('#home .logo');
+  decorated('#game .title');
+  document.queries.set('#home .hintline', new FakeElement('div', '', document));
+  document.queries.set('#game .hintline', new FakeElement('div', '', document));
+  document.queries.set('.energy .max', new FakeElement('span', '', document));
+  document.queryLists.set('#home .homestats .st span',
+    [0, 1, 2].map(() => new FakeElement('span', '', document)));
+  document.queryLists.set('#game .hud .box .k',
+    [0, 1, 2].map(() => new FakeElement('span', '', document)));
+  elements.toolMine.childNodes.push(textNode(''));
+  elements.toolSafe.childNodes.push(textNode(''));
+  return { document, elements };
+}
+
+async function createPageRuntime(options) {
   options = options || {};
+  const { document, elements } = makePageDocument();
+  const vibrations = [];
+  const storage = new Map();
   let now = 1000;
   let nextTimer = 1;
-  const timers = new Map();
-  const vibrations = [];
-  const cells = new Map();
-  const sandbox = {
-    S: {
-      done: false,
-      size: 5,
-      mines: new Set(options.mines || [3]),
-      found: new Set(),
-      marks: new Set(),
-      opened: new Set(),
-      lives: 3
-    },
-    lastTap: { idx: -1, t: 0 },
-    DBL_MS: 320,
-    drag: null,
-    clickTimer: null,
-    Date: { now() { return now; } },
-    setTimeout(fn) {
-      const id = nextTimer++;
-      timers.set(id, fn);
-      return id;
-    },
-    clearTimeout(id) { timers.delete(id); },
-    cellEl(idx) {
-      if (!cells.has(idx)) {
-        const classes = new Set();
-        cells.set(idx, {
-          classList: {
-            add(...names) { names.forEach(name => classes.add(name)); },
-            remove(...names) { names.forEach(name => classes.delete(name)); }
-          }
-        });
-      }
-      return cells.get(idx);
-    },
-    blip() {},
-    renderHud() {},
-    onWin() {},
-    onDead() {},
-    toast() {},
-    t(key) { return I18n.t('zh', key); }
+  const timeouts = new Map();
+  const intervals = new Map();
+  const windowListeners = new Map();
+  const realPlatform = PlatformCore.create(cfg.platform);
+  const session = {
+    mode: 'online',
+    user: { name: options.name || 'Alice' },
+    core: realPlatform,
+    loadCloud() { return Promise.resolve(null); },
+    saveCloud() { return Promise.resolve(); },
+    queueSync() {},
+    flush() {},
+    on() {},
+    login() { return Promise.resolve(); },
+    logout() { this.user = null; return Promise.resolve(); }
   };
-  if (Object.prototype.hasOwnProperty.call(options, 'navigator')) {
-    if (options.navigator !== undefined) sandbox.navigator = options.navigator;
-  } else {
-    sandbox.navigator = {
-      vibrate(ms) {
-        vibrations.push(ms);
-        return true;
-      }
+  const platformRuntime = Object.assign({}, PlatformCore, {
+    connect() { return Promise.resolve(session); }
+  });
+  class FakeDate extends Date {
+    static now() { return now; }
+  }
+  class FakeAudioContext {
+    constructor() { this.currentTime = 0; this.destination = {}; }
+    createOscillator() {
+      return { type: '', frequency: { value: 0 }, connect() {}, start() {}, stop() {} };
+    }
+    createGain() {
+      return {
+        gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect() {}
+      };
+    }
+  }
+  const navigator = { language: 'en-US' };
+  if (options.vibrate !== null) {
+    navigator.vibrate = options.vibrate || function (ms) {
+      vibrations.push(ms);
+      return true;
     };
   }
-  vm.runInNewContext([
-    htmlFunction('vibrateCorrectMine'),
-    htmlFunction('toggleMark'),
-    htmlFunction('dig'),
-    htmlFunction('onTap'),
-    htmlDebugSolve()
-  ].join('\n'), sandbox);
+  const sandbox = {
+    console,
+    document,
+    navigator,
+    location: { search: '?lang=en', protocol: 'https:', origin: 'https://play-color-mines.run.ceo' },
+    localStorage: {
+      getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+      setItem(key, value) { storage.set(key, String(value)); }
+    },
+    ShellCore: Shell,
+    HomeCore: Home,
+    RewardCore,
+    LocaleCore,
+    PlatformCore: platformRuntime,
+    MineEngine,
+    MineLevels,
+    Date: FakeDate,
+    AudioContext: FakeAudioContext,
+    webkitAudioContext: FakeAudioContext,
+    prompt() { return null; },
+    setTimeout(fn) {
+      const id = nextTimer++;
+      timeouts.set(id, fn);
+      return id;
+    },
+    clearTimeout(id) { timeouts.delete(id); },
+    setInterval(fn) {
+      const id = nextTimer++;
+      intervals.set(id, fn);
+      return id;
+    },
+    clearInterval(id) { intervals.delete(id); },
+    addEventListener(type, fn) {
+      if (!windowListeners.has(type)) windowListeners.set(type, []);
+      windowListeners.get(type).push(fn);
+    }
+  };
+  sandbox.window = sandbox;
+  sandbox.self = sandbox;
+  sandbox.globalThis = sandbox;
+  const context = vm.createContext(sandbox);
+  vm.runInContext(mainInlineScript(), context, { filename: 'mine.html:inline' });
+  await new Promise(resolve => setImmediate(resolve));
+  await Promise.resolve();
 
-  function cellTarget(idx) {
-    const cell = { dataset: { idx: String(idx) } };
-    cell.closest = selector => selector === '.cell' ? cell : null;
-    return cell;
+  function pointer(type, idx, event) {
+    const board = elements.board;
+    const target = idx == null ? null : board.children[idx];
+    document.pointElement = event && Object.prototype.hasOwnProperty.call(event, 'pointTarget')
+      ? event.pointTarget
+      : target;
+    const init = Object.assign({
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: idx == null ? -1 : idx,
+      clientY: 0,
+      target
+    }, event || {});
+    delete init.pointTarget;
+    if (type === 'pointerdown') return board.dispatch(type, init);
+    return document.dispatch(type, init);
   }
 
   return {
-    sandbox,
+    context,
+    document,
+    elements,
     vibrations,
+    session,
     advance(ms) { now += ms; },
-    pendingTimers() { return timers.size; },
-    flushTimers() {
-      const callbacks = Array.from(timers.values());
-      timers.clear();
+    flushTimeouts() {
+      const callbacks = Array.from(timeouts.values());
+      timeouts.clear();
       callbacks.forEach(fn => fn());
     },
-    tap(idx, event) {
-      sandbox.onTap(Object.assign({
-        isPrimary: true,
-        pointerType: 'mouse',
-        button: 0,
-        target: cellTarget(idx)
-      }, event));
+    start() {
+      elements.btnStart.dispatch('click');
+      assert.strictEqual(typeof elements.board.onpointerdown, 'function',
+        '页面启动后未安装 board pointerdown');
+      for (const type of ['pointermove', 'pointerup', 'pointercancel']) {
+        assert.ok((document.listeners.get(type) || []).length > 0,
+          '页面启动后未安装 document ' + type);
+      }
+      assert.ok(context.window.__mine && typeof context.window.__mine.solve === 'function',
+        '页面启动后未安装 window.__mine');
     },
-    dig(idx) { return sandbox.dig(idx); },
-    solve() { return sandbox.debugSolve(); }
+    pointer,
+    state() { return context.window.__mine.state(); },
+    account() {
+      return {
+        avatar: elements.accountAvatar.textContent,
+        status: elements.accountStatus.textContent,
+        title: elements.accountStatus.title,
+        action: elements.accountAction.textContent,
+        aria: elements.btnAccount.attributes['aria-label']
+      };
+    }
   };
 }
 
@@ -275,20 +446,25 @@ test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json �
   assert.ok(joined.includes('id="btnAccount"'), '首页缺 account-row 回填锚点');
 });
 
-test('登录账号行真实消费完整 SDK nickname，并随当前语言重渲染状态', () => {
+test('登录账号行经真实页面启动消费 PlatformCore nickname，并随语言入口重渲染', async () => {
   const name = '👩‍💻-' + 'A'.repeat(72);
-  const view = renderAccountInBothLocales(name);
-  assert.strictEqual(view.en.avatar, '👩‍💻', '账号头像必须使用 PlatformCore 给出的完整字素');
-  assert.strictEqual(view.zh.avatar, '👩‍💻', '切换语言不得改变账号头像');
-  assert.strictEqual(view.en.status, name + ' · cloud sync on', '英文登录态未用 loggedInNamed 插入完整昵称');
-  assert.strictEqual(view.zh.status, name + ' · 进度云同步', '中文登录态未用 loggedInNamed 插入完整昵称');
-  assert.strictEqual(view.en.title, name, '英文账号 title 不得截断昵称');
-  assert.strictEqual(view.zh.title, name, '中文账号 title 不得截断昵称');
-  assert.strictEqual(view.en.action, 'Sign out');
-  assert.strictEqual(view.zh.action, '退出');
-  assert.ok(view.en.aria.includes(view.en.status) && view.en.aria.includes(view.en.action),
+  const page = await createPageRuntime({ name });
+  const en = page.account();
+  assert.strictEqual(en.avatar, '👩‍💻', '账号头像必须来自真实 PlatformCore 完整首字素');
+  assert.strictEqual(en.status, name + ' · cloud sync on', '英文登录态未用 loggedInNamed 插入完整昵称');
+  assert.strictEqual(en.title, name, '英文账号 title 不得截断昵称');
+  assert.strictEqual(en.action, 'Sign out');
+  assert.ok(en.aria.includes(en.status) && en.aria.includes(en.action),
     '英文账号 aria-label 未包含可见状态与操作');
-  assert.ok(view.zh.aria.includes(view.zh.status) && view.zh.aria.includes(view.zh.action),
+
+  page.elements.langSel.value = 'zh';
+  page.elements.langSel.dispatch('change', { target: page.elements.langSel });
+  const zh = page.account();
+  assert.strictEqual(zh.avatar, '👩‍💻', '切换语言不得改变账号头像');
+  assert.strictEqual(zh.status, name + ' · 进度云同步', '中文登录态未用 loggedInNamed 插入完整昵称');
+  assert.strictEqual(zh.title, name, '中文账号 title 不得截断昵称');
+  assert.strictEqual(zh.action, '退出');
+  assert.ok(zh.aria.includes(zh.status) && zh.aria.includes(zh.action),
     '中文账号 aria-label 未包含可见状态与操作');
   assert.match(html, /\.profilerow \.profilename\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/,
     '长昵称只能由 CSS 单行视觉省略，DOM 文本必须保持完整');
@@ -317,89 +493,132 @@ test('叉号与雷按格子宽度响应式缩放，小格同步缩小且不再�
     '桌面说明和次级标签缺少可读性增强');
 });
 
-test('仅主指针左键同格双击正确雷时挖开并轻震一次 18ms', () => {
-  const correct = createPointerHarness({ mines: [3] });
-  correct.tap(3);
-  assert.strictEqual(correct.pendingTimers(), 1, '首次主指针点击应等待双击窗口');
-  assert.deepStrictEqual(correct.vibrations, [], '首次点击不得震动');
+test('真实事件接线仅在第二次有效 pointerup 后挖正确雷并轻震一次 18ms', async () => {
+  const data = MineLevels.get(1);
+  const mines = [];
+  data.board.mines.forEach((col, row) => mines.push(row * data.size + col));
+  const mine = mines[0];
+
+  const correct = await createPageRuntime();
+  correct.start();
+  correct.pointer('pointerdown', mine);
+  correct.pointer('pointerup', mine);
   correct.advance(100);
-  correct.tap(3);
-  assert.strictEqual(correct.sandbox.S.found.has(3), true, '同格双击未执行真实 dig');
-  assert.strictEqual(correct.pendingTimers(), 0, '完成双击后必须取消单击标记计时器');
+  correct.pointer('pointerdown', mine);
+  assert.deepStrictEqual(Array.from(correct.state().found), [],
+    '第二次 pointerdown 尚未完成手势，不得提前挖雷');
+  assert.deepStrictEqual(correct.vibrations, [], '第二次 pointerdown 不得提前震动');
+  correct.pointer('pointerup', mine);
+  assert.deepStrictEqual(Array.from(correct.state().found), [mine], '有效第二次 pointerup 未执行真实 dig');
   assert.deepStrictEqual(correct.vibrations, [18], '正确雷双击必须精确触发一次 18ms 轻震');
 
-  const secondary = createPointerHarness({ mines: [3] });
-  secondary.tap(3, { isPrimary: false });
+  const secondary = await createPageRuntime();
+  secondary.start();
+  secondary.pointer('pointerdown', mine, { isPrimary: false });
+  secondary.pointer('pointerup', mine, { isPrimary: false });
   secondary.advance(100);
-  secondary.tap(3, { isPrimary: false });
-  assert.strictEqual(secondary.sandbox.S.found.size, 0, '非主指针不得挖格');
-  assert.strictEqual(secondary.pendingTimers(), 0, '非主指针不得启动单击计时器');
+  secondary.pointer('pointerdown', mine, { isPrimary: false });
+  secondary.pointer('pointerup', mine, { isPrimary: false });
+  assert.deepStrictEqual(Array.from(secondary.state().found), [], '非主指针不得挖格');
   assert.deepStrictEqual(secondary.vibrations, [], '非主指针不得震动');
 
-  const rightButton = createPointerHarness({ mines: [3] });
-  rightButton.tap(3, { button: 2 });
+  const rightButton = await createPageRuntime();
+  rightButton.start();
+  rightButton.pointer('pointerdown', mine, { button: 2 });
+  rightButton.pointer('pointerup', mine, { button: 2 });
   rightButton.advance(100);
-  rightButton.tap(3, { button: 2 });
-  assert.strictEqual(rightButton.sandbox.S.found.size, 0, '右键不得挖格');
-  assert.strictEqual(rightButton.pendingTimers(), 0, '右键不得启动单击计时器');
+  rightButton.pointer('pointerdown', mine, { button: 2 });
+  rightButton.pointer('pointerup', mine, { button: 2 });
+  assert.deepStrictEqual(Array.from(rightButton.state().found), [], '右键不得挖格');
   assert.deepStrictEqual(rightButton.vibrations, [], '右键不得震动');
 });
 
-test('单击、错误格、道具和调试入口均不震，Vibration API 缺失或失败安全降级', () => {
-  const single = createPointerHarness({ mines: [3] });
-  single.tap(4);
-  assert.deepStrictEqual(single.vibrations, [], '单击等待阶段不得震动');
-  single.flushTimers();
-  assert.strictEqual(single.sandbox.S.marks.has(4), true, '单击计时完成后应执行真实 toggleMark');
-  assert.deepStrictEqual(single.vibrations, [], '单击标记安全格不得震动');
+test('真实页面 move/cancel、单击、错误格、两类道具与 window.__mine 均不误震', async () => {
+  const data = MineLevels.get(1);
+  const mines = [];
+  data.board.mines.forEach((col, row) => mines.push(row * data.size + col));
+  const mine = mines[0];
+  const safe = Array.from({ length: data.size * data.size }, (_, idx) => idx)
+    .find(idx => !mines.includes(idx));
 
-  const wrong = createPointerHarness({ mines: [3] });
-  wrong.tap(4);
+  const moved = await createPageRuntime();
+  moved.start();
+  moved.pointer('pointerdown', mine);
+  moved.pointer('pointerup', mine);
+  moved.advance(100);
+  moved.pointer('pointerdown', mine);
+  moved.pointer('pointermove', safe);
+  moved.pointer('pointerup', safe);
+  assert.deepStrictEqual(Array.from(moved.state().found), [], '第二次手势移动后不得挖雷');
+  assert.deepStrictEqual(moved.vibrations, [], '第二次手势移动后不得震动');
+
+  const cancelled = await createPageRuntime();
+  cancelled.start();
+  cancelled.pointer('pointerdown', mine);
+  cancelled.pointer('pointerup', mine);
+  cancelled.advance(100);
+  cancelled.pointer('pointerdown', mine);
+  cancelled.pointer('pointercancel', mine);
+  assert.deepStrictEqual(Array.from(cancelled.state().found), [], '第二次手势取消后不得挖雷');
+  assert.deepStrictEqual(cancelled.vibrations, [], '第二次手势取消后不得震动');
+
+  const single = await createPageRuntime();
+  single.start();
+  single.pointer('pointerdown', safe);
+  single.pointer('pointerup', safe);
+  single.flushTimeouts();
+  assert.strictEqual(single.elements.board.children[safe].classList.contains('safe'), true,
+    '单击计时完成后应从真实页面入口标记安全格');
+  assert.deepStrictEqual(single.vibrations, [], '单击标记不得震动');
+
+  const wrong = await createPageRuntime();
+  wrong.start();
+  wrong.pointer('pointerdown', safe);
+  wrong.pointer('pointerup', safe);
   wrong.advance(100);
-  wrong.tap(4);
-  assert.strictEqual(wrong.sandbox.S.opened.has(4), true, '错误格双击未执行真实 dig');
-  assert.strictEqual(wrong.sandbox.S.lives, 2, '错误格双击应扣一次生命');
+  wrong.pointer('pointerdown', safe);
+  wrong.pointer('pointerup', safe);
+  assert.strictEqual(wrong.state().lives, 2, '错误格双击应扣一次生命');
   assert.deepStrictEqual(wrong.vibrations, [], '错误格双击不得震动');
 
-  const direct = createPointerHarness({ mines: [3] });
-  assert.strictEqual(direct.dig(3), true, '程序化 dig 应返回命中雷结果');
-  assert.strictEqual(direct.sandbox.S.found.has(3), true, '程序化 dig 未完成找雷');
+  const direct = await createPageRuntime();
+  direct.start();
+  assert.strictEqual(direct.context.window.__mine.dig(mine), true, '真实 window.__mine.dig 应返回命中雷结果');
+  assert.ok(Array.from(direct.state().found).includes(mine), '真实 window.__mine.dig 未完成找雷');
   assert.deepStrictEqual(direct.vibrations, [], 'window.__mine.dig 程序化入口不得震动');
 
-  const solved = createPointerHarness({ mines: [1, 3] });
-  solved.solve();
-  assert.deepStrictEqual(Array.from(solved.sandbox.S.found).sort(), [1, 3],
-    'window.__mine.solve 未通过页面真实 dig 找完雷');
+  const solved = await createPageRuntime();
+  solved.start();
+  solved.context.window.__mine.solve();
+  assert.strictEqual(solved.state().found.length, data.size, '真实 window.__mine.solve 未找完本关雷');
   assert.deepStrictEqual(solved.vibrations, [], 'window.__mine.solve 程序化入口不得震动');
 
-  const toolCalls = [];
-  const toolHandler = htmlClickHandler('toolMine');
-  vm.runInNewContext(toolHandler + '\nclickHandler();', {
-    navigator: { vibrate(ms) { toolCalls.push(ms); return true; } },
-    S: { done: false, size: 5, board: {}, found: new Set(), marks: new Set() },
-    save: { toolMine: 1 },
-    MineEngine: { pickUnfoundMine() { return 2; } },
-    persist() {},
-    cellEl() { return { classList: { add() {}, remove() {} } }; },
-    renderHud() {}, onWin() {}, toast() {}, offerAdTool() {}
-  });
-  assert.deepStrictEqual(toolCalls, [], '找雷道具路径不得触发震动');
+  const tools = await createPageRuntime();
+  tools.start();
+  assert.ok((tools.elements.toolMine.listeners.get('click') || []).length > 0, 'toolMine 未安装真实点击入口');
+  assert.ok((tools.elements.toolSafe.listeners.get('click') || []).length > 0, 'toolSafe 未安装真实点击入口');
+  tools.elements.toolMine.dispatch('click');
+  tools.elements.toolSafe.dispatch('click');
+  assert.deepStrictEqual(tools.vibrations, [], 'toolMine 与 toolSafe 实际入口均不得震动');
 
-  const missingApi = createPointerHarness({ mines: [3], navigator: undefined });
+  const missingApi = await createPageRuntime({ vibrate: null });
+  missingApi.start();
   assert.doesNotThrow(() => {
-    missingApi.tap(3);
+    missingApi.pointer('pointerdown', mine);
+    missingApi.pointer('pointerup', mine);
     missingApi.advance(100);
-    missingApi.tap(3);
+    missingApi.pointer('pointerdown', mine);
+    missingApi.pointer('pointerup', mine);
   }, '无 Vibration API 时正确雷双击不应报错');
 
-  const rejectedApi = createPointerHarness({
-    mines: [3],
-    navigator: { vibrate() { throw new Error('blocked'); } }
-  });
+  const rejectedApi = await createPageRuntime({ vibrate() { throw new Error('blocked'); } });
+  rejectedApi.start();
   assert.doesNotThrow(() => {
-    rejectedApi.tap(3);
+    rejectedApi.pointer('pointerdown', mine);
+    rejectedApi.pointer('pointerup', mine);
     rejectedApi.advance(100);
-    rejectedApi.tap(3);
+    rejectedApi.pointer('pointerdown', mine);
+    rejectedApi.pointer('pointerup', mine);
   }, '浏览器拒绝震动时不应阻断正确雷双击');
 });
 

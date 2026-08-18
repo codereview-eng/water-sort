@@ -104,8 +104,9 @@
     border-radius:12px; padding:10px 12px; cursor:pointer; color:var(--ink); font-size:13px; text-align:left; width:100%;}
   .profilerow .avatar{width:32px; height:32px; border-radius:50%; background:var(--accent); color:#20160a;
     display:flex; align-items:center; justify-content:center; font-weight:800; flex:none;}
-  .profilerow .profileinfo{flex:1; display:flex; flex-direction:column; gap:1px;}
+  .profilerow .profileinfo{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px;}
   .profilerow .profilelabel{font-size:11px; color:var(--ink-3);}
+  .profilerow .profilename{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .profilerow .profilesource{font-size:11px; color:var(--ink-3);}
   .langrow{display:flex; align-items:center; justify-content:space-between; background:var(--surface);
     border:1px solid var(--edge); border-radius:12px; padding:10px 12px; font-size:13px; color:var(--ink-2);}
@@ -501,16 +502,23 @@
   }
   function renderAccount() {
     if (!$('btnAccount')) return;
+    var view = { avatar: '☁', status: '连接中…', title: '连接中…', action: '' };
     if (!Plat || Plat.mode !== 'online') {
-      $('accountStatus').textContent = Plat ? '本地存档' : '连接中…';
-      $('accountAction').textContent = '';
+      view.status = Plat ? '本地存档' : '连接中…';
+      view.title = view.status;
     } else if (Plat.user) {
-      $('accountStatus').textContent = '已登录 · 进度云同步';
-      $('accountAction').textContent = '退出';
+      view = Plat.core.accountPresentation(Plat.user);
+      view.action = '退出';
     } else {
-      $('accountStatus').textContent = '未登录 · 进度仅存本机';
-      $('accountAction').textContent = '登录';
+      view.status = '未登录 · 进度仅存本机';
+      view.title = view.status;
+      view.action = '登录';
     }
+    $('accountAvatar').textContent = view.avatar;
+    $('accountStatus').textContent = view.status;
+    $('accountStatus').title = view.title;
+    $('accountAction').textContent = view.action;
+    $('btnAccount').setAttribute('aria-label', 'run.ceo 账号：' + view.status + (view.action ? '，' + view.action : ''));
   }
   /* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
   function maybePromptLogin() {

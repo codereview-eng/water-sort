@@ -660,12 +660,14 @@ test('真实事件接线仅在第二次有效 pointerup 后挖正确雷并轻震
     '未发生 pointermove 的错格 pointerup 不得提交挖格');
   assert.deepStrictEqual(wrongCellRelease.vibrations, [],
     '未发生 pointermove 的错格 pointerup 不得触发震动');
-  wrongCellRelease.pointer('pointerdown', mine);
-  wrongCellRelease.pointer('pointerup', mine);
+  wrongCellRelease.pointer('pointerdown', safe);
+  wrongCellRelease.pointer('pointerup', safe);
   assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [],
-    '错格抬起后的一次合法点击不得误完成陈旧双击');
+    '错格抬起后复击同一格不得误完成陈旧双击');
+  assert.strictEqual(wrongCellRelease.state().lives, 3,
+    '错格抬起后复击同一安全格不得误扣生命');
   assert.deepStrictEqual(wrongCellRelease.vibrations, [],
-    '错格抬起后的合法单击不得触发震动');
+    '错格抬起后复击同一格不得触发震动');
 });
 
 test('真实页面 move/cancel、单击、错误格、两类道具与 window.__mine 均不误震', async () => {

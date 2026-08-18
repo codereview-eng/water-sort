@@ -577,6 +577,8 @@ test('真实事件接线仅在第二次有效 pointerup 后挖正确雷并轻震
   const mines = [];
   data.board.mines.forEach((col, row) => mines.push(row * data.size + col));
   const mine = mines[0];
+  const safe = Array.from({ length: data.size * data.size }, (_, idx) => idx)
+    .find(idx => !mines.includes(idx));
 
   const correct = await createPageRuntime();
   correct.start();
@@ -627,6 +629,43 @@ test('真实事件接线仅在第二次有效 pointerup 后挖正确雷并轻震
     assert.deepStrictEqual(release.vibrations, [],
       invalidRelease.label + '不得触发震动');
   }
+
+  const otherPointer = await createPageRuntime();
+  otherPointer.start();
+  otherPointer.pointer('pointerdown', mine, { pointerId: 1 });
+  otherPointer.pointer('pointerup', mine, { pointerId: 1 });
+  otherPointer.advance(100);
+  otherPointer.pointer('pointerdown', mine, { pointerId: 1 });
+  otherPointer.pointer('pointerup', mine, { pointerId: 2 });
+  assert.deepStrictEqual(Array.from(otherPointer.state().found), [],
+    '不同 pointerId 的 pointerup 不得提交挖格');
+  assert.deepStrictEqual(otherPointer.vibrations, [],
+    '不同 pointerId 的 pointerup 不得触发震动');
+  otherPointer.pointer('pointercancel', mine, { pointerId: 1 });
+  otherPointer.pointer('pointerdown', mine, { pointerId: 1 });
+  otherPointer.pointer('pointerup', mine, { pointerId: 1 });
+  assert.deepStrictEqual(Array.from(otherPointer.state().found), [],
+    '取消原指针后的一次合法点击不得误完成陈旧双击');
+  assert.deepStrictEqual(otherPointer.vibrations, [],
+    '取消原指针后的合法单击不得触发震动');
+
+  const wrongCellRelease = await createPageRuntime();
+  wrongCellRelease.start();
+  wrongCellRelease.pointer('pointerdown', mine);
+  wrongCellRelease.pointer('pointerup', mine);
+  wrongCellRelease.advance(100);
+  wrongCellRelease.pointer('pointerdown', mine);
+  wrongCellRelease.pointer('pointerup', safe);
+  assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [],
+    '未发生 pointermove 的错格 pointerup 不得提交挖格');
+  assert.deepStrictEqual(wrongCellRelease.vibrations, [],
+    '未发生 pointermove 的错格 pointerup 不得触发震动');
+  wrongCellRelease.pointer('pointerdown', mine);
+  wrongCellRelease.pointer('pointerup', mine);
+  assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [],
+    '错格抬起后的一次合法点击不得误完成陈旧双击');
+  assert.deepStrictEqual(wrongCellRelease.vibrations, [],
+    '错格抬起后的合法单击不得触发震动');
 });
 
 test('真实页面 move/cancel、单击、错误格、两类道具与 window.__mine 均不误震', async () => {

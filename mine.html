@@ -35,19 +35,25 @@
   /* ---------- 棋盘 ---------- */
   .boardwrap{background:var(--surface); border:1px solid var(--edge); border-radius:14px; padding:8px;}
   .board{display:grid; gap:var(--cell-gap); width:100%; aspect-ratio:1; touch-action:none;}
-  .cell{position:relative; border-radius:6px; border:1px solid rgba(0,0,0,.28);
+  .cell{position:relative; container-type:inline-size; border-radius:6px; border:1px solid rgba(0,0,0,.28);
     display:flex; align-items:center; justify-content:center; cursor:pointer;
-    font-size:15px; font-weight:800; overflow:hidden;
+    font-size:32px; font-weight:800; overflow:hidden;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 0 rgba(0,0,0,.18);}
-  .cell.small{font-size:12px; border-radius:5px;}
+  .cell.small{font-size:20px; border-radius:5px;}
   .cell .mk{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     color:rgba(0,0,0,.62); text-shadow:0 1px 0 rgba(255,255,255,.25); pointer-events:none;}
-  .cell.safe .mk::before{content:'✕';}
-  .cell.hintsafe .mk::before{content:'✕'; color:#0b6b3a;}
+  .cell .mk::before{font-size:32px; line-height:1;}
+  .cell.small .mk::before{font-size:20px;}
+  @supports (font-size:1cqi){
+    .cell .mk::before{font-size:clamp(18px,58cqi,48px);}
+    .cell.small .mk::before{font-size:clamp(12px,58cqi,30px);}
+  }
+  .cell.safe .mk::before{content:'✕'; font-weight:900; -webkit-text-stroke:.035em currentColor;}
+  .cell.hintsafe .mk::before{content:'✕'; color:#0b6b3a; font-weight:900; -webkit-text-stroke:.035em currentColor;}
   .cell.opened{filter:saturate(.35) brightness(.72);}
-  .cell.opened .mk::before{content:'·'; font-size:1.4em;}
+  .cell.opened .mk::before{content:'·'; font-size:.65em;}
   .cell.mine{filter:brightness(1.06);}
-  .cell.mine .mk::before{content:'💣'; font-size:.95em; text-shadow:none;}
+  .cell.mine .mk::before{content:'💣'; text-shadow:none;}
   .cell.boom{animation:shake .4s;}
   @keyframes shake{20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
   .cell.pop{animation:pop .35s;}
@@ -61,6 +67,10 @@
   .tool .cnt{background:rgba(255,180,84,.16); color:var(--accent); border-radius:8px; padding:1px 7px; font-size:12px;}
   .tool:disabled{opacity:.45;}
   .hintline{font-size:11px; color:var(--ink-3); text-align:center; line-height:1.5;}
+  @media (min-width:700px){
+    .hintline{font-size:13px; color:#b9c5d3; line-height:1.65;}
+    .hud .k,.topbar .backbtn{color:#aeb9c8;}
+  }
 
   /* ---------- 弹窗 / toast ---------- */
   .overlay{position:fixed; inset:0; background:rgba(8,12,18,.66); display:none;
@@ -169,6 +179,19 @@
   var KEY = 'mine_save_v1';
   var COLORS = ['#7f9cf5','#f56d6d','#f5c66d','#6dd3a8','#c98df0','#6dc4f0',
                 '#f09db8','#a8d36d','#f0a56d','#8f8ff0','#6df0d8'];  // 11 色恰好覆盖 11×11
+  var REGION_TEXTURES = [
+    { image: 'repeating-linear-gradient(45deg, rgba(15,22,32,.11) 0 1.4px, transparent 1.4px 8px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(-45deg, rgba(15,22,32,.11) 0 1.4px, transparent 1.4px 8px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(0deg, rgba(15,22,32,.12) 0 1.2px, transparent 1.2px 7px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(90deg, rgba(15,22,32,.12) 0 1.2px, transparent 1.2px 7px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(45deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px), repeating-linear-gradient(-45deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(0deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px), repeating-linear-gradient(90deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px)', size: 'auto' },
+    { image: 'radial-gradient(circle, rgba(15,22,32,.14) 0 1.25px, transparent 1.5px)', size: '7px 7px' },
+    { image: 'radial-gradient(circle at 25% 25%, rgba(15,22,32,.12) 0 1.15px, transparent 1.4px), radial-gradient(circle at 75% 75%, rgba(15,22,32,.12) 0 1.15px, transparent 1.4px)', size: '12px 12px' },
+    { image: 'repeating-radial-gradient(circle at center, rgba(15,22,32,.10) 0 1px, transparent 1px 5px)', size: 'auto' },
+    { image: 'conic-gradient(from 45deg, rgba(15,22,32,.10) 25%, transparent 0 50%, rgba(15,22,32,.10) 0 75%, transparent 0)', size: '8px 8px' },
+    { image: 'repeating-linear-gradient(60deg, rgba(15,22,32,.11) 0 1.2px, transparent 1.2px 11px), repeating-linear-gradient(-60deg, rgba(15,22,32,.06) 0 1px, transparent 1px 11px)', size: 'auto' }
+  ];
   var AD_TOOL_GRANT = 1;               // 看广告补 1 个道具（演示：模拟播放）
   var AD_TIME_BONUS = 60;              // 看广告加 60 秒
   /* GameConfig 内嵌：与 games/mine/game.config.json 逐字段一致（mine-config.test.js 校验）；
@@ -233,7 +256,11 @@
       var d = document.createElement('div');
       d.className = 'cell' + (S.size >= 9 ? ' small' : '');
       d.dataset.idx = i;
-      d.style.background = COLORS[S.board.region[i] % COLORS.length];
+      var region = S.board.region[i] % COLORS.length;
+      var texture = REGION_TEXTURES[region];
+      d.style.backgroundColor = COLORS[region];
+      d.style.backgroundImage = texture.image;
+      d.style.backgroundSize = texture.size;
       var mk = document.createElement('span'); mk.className = 'mk'; d.appendChild(mk);
       boardEl.appendChild(d);
     }
@@ -329,6 +356,12 @@
     else { S.marks.add(idx); el.classList.add('safe'); blip(660, .06); }
   }
 
+  function vibrateCorrectMine() {
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(18);
+    } catch (e) {}
+  }
+
   function dig(idx) {
     var el = cellEl(idx);
     if (S.mines.has(idx)) {                 // 挖中雷 = 找对
@@ -336,6 +369,7 @@
       el.classList.remove('safe', 'hintsafe');
       el.classList.add('mine', 'pop');
       blip(880, .12);
+      vibrateCorrectMine();
       renderHud();
       if (S.found.size === S.size) return onWin();
     } else {                                // 挖错 → 扣血

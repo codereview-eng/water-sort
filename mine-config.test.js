@@ -7,6 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('node:vm');
 const Shell = require('./core/shell.js');
 const Home = require('./core/home.js');
 const RewardCore = require('./core/reward.js');
@@ -18,6 +19,28 @@ function embedded() {
   const m = html.match(/<script id="gameConfig" type="application\/json">([\s\S]*?)<\/script>/);
   assert.ok(m, 'mine.html 缺内嵌 gameConfig JSON 块');
   return JSON.parse(m[1]);
+}
+
+function htmlFunction(name) {
+  const m = html.match(new RegExp('  function ' + name + '\\([^\\n]*\\) \\{[\\s\\S]*?\\n  \\}'));
+  assert.ok(m, 'mine.html 缺函数 ' + name);
+  return m[0].trim();
+}
+
+function htmlArray(name) {
+  const m = html.match(new RegExp('var ' + name + ' = (\\[[\\s\\S]*?\\]);'));
+  assert.ok(m, 'mine.html 缺数组 ' + name);
+  return vm.runInNewContext(m[1]);
+}
+
+function htmlClickHandler(id) {
+  const marker = "$('" + id + "').addEventListener('click', function () {";
+  const start = html.indexOf(marker);
+  assert.ok(start >= 0, 'mine.html 缺点击处理 ' + id);
+  const bodyStart = start + marker.length;
+  const end = html.indexOf('\n  });', bodyStart);
+  assert.ok(end >= 0, 'mine.html 点击处理未闭合 ' + id);
+  return 'function clickHandler() {' + html.slice(bodyStart, end) + '\n}';
 }
 
 test('mine.html 内嵌 GameConfig 与 games/mine/game.config.json 逐字段一致', () => {
@@ -60,4 +83,168 @@ test('reward 配置过 RewardCore 校验且页面经 CFG 消费、手写首页�
   assert.ok(html.includes('RewardCore.create(CFG.reward)'), '页面未经 RewardCore 消费 reward 配置');
   assert.ok(html.includes('ShellCore.create(HomeCore.registry(), CFG.screens)'), '页面未经 ShellCore 渲染 screens');
   assert.ok(!/<div class="homestats">/.test(html), '仍有手写 homestats markup（首页必须由模块渲染）');
+});
+
+test('叉号与雷按格子宽度响应式缩放，小格同步缩小且不再固定为 12/15px', () => {
+  assert.match(html, /\.cell\{[^}]*container-type:inline-size;/s, 'cell 未建立自身尺寸容器');
+  assert.match(html, /\.cell \.mk::before\{[^}]*font-size:32px;[^}]*line-height:1;/s, '普通格缺响应式不支持时的符号保底尺寸');
+  assert.match(html, /\.cell\.small \.mk::before\{[^}]*font-size:20px;/s, '小格缺响应式不支持时的符号保底尺寸');
+  assert.match(html, /@supports \(font-size:1cqi\)\{[\s\S]*?\.cell \.mk::before\{font-size:clamp\(18px,58cqi,48px\);\}[\s\S]*?\.cell\.small \.mk::before\{font-size:clamp\(12px,58cqi,30px\);\}/,
+    '容器单位必须写在符号子元素上，才能相对自身格子缩放');
+  assert.doesNotMatch(html, /@supports \(font-size:1cqi\)\{[\s\S]*?\.cell\{font-size:[^}]*cqi[^}]*\}/,
+    '容器自身不能用自身 cqi 计算字号，否则会退回视口单位');
+  assert.doesNotMatch(html, /\.cell\.mine \.mk::before\{[^}]*font-size:\.95em;/s, '雷仍被额外缩小');
+  assert.match(html, /@media \(min-width:700px\)\{[\s\S]*?\.hintline\{font-size:13px; color:#b9c5d3; line-height:1\.65;\}[\s\S]*?\.hud \.k,\.topbar \.backbtn\{color:#aeb9c8;\}/,
+    '桌面说明和次级标签缺少可读性增强');
+});
+
+test('正确双击翻开雷仅在支持设备轻震，缺 API 或调用失败时安全降级', () => {
+  const fn = htmlFunction('vibrateCorrectMine');
+  const calls = [];
+  vm.runInNewContext(fn + '\nvibrateCorrectMine();', {
+    navigator: { vibrate(ms) { calls.push(ms); return true; } }
+  });
+  assert.deepStrictEqual(calls, [18], '正确雷轻震应为单次 18ms');
+  assert.doesNotThrow(() => vm.runInNewContext(fn + '\nvibrateCorrectMine();', {}),
+    '无 Vibration API 时不应报错');
+  assert.doesNotThrow(() => vm.runInNewContext(fn + '\nvibrateCorrectMine();', {
+    navigator: { vibrate() { throw new Error('blocked'); } }
+  }), '浏览器拒绝震动时不应阻断游戏');
+  const dig = htmlFunction('dig');
+  function runDig(isMine) {
+    const vibrations = [];
+    const sandbox = {
+      navigator: { vibrate(ms) { vibrations.push(ms); return true; } },
+      S: {
+        done: false, size: 5, mines: new Set(isMine ? [3] : []),
+        found: new Set(), marks: new Set([3]), opened: new Set(), lives: 3
+      },
+      cellEl() { return { classList: { add() {}, remove() {} } }; },
+      blip() {}, renderHud() {}, onWin() {}, onDead() {}, toast() {}
+    };
+    vm.runInNewContext(fn + '\n' + dig + '\ndig(3);', sandbox);
+    return vibrations;
+  }
+  assert.deepStrictEqual(runDig(true), [18], '正确雷路径必须精确触发一次 18ms 轻震');
+  assert.deepStrictEqual(runDig(false), [], '错误格路径不得触发震动');
+
+  const toolCalls = [];
+  const toolHandler = htmlClickHandler('toolMine');
+  vm.runInNewContext(fn + '\n' + toolHandler + '\nclickHandler();', {
+    navigator: { vibrate(ms) { toolCalls.push(ms); return true; } },
+    S: { done: false, size: 5, board: {}, found: new Set(), marks: new Set() },
+    save: { toolMine: 1 },
+    MineEngine: { pickUnfoundMine() { return 2; } },
+    persist() {},
+    cellEl() { return { classList: { add() {}, remove() {} } }; },
+    renderHud() {}, onWin() {}, toast() {}, offerAdTool() {}
+  });
+  assert.deepStrictEqual(toolCalls, [], '找雷道具路径不得触发震动');
+
+  const toggleMark = htmlFunction('toggleMark');
+  function runToggleMark(initiallyMarked) {
+    const vibrations = [];
+    const sandbox = {
+      navigator: { vibrate(ms) { vibrations.push(ms); return true; } },
+      S: {
+        done: false, found: new Set(), opened: new Set(),
+        marks: new Set(initiallyMarked ? [4] : [])
+      },
+      cellEl() { return { classList: { add() {}, remove() {} } }; },
+      blip() {}
+    };
+    vm.runInNewContext(fn + '\n' + toggleMark + '\ntoggleMark(4);', sandbox);
+    return { vibrations, marked: sandbox.S.marks.has(4) };
+  }
+  const marked = runToggleMark(false);
+  assert.strictEqual(marked.marked, true, '单击未标记格应完成标记');
+  assert.deepStrictEqual(marked.vibrations, [], '单击标记安全格不得触发震动');
+  const unmarked = runToggleMark(true);
+  assert.strictEqual(unmarked.marked, false, '单击已标记格应完成取消标记');
+  assert.deepStrictEqual(unmarked.vibrations, [], '单击取消标记不得触发震动');
+});
+
+test('每种颜色配置唯一淡色底纹，覆盖离散纹理族并由渲染完整消费', () => {
+  const colors = htmlArray('COLORS');
+  const textures = htmlArray('REGION_TEXTURES');
+  const expectedColors = [
+    '#7f9cf5', '#f56d6d', '#f5c66d', '#6dd3a8', '#c98df0', '#6dc4f0',
+    '#f09db8', '#a8d36d', '#f0a56d', '#8f8ff0', '#6df0d8'
+  ];
+  const expectedTextures = [
+    { image: 'repeating-linear-gradient(45deg, rgba(15,22,32,.11) 0 1.4px, transparent 1.4px 8px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(-45deg, rgba(15,22,32,.11) 0 1.4px, transparent 1.4px 8px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(0deg, rgba(15,22,32,.12) 0 1.2px, transparent 1.2px 7px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(90deg, rgba(15,22,32,.12) 0 1.2px, transparent 1.2px 7px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(45deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px), repeating-linear-gradient(-45deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px)', size: 'auto' },
+    { image: 'repeating-linear-gradient(0deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px), repeating-linear-gradient(90deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px)', size: 'auto' },
+    { image: 'radial-gradient(circle, rgba(15,22,32,.14) 0 1.25px, transparent 1.5px)', size: '7px 7px' },
+    { image: 'radial-gradient(circle at 25% 25%, rgba(15,22,32,.12) 0 1.15px, transparent 1.4px), radial-gradient(circle at 75% 75%, rgba(15,22,32,.12) 0 1.15px, transparent 1.4px)', size: '12px 12px' },
+    { image: 'repeating-radial-gradient(circle at center, rgba(15,22,32,.10) 0 1px, transparent 1px 5px)', size: 'auto' },
+    { image: 'conic-gradient(from 45deg, rgba(15,22,32,.10) 25%, transparent 0 50%, rgba(15,22,32,.10) 0 75%, transparent 0)', size: '8px 8px' },
+    { image: 'repeating-linear-gradient(60deg, rgba(15,22,32,.11) 0 1.2px, transparent 1.2px 11px), repeating-linear-gradient(-60deg, rgba(15,22,32,.06) 0 1px, transparent 1px 11px)', size: 'auto' }
+  ];
+  assert.deepStrictEqual(Array.from(colors), expectedColors, '彩雷 11 色区域色板发生漂移');
+  assert.deepStrictEqual(Array.from(textures, texture => ({
+    image: texture.image,
+    size: texture.size
+  })), expectedTextures, '彩雷 11 组区域底纹发生漂移');
+  assert.strictEqual(new Set(colors).size, 11, '11 种区域颜色必须互不重复');
+  assert.strictEqual(textures.length, colors.length, '每种颜色都必须有对应底纹');
+  assert.strictEqual(new Set(textures.map(texture => texture.image + '|' + texture.size)).size,
+    textures.length, '不同颜色的底纹必须可区分');
+  for (const texture of textures) {
+    assert.strictEqual(typeof texture.image, 'string', '底纹缺 image');
+    assert.strictEqual(typeof texture.size, 'string', '底纹缺 background-size');
+    assert.match(texture.image, /gradient\(/, '底纹必须使用可缩放 CSS gradient');
+    const alphas = [...texture.image.matchAll(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/g)].map(m => Number(m[1]));
+    assert.ok(alphas.length > 0 && Math.max(...alphas) <= 0.14, '底纹透明度必须克制，不能盖过底色');
+  }
+  assert.ok(textures.some(texture => /repeating-linear-gradient\(0deg/.test(texture.image)),
+    '底纹缺水平线编码');
+  assert.ok(textures.some(texture => /repeating-linear-gradient\(90deg/.test(texture.image)),
+    '底纹缺垂直线编码');
+  assert.ok(textures.some(texture => /(^|,\s*)radial-gradient\(circle/.test(texture.image)),
+    '底纹缺点阵编码');
+  assert.ok(textures.some(texture => texture.image.includes('repeating-radial-gradient(')),
+    '底纹缺环纹编码');
+  assert.ok(textures.some(texture => texture.image.includes('conic-gradient(')),
+    '底纹缺块状编码');
+  assert.ok(textures.some(texture => (texture.image.match(/gradient\(/g) || []).length >= 2),
+    '底纹缺交叉线或网格等叠层编码');
+  const renderBoard = htmlFunction('renderBoard');
+  assert.ok(renderBoard.includes('d.style.backgroundColor = COLORS[region];'), '棋盘未消费颜色配置');
+  assert.ok(renderBoard.includes('var texture = REGION_TEXTURES[region];'), '棋盘未读取底纹配置');
+  assert.ok(renderBoard.includes('d.style.backgroundImage = texture.image;'), '棋盘未消费底纹图案');
+  assert.ok(renderBoard.includes('d.style.backgroundSize = texture.size;'), '棋盘未消费底纹尺寸');
+  assert.match(html, /\.cell\.safe \.mk::before\{[^}]*font-weight:900;[^}]*-webkit-text-stroke:\.035em currentColor;/s,
+    '手机小格中的叉号缺少加粗描边');
+});
+
+test('通关保持游戏页并弹出下一关或返回主页二选一', () => {
+  const onWin = htmlFunction('onWin');
+  let args = null;
+  let nextLevel = null;
+  let wentHome = false;
+  const sandbox = {
+    S: { done: false, lv: 7, size: 9 },
+    save: { level: 7, clears: 2 },
+    stopTimer() {},
+    persist() {},
+    dialog(...values) { args = values; },
+    startLevel(level) { nextLevel = level; },
+    showHome() { wentHome = true; }
+  };
+  vm.runInNewContext(onWin + '\nonWin();', sandbox);
+  assert.strictEqual(wentHome, false, '通关弹窗出现前不应自动返回主页');
+  assert.strictEqual(sandbox.S.done, true);
+  assert.strictEqual(sandbox.save.level, 8);
+  assert.strictEqual(sandbox.save.clears, 3);
+  assert.ok(args, '通关未弹出选择');
+  assert.strictEqual(args[2], '下一关');
+  assert.strictEqual(args[4], '返回首页');
+  args[3]();
+  assert.strictEqual(nextLevel, 8, '主操作未进入下一关');
+  args[5]();
+  assert.strictEqual(wentHome, true, '次操作未返回主页');
 });

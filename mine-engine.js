@@ -262,12 +262,18 @@
     return out;
   }
 
+  function contains(indexes, value) {
+    if (!indexes) return false;
+    if (typeof indexes.has === 'function') return indexes.has(value);
+    return indexes.indexOf(value) !== -1;
+  }
+
   /* 道具1:从还没找到的雷里挑一颗(rand 可注入,默认 Math.random);全找完返回 -1 */
   function pickUnfoundMine(board, foundIdx, rand) {
     const left = [];
     const all = mineIndexes(board);
     for (let i = 0; i < all.length; i++) {
-      if (!foundIdx || foundIdx.indexOf(all[i]) === -1) left.push(all[i]);
+      if (!contains(foundIdx, all[i])) left.push(all[i]);
     }
     if (!left.length) return -1;
     return left[Math.floor((rand || Math.random)() * left.length)];
@@ -281,7 +287,7 @@
     const cand = [];
     for (let i = 0; i < board.size * board.size; i++) {
       if (isMine[i]) continue;
-      if (excludedIdx && excludedIdx.indexOf(i) !== -1) continue;
+      if (contains(excludedIdx, i)) continue;
       cand.push(i);
     }
     if (!cand.length) return -1;

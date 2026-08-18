@@ -19,6 +19,99 @@
 
   function fail(msg) { throw new Error('platform config: ' + msg); }
 
+  /* 账号 nickname 仅作为文本展示：去掉控制/双向欺骗/default-ignorable/视觉空白，
+     保留可见名称内部合法的 ZWJ/ZWNJ/variation selector，并用 NFC 统一等价字形。 */
+  var UNICODE_MARK = null;
+  var DEFAULT_IGNORABLE = null;
+  try { UNICODE_MARK = new RegExp('\\p{Mark}', 'u'); } catch (err) {}
+  try { DEFAULT_IGNORABLE = new RegExp('\\p{Default_Ignorable_Code_Point}', 'u'); } catch (err) {}
+
+  function isGraphemeExtend(ch) {
+    var cp = ch.codePointAt(0);
+    return (UNICODE_MARK && UNICODE_MARK.test(ch)) ||
+      (cp >= 0x0300 && cp <= 0x036F) ||
+      (cp >= 0x1AB0 && cp <= 0x1AFF) ||
+      (cp >= 0x1DC0 && cp <= 0x1DFF) ||
+      (cp >= 0x20D0 && cp <= 0x20FF) ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      (cp >= 0xFE20 && cp <= 0xFE2F) ||
+      (cp >= 0x1F3FB && cp <= 0x1F3FF) ||
+      (cp >= 0xE0020 && cp <= 0xE007F) ||
+      (cp >= 0xE0100 && cp <= 0xE01EF);
+  }
+
+  function isAllowedNameFormat(cp) {
+    return cp === 0x200C || cp === 0x200D ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      (cp >= 0xE0100 && cp <= 0xE01EF);
+  }
+
+  function isDefaultIgnorable(ch) {
+    var cp = ch.codePointAt(0);
+    if (DEFAULT_IGNORABLE) return DEFAULT_IGNORABLE.test(ch);
+    return cp === 0x00AD || cp === 0x034F || cp === 0x061C ||
+      (cp >= 0x115F && cp <= 0x1160) ||
+      (cp >= 0x17B4 && cp <= 0x17B5) ||
+      (cp >= 0x180B && cp <= 0x180F) ||
+      (cp >= 0x200B && cp <= 0x200F) ||
+      (cp >= 0x202A && cp <= 0x202E) ||
+      (cp >= 0x2060 && cp <= 0x206F) ||
+      cp === 0x3164 ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      cp === 0xFEFF || cp === 0xFFA0 ||
+      (cp >= 0xFFF0 && cp <= 0xFFF8) ||
+      (cp >= 0x1BCA0 && cp <= 0x1BCA3) ||
+      (cp >= 0x1D173 && cp <= 0x1D17A) ||
+      (cp >= 0xE0000 && cp <= 0xE0FFF);
+  }
+
+  function isUnsafeNameCodePoint(cp) {
+    return (cp >= 0x0000 && cp <= 0x001F) ||
+      (cp >= 0x007F && cp <= 0x009F) ||
+      cp === 0x2028 || cp === 0x2029 || cp === 0x2800 ||
+      (cp >= 0xFFF9 && cp <= 0xFFFB);
+  }
+
+  function isBoundaryInvisible(ch) {
+    var cp = ch.codePointAt(0);
+    return /\s/.test(ch) || isAllowedNameFormat(cp) || isGraphemeExtend(ch);
+  }
+
+  function normalizeAccountName(value) {
+    if (typeof value !== 'string') return '';
+    var name = value;
+    if (name && typeof name.normalize === 'function') name = name.normalize('NFC');
+    var chars = Array.from(name).filter(function (ch) {
+      var cp = ch.codePointAt(0);
+      if (isUnsafeNameCodePoint(cp)) return false;
+      return !isDefaultIgnorable(ch) || isAllowedNameFormat(cp);
+    });
+    while (chars.length && isBoundaryInvisible(chars[0])) chars.shift();
+    while (chars.length) {
+      var tail = chars[chars.length - 1];
+      if (/\s/.test(tail) || tail === '\u200C' || tail === '\u200D') chars.pop();
+      else break;
+    }
+    name = chars.join('').trim();
+    if (!name) return '';
+    for (var i = 0; i < chars.length; i += 1) {
+      if (!isBoundaryInvisible(chars[i])) return name;
+    }
+    return '';
+  }
+
+  function firstGrapheme(name) {
+    if (!name) return '';
+    try {
+      if (typeof Intl === 'object' && typeof Intl.Segmenter === 'function') {
+        var segments = new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(name);
+        var first = segments[Symbol.iterator]().next();
+        if (!first.done && first.value && first.value.segment) return first.value.segment;
+      }
+    } catch (err) {}
+    return '';
+  }
+
   /* ---------- 纯函数层 ---------- */
 
   function create(cfg) {
@@ -104,13 +197,23 @@
       return (state.clears || 0) >= promptAfter;
     }
 
+    /* 登录账号展示契约：只暴露安全 nickname 与首字素头像，本地化由消费方负责。 */
+    function accountPresentation(user) {
+      var name = normalizeAccountName(user && user.name);
+      return {
+        avatar: firstGrapheme(name) || '☁',
+        name: name
+      };
+    }
+
     return {
       entity: cfg.entity,
       loginPromptAfterClears: promptAfter,
       toRow: toRow,
       fromRow: fromRow,
       mergeSave: mergeSave,
-      shouldPromptLogin: shouldPromptLogin
+      shouldPromptLogin: shouldPromptLogin,
+      accountPresentation: accountPresentation
     };
   }
 

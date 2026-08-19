@@ -7,8 +7,13 @@ const Shell = require('./shell.js');
 
 test('registry: 含全部通用模块', () => {
   const reg = Home.registry();
-  for (const t of ['logo', 'energy', 'start-button', 'homestats', 'profile-row', 'sound-toggle', 'lang-select', 'hintline', 'account-row']) {
+  for (const t of ['logo', 'energy', 'start-button', 'homestats', 'identity-row', 'sound-toggle', 'lang-select', 'hintline']) {
     assert.strictEqual(typeof reg.get(t), 'function', t + ' 缺失');
+  }
+  /* 两栏身份已合成一栏：旧的「玩家名称行 + run.ceo 账号行」必须彻底下线，
+     留着任一个都可能被某个 config 重新声明出来，首页又冒出第二个名字 */
+  for (const gone of ['profile-row', 'account-row']) {
+    assert.strictEqual(reg.get(gone), undefined, gone + ' 应已被 identity-row 取代');
   }
 });
 
@@ -56,10 +61,10 @@ test('homestats: items 声明渲染 + 形状 fail-fast', () => {
   assert.throws(() => Home.registry().get('homestats')({ items: [{ id: 'a' }] }), /items\[\]\.label/);
 });
 
-test('profile-row / sound-toggle / lang-select: 与 water.html 现状 id 对齐', () => {
+test('identity-row / sound-toggle / lang-select: 回填锚点齐全', () => {
   const reg = Home.registry();
-  const p = reg.get('profile-row')({});
-  for (const id of ['btnProfile', 'profileAvatar', 'profileLabel', 'profileName', 'profileSource']) {
+  const p = reg.get('identity-row')({});
+  for (const id of ['btnIdentity', 'idAvatar', 'idBadge', 'idName', 'idSource', 'idSub', 'idAction']) {
     assert.ok(p.includes('id="' + id + '"'), id);
   }
   const s = reg.get('sound-toggle')({});
@@ -75,13 +80,13 @@ test('hintline: 多行 <br> 拼接且逐行转义', () => {
   assert.throws(() => Home.registry().get('hintline')({ lines: [] }), /非空数组/);
 });
 
-test('account-row: 平台账号行带稳定回填 id，label 可覆盖且转义', () => {
-  const html = Home.registry().get('account-row')({});
-  for (const id of ['id="btnAccount"', 'id="accountAvatar"', 'id="accountLabel"', 'id="accountStatus"', 'id="accountAction"']) {
-    assert.ok(html.includes(id), id);
+test('identity-row: 一行之内只有一个名字槽位，且不带任何本地改名入口', () => {
+  const html = Home.registry().get('identity-row')({});
+  assert.strictEqual((html.match(/class="profilename"/g) || []).length, 1, '一栏只能有一个名字');
+  assert.strictEqual(html.match(/id="btn[A-Za-z]+"/g).length, 1, '整行只有一个可点区域');
+  for (const legacy of ['profileLabel', 'accountStatus', 'accountAction', 'profileSource']) {
+    assert.ok(!html.includes(legacy), '不应残留旧两栏锚点 ' + legacy);
   }
-  assert.ok(html.includes('run.ceo 账号'));
-  assert.ok(Home.registry().get('account-row')({ label: '<b>x</b>' }).includes('&lt;b&gt;'));
 });
 
 test('装配: ShellCore + home registry 按 config 声明渲染 home screen', () => {

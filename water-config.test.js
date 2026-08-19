@@ -29,8 +29,13 @@ test('screens.home 声明可被 ShellCore+HomeCore+water 扩展完整渲染且�
   assert.strictEqual(parts.length, cfg.screens.home.modules.length);
   for (const p of parts) assert.ok(typeof p === 'string' && p.length > 0, '模块渲染产出空 markup');
   const joined = parts.join('');
-  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'btnWeekly', 'wkBadge', 'wkEntryTitle', 'wkEntrySub', 'wkEntryFrag', 'btnLb', 'stWins', 'stBottles', 'btnProfile', 'profileName', 'profileAvatar', 'profileSource', 'sfxToggle', 'langSel']) {
+  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'btnWeekly', 'wkBadge', 'wkEntryTitle', 'wkEntrySub', 'wkEntryFrag', 'btnLb', 'stWins', 'stBottles', 'btnIdentity', 'idName', 'idAvatar', 'idSource', 'idSub', 'idAction', 'sfxToggle', 'langSel']) {
     assert.ok(joined.includes('id="' + id + '"'), '缺回填锚点 ' + id);
+  }
+  /* 两栏身份合一：旧的「玩家名称行 + run.ceo 账号行」不得再出现，
+     否则首页又是两个名字，且其中一个还带本地改名入口 */
+  for (const gone of ['btnProfile', 'profileLabel', 'btnAccount', 'accountStatus', 'accountAction']) {
+    assert.ok(!joined.includes('id="' + gone + '"'), '首页仍残留旧两栏锚点 ' + gone);
   }
 });
 
@@ -49,7 +54,24 @@ test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json �
   assert.ok(html.includes('PlatformCore.connect(GAME_CFG.platform)'), '页面未经 PlatformCore 消费 platform 配置');
   assert.ok(html.includes('<script src="./core/platform.js"></script>'), '页面未引入 core/platform.js');
   const joined = Shell.create(Home.registry(WaterHome.extensions()), { home: cfg.screens.home }).render('home', {}).join('');
-  assert.ok(joined.includes('id="btnAccount"'), '首页缺 account-row 回填锚点');
+  assert.ok(joined.includes('id="btnIdentity"'), '首页缺 identity-row 回填锚点');
+});
+
+test('身份显示：单栏身份行接线齐全，游戏内没有任何本地改名入口', () => {
+  assert.ok(html.includes('<script src="./core/identity.js"></script>'), '页面未引入 core/identity.js');
+  for (const hook of ['IdentityCore.resolve', 'function renderIdentity', "getElementById('btnIdentity')",
+    'IdentityCore.renameUrl', 'IdentityCore.takeRenameFlag', 'IdentityCore.renameOutcome']) {
+    assert.ok(html.includes(hook), '页面缺身份行接线 ' + hook);
+  }
+  /* 定案：改名只能改 run.ceo 上本游戏的云端名称，游戏内不得有输入框/prompt */
+  for (const banned of ['profileInput', 'profileEditTitle', 'normalizeAlias', 'window.prompt', 'renderAccount(']) {
+    assert.ok(!html.includes(banned), '页面仍残留本地改名/旧账号行代码 ' + banned);
+  }
+  /* 改名跳转必须走平台契约参数名，且默认只改本游戏 */
+  const Identity = require('./core/identity.js');
+  const url = Identity.renameUrl({ apex: 'https://run.ceo', slug: 'water-sort', returnTo: 'https://play-water-sort.run.ceo/' });
+  assert.ok(url.startsWith('https://run.ceo/coder/play/nickname?'), '改名地址不是平台改名页');
+  assert.ok(url.includes('scope=perGame'), '改名默认必须是 perGame');
 });
 
 test('water 扩展不与通用模块重名，且页面经 ShellCore 消费、手写首页已移除', () => {

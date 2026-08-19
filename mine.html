@@ -116,8 +116,9 @@
     display:flex; align-items:center; justify-content:center; font-weight:800; flex:none;}
   .profilerow .profileinfo{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px;}
   .profilerow .profilelabel{font-size:12px; color:var(--ink-2); line-height:1.35;}
-  .profilerow .profilename{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .profilerow .profilesource{font-size:12px; color:var(--ink-2); line-height:1.35;}
+  .profilerow .inlinename{display:flex; align-items:baseline; gap:6px; min-width:0;}
+  .profilerow .profilename{flex:0 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .profilerow .profilesource{flex:0 0 auto; font-style:normal; font-size:11px; color:var(--ink-2); line-height:1.35;}
   .langrow{display:flex; align-items:center; justify-content:space-between; background:var(--surface);
     border:1px solid var(--edge); border-radius:12px; padding:10px 12px; font-size:13px; color:var(--ink-2);}
   .sfxbtn{border:1px solid var(--edge); background:transparent; color:var(--ink); border-radius:8px;
@@ -174,11 +175,12 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny"},"fail-revive":{"format":"rewarded","onFail":"retry"},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"langName":"English","title":"Color Mines","logoMain":"Color Mines","logoSub":"COLOR MINES","start":"Play Level","startCost":"Costs {cost} energy · exactly one mine per color / row / column","homeProgress":"Current level","homeClears":"Total clears","homeTools":"Tools","profileLabel":"Player name","player":"Player","profileSource":"This browser","accountLabel":"run.ceo account","sfxLabel":"Sound","sfxOn":"On","sfxOff":"Off","langLabel":"Language","homeHint1":"Click = mark safe · drag = mark multiple · double-click = dig","homeHint2":"Mines never touch; reason before you move","back":"‹ Back","hudLevel":"Level","hudMines":"Mines left","hudTime":"Time","boardAria":"Minesweeper board","toolMine":"Find one mine","toolSafe":"Mark a safe cell","gameHint":"Click = mark safe ✕ (click again to cancel) · drag = mark/unmark · double-click = dig · exactly one mine per color / row / column; mines never touch","energyFull":"Energy full","energyRefill":"+1 energy in {seconds}s","levelFailed":"Could not generate this level","notMine":"Not a mine! {lives} lives left","allMinesFound":"All mines have been found","noSafeCell":"No safe cell left to hint","safeHint":"This cell is not a mine","toolEmptyTitle":"No tools left","toolEmptyBody":"Watch an ad to add {count} “{name}”.","watchAd":"Watch ad +{count}","toolRefilled":"Tool added","cancel":"Cancel","winTitle":"🎉 Level {level} cleared!","winBody":"You found all {count} mines.","nextLevel":"Next level","home":"Home","deadTitle":"💥 No lives left","deadBody":"Watch an ad to revive with 1 life and keep progress, or restart this level.","revive":"Watch ad to revive","restart":"Restart level","timeUpTitle":"⏰ Time's up","timeUpBody":"Watch an ad for +{seconds}s, or restart this level.","watchAdSeconds":"Watch ad +{seconds}s","energyLowTitle":"Not enough energy","energyLowBody":"You have {energy} energy; entering costs {cost}. Watch an ad for +{bonus} energy.","energyAdded":"Energy added","promptName":"Player name (saved on this device only)","exitTitle":"Leave this level?","exitBody":"Progress in this level will be lost. Next time you will restart Level {level}.","exit":"Leave","continue":"Keep playing","authExpired":"Login expired; progress stays on this device","localSave":"Local save","connecting":"Connecting…","loggedIn":"Signed in · cloud sync on","loggedInNamed":"{name} · cloud sync on","loggedOut":"Not signed in · progress stays on this device","login":"Sign in","logout":"Sign out","cloudPromptTitle":"Save progress to the cloud?","cloudPromptBody":"You have cleared {clears} boards. Sign in to run.ceo to sync progress, tools and energy across devices.","later":"Later","platformConnecting":"Connecting to platform…","localOnly":"Cloud save is unavailable here; progress stays on this device","logoutTitle":"Sign out?","logoutBody":"Progress stays on this device and cloud saves are not deleted.","loggedOutToast":"Signed out; progress now stays on this device"},"zh":{"langName":"简体中文","title":"彩色扫雷 · Color Mines","logoMain":"彩色扫雷","logoSub":"COLOR MINES","start":"开始 第","startCost":"消耗 {cost} 体力 · 每种颜色 / 每行 / 每列恰好一颗雷","homeProgress":"当前进度","homeClears":"累计通关","homeTools":"道具","profileLabel":"玩家名称","player":"玩家","profileSource":"网页本地","accountLabel":"run.ceo 账号","sfxLabel":"音效","sfxOn":"开","sfxOff":"关","langLabel":"语言","homeHint1":"单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","homeHint2":"雷与雷互不相邻，先推理再动手","back":"‹ 返回","hudLevel":"关卡","hudMines":"剩余雷","hudTime":"时间","boardAria":"扫雷棋盘","toolMine":"找一个雷","toolSafe":"排一个安全格","gameHint":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开 · 每种颜色 / 每行 / 每列恰好一颗雷，雷与雷互不相邻","energyFull":"体力已满","energyRefill":"+1 体力 {seconds} 秒后","levelFailed":"关卡生成失败","notMine":"不是雷！剩余 {lives} 条命","allMinesFound":"雷已经全部找到了","noSafeCell":"没有可提示的格子了","safeHint":"这个格子不是雷","toolEmptyTitle":"道具用完了","toolEmptyBody":"看一段广告，补 {count} 个「{name}」道具。","watchAd":"看广告 +{count}","toolRefilled":"已补充道具","cancel":"取消","winTitle":"🎉 第 {level} 关通过！","winBody":"全部 {count} 颗雷都找到了。","nextLevel":"下一关","home":"返回首页","deadTitle":"💥 没有生命了","deadBody":"看一段广告复活（恢复 1 条命，进度保留），或重开本关。","revive":"看广告复活","restart":"重开本关","timeUpTitle":"⏰ 时间到","timeUpBody":"看一段广告 +{seconds} 秒继续，或重开本关。","watchAdSeconds":"看广告 +{seconds}s","energyLowTitle":"体力不足","energyLowBody":"当前体力 {energy}，进关需要 {cost}。看一段广告补 {bonus} 体力。","energyAdded":"已补充体力","promptName":"玩家名称（仅保存在本机）","exitTitle":"退出本关？","exitBody":"本关进度不保留，下次从第 {level} 关重新开始。","exit":"退出","continue":"继续玩","authExpired":"登录已过期，进度暂存本机","localSave":"本地存档","connecting":"连接中…","loggedIn":"已登录 · 进度云同步","loggedInNamed":"{name} · 进度云同步","loggedOut":"未登录 · 进度仅存本机","login":"登录","logout":"退出","cloudPromptTitle":"进度存到云端？","cloudPromptBody":"你已通关 {clears} 盘。登录 run.ceo 账号后，进度、道具、体力跨设备同步。","later":"稍后","platformConnecting":"平台连接中…","localOnly":"当前环境不支持云存档，进度保存在本机","logoutTitle":"退出登录？","logoutBody":"本机继续保留当前进度，云端存档不受影响。","loggedOutToast":"已退出，进度改存本机"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"icon":"💣","text":"彩色扫雷","em":"COLOR MINES"}},{"type":"energy","props":{}},{"type":"homestats","props":{"items":[{"id":"homeLv","label":"当前进度","initial":1},{"id":"homeClears","label":"累计通关"},{"id":"homeTools","label":"道具"}]}},{"type":"start-button","props":{"label":"开始 第","small":"消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"}},{"type":"profile-row","props":{}},{"type":"account-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}},{"type":"hintline","props":{"lines":["单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","雷与雷互不相邻，先推理再动手"]}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"level":{"col":"level","merge":"max"},"clears":{"col":"clears","merge":"max"},"toolMine":{"col":"tool_mine","merge":"newest"},"toolSafe":{"col":"tool_safe","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
+<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny"},"fail-revive":{"format":"rewarded","onFail":"retry"},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"langName":"English","title":"Color Mines","logoMain":"Color Mines","logoSub":"COLOR MINES","start":"Play Level","startCost":"Costs {cost} energy · exactly one mine per color / row / column","homeProgress":"Current level","homeClears":"Total clears","homeTools":"Tools","profileLabel":"Player name","player":"Player","profileSource":"This browser","accountLabel":"run.ceo account","sfxLabel":"Sound","sfxOn":"On","sfxOff":"Off","langLabel":"Language","homeHint1":"Click = mark safe · drag = mark multiple · double-click = dig","homeHint2":"Mines never touch; reason before you move","back":"‹ Back","hudLevel":"Level","hudMines":"Mines left","hudTime":"Time","boardAria":"Minesweeper board","toolMine":"Find one mine","toolSafe":"Mark a safe cell","gameHint":"Click = mark safe ✕ (click again to cancel) · drag = mark/unmark · double-click = dig · exactly one mine per color / row / column; mines never touch","energyFull":"Energy full","energyRefill":"+1 energy in {seconds}s","levelFailed":"Could not generate this level","notMine":"Not a mine! {lives} lives left","allMinesFound":"All mines have been found","noSafeCell":"No safe cell left to hint","safeHint":"This cell is not a mine","toolEmptyTitle":"No tools left","toolEmptyBody":"Watch an ad to add {count} “{name}”.","watchAd":"Watch ad +{count}","toolRefilled":"Tool added","cancel":"Cancel","winTitle":"🎉 Level {level} cleared!","winBody":"You found all {count} mines.","nextLevel":"Next level","home":"Home","deadTitle":"💥 No lives left","deadBody":"Watch an ad to revive with 1 life and keep progress, or restart this level.","revive":"Watch ad to revive","restart":"Restart level","timeUpTitle":"⏰ Time's up","timeUpBody":"Watch an ad for +{seconds}s, or restart this level.","watchAdSeconds":"Watch ad +{seconds}s","energyLowTitle":"Not enough energy","energyLowBody":"You have {energy} energy; entering costs {cost}. Watch an ad for +{bonus} energy.","energyAdded":"Energy added","promptName":"Player name (saved on this device only)","exitTitle":"Leave this level?","exitBody":"Progress in this level will be lost. Next time you will restart Level {level}.","exit":"Leave","continue":"Keep playing","authExpired":"Login expired; progress stays on this device","localSave":"Local save","connecting":"Connecting…","loggedIn":"Signed in · cloud sync on","loggedInNamed":"{name} · cloud sync on","loggedOut":"Not signed in · progress stays on this device","login":"Sign in","logout":"Sign out","cloudPromptTitle":"Save progress to the cloud?","cloudPromptBody":"You have cleared {clears} boards. Sign in to run.ceo to sync progress, tools and energy across devices.","later":"Later","platformConnecting":"Connecting to platform…","localOnly":"Cloud save is unavailable here; progress stays on this device","logoutTitle":"Sign out?","logoutBody":"Progress stays on this device and cloud saves are not deleted.","loggedOutToast":"Signed out; progress now stays on this device","me":"Player","idSrcLocal":"This browser","idSrcTemp":"Temporary","idSrcCloud":"run.ceo","idSrcPending":"Checking…","idSubAnon":"Progress stays in this browser","idSubPending":"Checking platform status…","idSubCloud":"Cloud sync on · name and leaderboards match everywhere","idSubCloudTemp":"Cloud sync on · set a real name on run.ceo","idSubExpired":"Session expired · new progress kept in this browser","idSubUnsupported":"Cloud sync unavailable · progress stays in this browser","idActLogin":"Sign in","idActRelogin":"Sign in again","idActRename":"Rename","idPanelTitle":"Account","idPanelSource":"Name source","idPanelSourceCloud":"run.ceo · synced","idPanelSourceLocal":"This browser","idPanelCooldown":"Rename limit","idPanelCooldownVal":"Once every 7 days","idPanelRename":"Rename on run.ceo","idPanelLogout":"Sign out","idRenameNoSlug":"Cannot open the rename page right now. Please try again later.","idRenameApplied":"Rename saved: {name}","idRenameStale":"Rename result unknown · re-open the game to refresh","idRenameUnknown":"Rename result unknown · please try again later","idRenameDegraded":"Rename keeps not taking effect · sign out and sign in again"},"zh":{"langName":"简体中文","title":"彩色扫雷 · Color Mines","logoMain":"彩色扫雷","logoSub":"COLOR MINES","start":"开始 第","startCost":"消耗 {cost} 体力 · 每种颜色 / 每行 / 每列恰好一颗雷","homeProgress":"当前进度","homeClears":"累计通关","homeTools":"道具","profileLabel":"玩家名称","player":"玩家","profileSource":"网页本地","accountLabel":"run.ceo 账号","sfxLabel":"音效","sfxOn":"开","sfxOff":"关","langLabel":"语言","homeHint1":"单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","homeHint2":"雷与雷互不相邻，先推理再动手","back":"‹ 返回","hudLevel":"关卡","hudMines":"剩余雷","hudTime":"时间","boardAria":"扫雷棋盘","toolMine":"找一个雷","toolSafe":"排一个安全格","gameHint":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开 · 每种颜色 / 每行 / 每列恰好一颗雷，雷与雷互不相邻","energyFull":"体力已满","energyRefill":"+1 体力 {seconds} 秒后","levelFailed":"关卡生成失败","notMine":"不是雷！剩余 {lives} 条命","allMinesFound":"雷已经全部找到了","noSafeCell":"没有可提示的格子了","safeHint":"这个格子不是雷","toolEmptyTitle":"道具用完了","toolEmptyBody":"看一段广告，补 {count} 个「{name}」道具。","watchAd":"看广告 +{count}","toolRefilled":"已补充道具","cancel":"取消","winTitle":"🎉 第 {level} 关通过！","winBody":"全部 {count} 颗雷都找到了。","nextLevel":"下一关","home":"返回首页","deadTitle":"💥 没有生命了","deadBody":"看一段广告复活（恢复 1 条命，进度保留），或重开本关。","revive":"看广告复活","restart":"重开本关","timeUpTitle":"⏰ 时间到","timeUpBody":"看一段广告 +{seconds} 秒继续，或重开本关。","watchAdSeconds":"看广告 +{seconds}s","energyLowTitle":"体力不足","energyLowBody":"当前体力 {energy}，进关需要 {cost}。看一段广告补 {bonus} 体力。","energyAdded":"已补充体力","promptName":"玩家名称（仅保存在本机）","exitTitle":"退出本关？","exitBody":"本关进度不保留，下次从第 {level} 关重新开始。","exit":"退出","continue":"继续玩","authExpired":"登录已过期，进度暂存本机","localSave":"本地存档","connecting":"连接中…","loggedIn":"已登录 · 进度云同步","loggedInNamed":"{name} · 进度云同步","loggedOut":"未登录 · 进度仅存本机","login":"登录","logout":"退出","cloudPromptTitle":"进度存到云端？","cloudPromptBody":"你已通关 {clears} 盘。登录 run.ceo 账号后，进度、道具、体力跨设备同步。","later":"稍后","platformConnecting":"平台连接中…","localOnly":"当前环境不支持云存档，进度保存在本机","logoutTitle":"退出登录？","logoutBody":"本机继续保留当前进度，云端存档不受影响。","loggedOutToast":"已退出，进度改存本机","me":"玩家","idSrcLocal":"网页本地","idSrcTemp":"临时","idSrcCloud":"run.ceo","idSrcPending":"检查中…","idSubAnon":"进度只存这个浏览器","idSubPending":"正在检查平台状态…","idSubCloud":"云同步已开 · 名字与排行榜全设备一致","idSubCloudTemp":"云同步已开 · 现在是临时名，去 run.ceo 设置正式名","idSubExpired":"登录已过期 · 新进度暂存在这个浏览器","idSubUnsupported":"不支持云同步 · 进度存在这个浏览器","idActLogin":"登录","idActRelogin":"重新登录","idActRename":"改名","idPanelTitle":"账号","idPanelSource":"名称来源","idPanelSourceCloud":"run.ceo · 云端","idPanelSourceLocal":"本浏览器","idPanelCooldown":"改名限制","idPanelCooldownVal":"7 天一次","idPanelRename":"去 run.ceo 改名","idPanelLogout":"退出登录","idRenameNoSlug":"暂时无法打开改名页，请稍后再试。","idRenameApplied":"改名已更新为：{name}","idRenameStale":"改名结果未知 · 请重新进入游戏查看","idRenameUnknown":"改名结果未知 · 请稍后再试","idRenameDegraded":"改名多次未生效 · 请退出重新登录后再试"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"icon":"💣","text":"彩色扫雷","em":"COLOR MINES"}},{"type":"energy","props":{}},{"type":"homestats","props":{"items":[{"id":"homeLv","label":"当前进度","initial":1},{"id":"homeClears","label":"累计通关"},{"id":"homeTools","label":"道具"}]}},{"type":"start-button","props":{"label":"开始 第","small":"消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"}},{"type":"identity-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}},{"type":"hintline","props":{"lines":["单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","雷与雷互不相邻，先推理再动手"]}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"level":{"col":"level","merge":"max"},"clears":{"col":"clears","merge":"max"},"toolMine":{"col":"tool_mine","merge":"newest"},"toolSafe":{"col":"tool_safe","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
 <script src="./core/shell.js"></script>
 <script src="./core/home.js"></script>
 <script src="./core/reward.js"></script>
 <script src="./core/locale.js"></script>
+<script src="./core/identity.js"></script>
 <script src="./core/platform.js"></script>
 <script src="./mine-engine.js"></script>
 <script src="./mine-levels.js"></script>
@@ -397,13 +399,13 @@
     drag = null;
     if (ev.type === 'pointercancel' || ev.isPrimary === false ||
         (typeof ev.button === 'number' && ev.button !== 0)) {
-      resetTapChain();
+      resetGestureState();   // 必须连 pending 的单击计时器一起清：否则手势取消后仍会冒出「幽灵安全标记」
       return;
     }
     if (S.done || press.moved) return;
     var idx = cellIdxFromPoint(ev);
     if (idx !== press.startIdx) {
-      resetTapChain();
+      resetGestureState();   // 在别的格子抬手＝放弃这次点击，pending 计时器同样要清掉
       return;
     }
     commitTap(press.startIdx);
@@ -579,9 +581,6 @@
       '<small>' + t('startCost', { cost: Reward.E_COST }) + '</small>';
     var homeLabels = document.querySelectorAll('#home .homestats .st span');
     [t('homeProgress'), t('homeClears'), t('homeTools')].forEach(function (text, i) { homeLabels[i].textContent = text; });
-    $('profileLabel').textContent = t('profileLabel');
-    $('profileSource').textContent = t('profileSource');
-    $('accountLabel').textContent = t('accountLabel');
     $('sfxLabel').textContent = t('sfxLabel');
     var homeHint = document.querySelector('#home .hintline');
     homeHint.innerHTML = t('homeHint1') + '<br>' + t('homeHint2');
@@ -604,7 +603,7 @@
     populateLangSel();
     renderHome();
     if (S) renderHud();
-    renderAccount();
+    renderIdentity();
   }
 
   function renderHome() {
@@ -619,8 +618,7 @@
     $('enBar').style.width = Math.min(100, Math.round(save.energy / Reward.E_MAX * 100)) + '%';
     $('enSub').textContent = save.energy >= Reward.E_MAX ? t('energyFull')
       : t('energyRefill', { seconds: Math.max(0, Math.ceil((Reward.E_TICK - (Date.now() - save.lastTs)) / 1000)) });
-    $('profileName').textContent = save.alias || t('player');
-    $('profileAvatar').textContent = (save.alias || t('player')).slice(0, 1);
+    renderIdentity();
     $('sfxToggle').textContent = save.sfx ? t('sfxOn') : t('sfxOff');
     $('sfxToggle').setAttribute('aria-pressed', String(!!save.sfx));
   }
@@ -629,7 +627,7 @@
     stopTimer();
     $('game').hidden = true; $('home').hidden = false;
     renderHome();
-    renderAccount();
+    renderIdentity();
     maybePromptLogin();
   }
   function startGame() {
@@ -650,11 +648,6 @@
     startLevel(save.level);
   }
   $('btnStart').addEventListener('click', startGame);
-  $('btnProfile').addEventListener('click', function () {
-    var name = window.prompt(t('promptName'), save.alias || '');
-    if (name === null) return;
-    save.alias = name.trim().slice(0, 12); persist(); renderHome();
-  });
   $('sfxToggle').addEventListener('click', function () { save.sfx = !save.sfx; persist(); renderHome(); });
   $('langSel').addEventListener('change', function (e) {
     try { localStorage.setItem(LANG_KEY, e.target.value); } catch (err) {}
@@ -669,15 +662,77 @@
 
   /* ============ run.ceo 平台（core/platform.js，SDK §0 两行接入）：云存档 + 登录，匿名可玩优先 ============ */
   var Plat = null, platPrompted = false;
+  var PLAT_EXPIRED = false;
+  var PLAT_LAST_NAME = '';
+  var DEGRADE_KEY = 'mine:renameDegrade';   // 改名降级计数（跨会话持久化，见 settleRenameReturn）
+  var IDENTITY_VIEW = null;
+  var RENAME_BEFORE = '';
+  function tempName() { return save.alias || ''; }
+  function identityState() {
+    return {
+      mode: !Plat ? 'pending' : (Plat.mode === 'online' ? 'online' : 'local'),
+      user: Plat && Plat.mode === 'online' ? Plat.user : null,
+      expired: PLAT_EXPIRED,
+      lastName: PLAT_LAST_NAME,
+      tempName: tempName(),
+      defaultKey: 'me'
+    };
+  }
+  function renderIdentity() {
+    var row = document.getElementById('btnIdentity');
+    if (!row) return;
+    var v = IdentityCore.resolve(identityState());
+    IDENTITY_VIEW = v;
+    var name = v.name || t(v.nameKey || 'me');
+    if (v.nameKind === 'cloud') PLAT_LAST_NAME = name;
+    row.dataset.state = v.state;
+    row.dataset.badge = v.badge;
+    row.dataset.action = v.action.kind;
+    document.getElementById('idName').textContent = name;
+    var avatar = document.getElementById('idAvatar');
+    var avatarText = IdentityCore.avatarChar(name) || (LANG === 'zh' ? '玩' : 'P');
+    if (avatar.firstChild) avatar.firstChild.nodeValue = avatarText;
+    else avatar.textContent = avatarText;
+    document.getElementById('idBadge').textContent = v.badge === 'ok' ? '✓' : (v.badge === 'warn' ? '!' : '');
+    document.getElementById('idSource').textContent = v.sourceKey ? t(v.sourceKey) : '';
+    document.getElementById('idSub').textContent = t(v.subKey);
+    document.getElementById('idAction').textContent = v.action.labelKey ? t(v.action.labelKey) : '';
+  }
+  function platformApex() {
+    var m = /^play-([a-z0-9-]+)\.(.+)$/.exec(location.hostname);
+    return m ? location.protocol + '//' + m[2] + (location.port ? ':' + location.port : '') : location.origin;
+  }
+  function gotoRename() {
+    var slug = Plat && Plat.play && Plat.play.slug;
+    if (!slug) { toast(t('idRenameNoSlug')); return; }
+    try { sessionStorage.setItem('mine:renameFrom', PLAT_LAST_NAME); } catch (e) {}
+    var url = IdentityCore.renameUrl({
+      apex: platformApex(),
+      slug: slug,
+      returnTo: IdentityCore.markReturn(location.href)
+    });
+    location.assign(url);
+  }
+  function openIdentityPanel() {
+    var v = IDENTITY_VIEW || IdentityCore.resolve(identityState());
+    dialog(t('idPanelTitle'),
+      (v.name || t(v.nameKey || 'me')) + '\n' +
+      t('idPanelSource') + ': ' + (v.state === 'cloud' || v.state === 'cloudTemp' ? t('idPanelSourceCloud') : t('idPanelSourceLocal')) + '\n' +
+      t('idPanelCooldown') + ': ' + t('idPanelCooldownVal'),
+      t('idPanelRename'), gotoRename, t('idPanelLogout'), function () {
+        Plat.logout(); Plat.user = null; PLAT_EXPIRED = false; PLAT_LAST_NAME = '';
+        renderIdentity(); toast(t('loggedOutToast'));
+      });
+  }
   function platformSync() {
     if (!Plat || Plat.mode !== 'online' || !Plat.user) return;
     Plat.queueSync(function () { return save; }, {
-      onAuthLost: function () { renderAccount(); toast(t('authExpired')); }
+      onAuthLost: function () { PLAT_EXPIRED = true; renderIdentity(); toast(t('authExpired')); }
     });
   }
   function loadPlatformCloud(session) {
     if (!session || session.mode !== 'online' || !session.user) {
-      renderAccount();
+      renderIdentity();
       return Promise.resolve();
     }
     return session.loadCloud().then(function (row) {
@@ -685,35 +740,12 @@
       var localFresh = (save.clears || 0) === 0 && save.level <= 1;
       var merged = session.core.mergeSave(save, row, { localFresh: localFresh }).save;
       Object.keys(merged).forEach(function (k) { save[k] = merged[k]; });
-      persist(); renderHome(); renderAccount();
-    }).catch(function () { renderAccount(); });
+      persist(); renderHome(); renderIdentity();
+    }).catch(function () { renderIdentity(); });
   }
   function loginPlatform() {
     if (!Plat || Plat.mode !== 'online') return;
     Plat.login(); // SDK 顶层跳转；本页终止，回跳后的新页面由 connect() 恢复用户与云档
-  }
-  function renderAccount() {
-    if (!$('btnAccount')) return;
-    var view = { avatar: '☁', status: t('connecting'), title: t('connecting'), action: '' };
-    if (!Plat || Plat.mode !== 'online') {
-      view.status = Plat ? t('localSave') : t('connecting');
-      view.title = view.status;
-    } else if (Plat.user) {
-      var account = Plat.core.accountPresentation(Plat.user);
-      view.avatar = account.avatar;
-      view.status = account.name ? t('loggedInNamed', { name: account.name }) : t('loggedIn');
-      view.title = account.name || view.status;
-      view.action = t('logout');
-    } else {
-      view.status = t('loggedOut');
-      view.title = view.status;
-      view.action = t('login');
-    }
-    $('accountAvatar').textContent = view.avatar;
-    $('accountStatus').textContent = view.status;
-    $('accountStatus').title = view.title;
-    $('accountAction').textContent = view.action;
-    $('btnAccount').setAttribute('aria-label', t('accountLabel') + ': ' + view.status + (view.action ? ', ' + view.action : ''));
   }
   /* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
   function maybePromptLogin() {
@@ -723,22 +755,71 @@
     dialog(t('cloudPromptTitle'), t('cloudPromptBody', { clears: save.clears || 0 }),
       t('login'), loginPlatform, t('later'), null);
   }
-  $('btnAccount').addEventListener('click', function () {
+  $('btnIdentity').addEventListener('click', function () {
     if (!Plat) { toast(t('platformConnecting')); return; }
     if (Plat.mode !== 'online') { toast(t('localOnly')); return; }
-    if (Plat.user) {
-      dialog(t('logoutTitle'), t('logoutBody'), t('logout'), function () {
-        Plat.logout(); renderAccount(); toast(t('loggedOutToast'));
-      }, t('cancel'), null);
-    } else loginPlatform();
+    var v = IDENTITY_VIEW || IdentityCore.resolve(identityState());
+    if (v.action.kind === 'panel') openIdentityPanel();
+    else if (v.action.kind === 'rename') gotoRename();
+    else if (v.action.kind === 'relogin') Plat.login();
+    else if (v.action.kind === 'login') loginPlatform();
   });
+  var RENAME_RETURNED = false;
+  try {
+    var renameFlag = IdentityCore.takeRenameFlag(location.href);
+    if (renameFlag.renamed) {
+      RENAME_RETURNED = true;
+      try {
+        RENAME_BEFORE = sessionStorage.getItem('mine:renameFrom') || '';
+        sessionStorage.removeItem('mine:renameFrom');
+      } catch (e) {}
+      history.replaceState(null, '', renameFlag.cleanUrl);
+    }
+  } catch (e) { /* file:// / 非 http(s) 页面无回跳场景 */ }
   PlatformCore.connect(CFG.platform).then(function (session) {
     Plat = session;
-    renderAccount();
+    if (PLAT_EXPIRED && session.user) PLAT_EXPIRED = false;
+    renderIdentity();
     if (session.mode !== 'online') return;
-    session.on('authexpired', function () { renderAccount(); });
-    loadPlatformCloud(session);
+    session.on('authexpired', function () { PLAT_EXPIRED = true; renderIdentity(); });
+    loadPlatformCloud(session).then(function () {
+      if (!RENAME_RETURNED) return;
+      settleRenameReturn();
+    });
   });
+  /* 改完名字回到游戏：名字到底变了没必须判定清楚，不许静默当成功。
+     stale/unknown 是「HTTP 正常、无异常、功能却没生效」那类降级——只记一行日志发现不了它常态化，
+     所以计数跨会话持久化，连续到阈值就升级成用户可见的告警提示。 */
+  function readRenameDegrade() {
+    try { return JSON.parse(localStorage.getItem(DEGRADE_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function writeRenameDegrade(state) {
+    try { localStorage.setItem(DEGRADE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function settleRenameReturn() {
+    var after = Plat && Plat.user && typeof Plat.user.name === 'string' ? Plat.user.name : null;
+    var outcome = IdentityCore.renameOutcome({ before: RENAME_BEFORE, after: after });
+    var degrade = IdentityCore.trackRenameDegrade({
+      prev: readRenameDegrade(), outcome: outcome, at: Date.now()
+    });
+    writeRenameDegrade(degrade);
+    if (outcome.warn) {
+      console.warn('[identity] 改名回跳后名字未更新:', {
+        status: outcome.status, before: RENAME_BEFORE, after: after,
+        platMode: Plat ? Plat.mode : 'pending', signedIn: !!(Plat && Plat.user),
+        streak: degrade.streak, total: degrade.total, alert: degrade.alert
+      });
+    }
+    if (outcome.status === 'applied') {
+      PLAT_LAST_NAME = outcome.name || PLAT_LAST_NAME;
+      toast(t('idRenameApplied', { name: outcome.name }));
+    } else {
+      toast(degrade.alert ? t('idRenameDegraded') : t(outcome.msgKey));
+    }
+    renderIdentity();
+    return { outcome: outcome, degrade: degrade };
+  }
+
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden' && Plat && Plat.mode === 'online') Plat.flush(function () { return save; });
   });

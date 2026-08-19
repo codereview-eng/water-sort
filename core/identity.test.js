@@ -183,6 +183,50 @@ test('renameOutcome：回来了但名字没变 → 明确 stale 态，用户可�
   assert.strictEqual(r.warn, true, '这条要能被日志/计数捕获，不是静默降级');
 });
 
+/* ---------------- 降级可观测性：不能只记一行日志，要能看出「是不是常态化了」 ---------------- */
+
+test('trackRenameDegrade：首次降级 → streak/total 起步，未到阈值不告警', () => {
+  const r = Id.trackRenameDegrade({ prev: null, outcome: { status: 'stale', warn: true }, at: 1000 });
+  assert.strictEqual(r.streak, 1);
+  assert.strictEqual(r.total, 1);
+  assert.strictEqual(r.alert, false);
+  assert.strictEqual(r.firstAt, 1000, '要记住第一次降级时间，才能算频率');
+  assert.strictEqual(r.lastStatus, 'stale');
+});
+
+test('trackRenameDegrade：连续降级到阈值 → 反向告警（降级常态化本身就是故障）', () => {
+  let s = null;
+  for (const at of [1000, 2000]) s = Id.trackRenameDegrade({ prev: s, outcome: { status: 'stale', warn: true }, at });
+  assert.strictEqual(s.alert, false, '第 2 次还不该告警');
+  s = Id.trackRenameDegrade({ prev: s, outcome: { status: 'unknown', warn: true }, at: 3000 });
+  assert.strictEqual(s.streak, 3);
+  assert.strictEqual(s.alert, true, '连续 3 次降级必须告警，否则 100% 失败会被当正常降级');
+  assert.strictEqual(s.total, 3);
+  assert.strictEqual(s.firstAt, 1000, '首次时间不能被后续覆盖');
+});
+
+test('trackRenameDegrade：阈值可调（1 次即告警）', () => {
+  const r = Id.trackRenameDegrade({ prev: null, outcome: { status: 'unknown', warn: true }, at: 5, threshold: 1 });
+  assert.strictEqual(r.alert, true);
+});
+
+test('trackRenameDegrade：成功一次清零连续计数，但保留累计数（防偶尔成功洗白常态降级）', () => {
+  let s = null;
+  for (const at of [1, 2, 3]) s = Id.trackRenameDegrade({ prev: s, outcome: { status: 'stale', warn: true }, at });
+  assert.strictEqual(s.alert, true);
+  s = Id.trackRenameDegrade({ prev: s, outcome: { status: 'applied', warn: false, name: '朱克锋' }, at: 4 });
+  assert.strictEqual(s.streak, 0, '成功后连续计数归零');
+  assert.strictEqual(s.alert, false);
+  assert.strictEqual(s.total, 3, '累计降级次数必须保留，否则看不出历史上出过问题');
+  assert.strictEqual(s.lastStatus, 'applied');
+});
+
+test('renameOutcome 的成功结果字段叫 name（页面接线必须读这个，不是 after）', () => {
+  const r = Id.renameOutcome({ before: '玩家3271', after: '朱克锋' });
+  assert.strictEqual(r.name, '朱克锋');
+  assert.strictEqual(r.after, undefined, '不存在 after 字段：接线读 after 会 toast 出 undefined');
+});
+
 test('renameOutcome：拿不到新名字（未登录/读取失败）→ unknown，不谎报成功', () => {
   const r = Id.renameOutcome({ before: '玩家3271', after: null });
   assert.strictEqual(r.status, 'unknown');

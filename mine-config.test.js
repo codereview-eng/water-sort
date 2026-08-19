@@ -913,6 +913,68 @@ test('每种颜色配置唯一淡色底纹，覆盖离散纹理族并由渲染�
     '手机小格中的叉号缺少加粗描边');
 });
 
+/* 改名回跳接线（页面级，非纯函数自证）：
+   纯函数测试全绿也挡不住「页面读了一个不存在的字段」——本轮就出过 outcome.after（实际叫 name），
+   成功改名会 toast 出 undefined。这里把 settleRenameReturn 抽进沙箱真跑一遍。 */
+function renameReturnSandbox(platUser) {
+  const Identity = require('./core/identity.js');
+  const store = new Map();
+  const toasts = [];
+  const sandbox = {
+    IdentityCore: Identity,
+    Plat: { mode: 'online', user: platUser },
+    RENAME_BEFORE: '玩家3271',
+    PLAT_LAST_NAME: '玩家3271',
+    DEGRADE_KEY: 'mine:renameDegrade',
+    Date,
+    JSON,
+    console: { warn() {} },
+    localStorage: {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, v)
+    },
+    toast(msg) { toasts.push(msg); },
+    renderIdentity() {},
+    I18n,          // 真实词典
+    LANG: 'zh'
+  };
+  /* 连页面真实的 t() 一起抽进来：LocaleCore.t 本身不插值，插值逻辑在页面这层，
+     测试桩自己实现插值等于绕开被测代码 */
+  const src = ['t', 'readRenameDegrade', 'writeRenameDegrade', 'settleRenameReturn'].map(htmlFunction).join('\n');
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  return { sandbox, toasts, store };
+}
+
+test('改名成功回跳：提示里必须出现新名字（不能是 undefined），并更新展示名', () => {
+  const { sandbox, toasts } = renameReturnSandbox({ name: '朱克锋' });
+  const r = vm.runInContext('settleRenameReturn()', sandbox);
+  assert.strictEqual(r.outcome.status, 'applied');
+  assert.strictEqual(toasts.length, 1);
+  assert.ok(toasts[0].includes('朱克锋'), '成功提示未包含新名字: ' + toasts[0]);
+  assert.ok(!/undefined/.test(toasts[0]), '成功提示出现 undefined（字段名接错）: ' + toasts[0]);
+  assert.strictEqual(sandbox.PLAT_LAST_NAME, '朱克锋', '展示名未更新');
+});
+
+test('改名未生效：连续降级到阈值后升级为可分辨的告警提示，且计数跨会话累计', () => {
+  const { sandbox, toasts, store } = renameReturnSandbox({ name: '玩家3271' }); // 名字没变 = stale
+  for (let i = 0; i < 3; i += 1) vm.runInContext('settleRenameReturn()', sandbox);
+  const state = JSON.parse(store.get('mine:renameDegrade'));
+  assert.strictEqual(state.streak, 3, '降级必须累计，单条日志看不出常态化');
+  assert.strictEqual(state.total, 3);
+  assert.strictEqual(state.alert, true, '连续降级达阈值必须告警');
+  assert.notStrictEqual(toasts[2], toasts[0], '告警态提示必须与普通降级提示可区分');
+  assert.strictEqual(toasts[2], I18n.t('zh', 'idRenameDegraded'));
+});
+
+test('改名结果未知（未登录/读不到名字）：不谎报成功', () => {
+  const { sandbox, toasts } = renameReturnSandbox(null);
+  const r = vm.runInContext('settleRenameReturn()', sandbox);
+  assert.strictEqual(r.outcome.status, 'unknown');
+  assert.strictEqual(toasts[0], I18n.t('zh', 'idRenameUnknown'));
+  assert.strictEqual(sandbox.PLAT_LAST_NAME, '玩家3271', '结果未知时不得改动展示名');
+});
+
 /* 幽灵安全标记回归（真行为，非源码正则）：
    单击会挂一个 DBL_MS 延迟计时器去标记格子；若第二次手势被取消（pointercancel / 非主指针 /
    右键）或在别的格子抬手，那个计时器必须一并清掉。旧代码只重置双击链、留着计时器，

@@ -802,6 +802,7 @@ const I18N = {
     idRenameGo: '继续', idRenameCancel: '取消', idRenameNoSlug: '暂时无法打开改名页,请稍后再试',
     idRenameApplied: '名字已更新为 {n},所有设备一致', idRenameStale: '改名已提交 · 新名字重新进入游戏后生效',
     idRenameUnknown: '改名结果未知 · 请重新进入游戏查看',
+    idRenameDegraded: '改名多次未生效 · 请退出重新登录后再试',
     idUnsupportedToast: '当前环境不支持云同步,进度存在这个浏览器,名字也改不了',
     idPendingToast: '平台连接中…',
     lbDate: '榜单日期 {d} · 每日刷新', lbOffline: '离线榜单:网络恢复后自动同步', lbMine: '我的成绩',
@@ -884,6 +885,7 @@ const I18N = {
     idRenameGo: 'Continue', idRenameCancel: 'Cancel', idRenameNoSlug: 'Cannot open the rename page right now, please try again later',
     idRenameApplied: 'Name updated to {n} — same on every device', idRenameStale: 'Rename submitted · the new name shows after you re-enter the game',
     idRenameUnknown: 'Rename result unknown · re-enter the game to check',
+    idRenameDegraded: 'Rename keeps not taking effect · sign out and sign in again',
     idUnsupportedToast: 'Cloud sync is unavailable here; progress stays in this browser and the name cannot be changed',
     idPendingToast: 'Connecting to the platform…',
     lbDate: 'Board of {d} · refreshes daily', lbOffline: 'Offline board: syncs once back online', lbMine: 'My score',
@@ -2548,22 +2550,31 @@ function confirmRename() {
 
 /* 改完名字回到游戏:名字到底变了没必须判定清楚,不许静默当成功。
    stale/unknown 都打带原因的 warn 日志 + 计数,并给用户一句能分辨的提示。 */
-var RENAME_STALE_COUNT = 0;
+const DEGRADE_KEY = 'water:renameDegrade';   // 跨会话持久化：内存计数刷新即归零,看不出降级是否常态化
+function readRenameDegrade() {
+  try { return JSON.parse(localStorage.getItem(DEGRADE_KEY) || 'null'); } catch (e) { return null; }
+}
+function writeRenameDegrade(state) {
+  try { localStorage.setItem(DEGRADE_KEY, JSON.stringify(state)); } catch (e) {}
+}
 function settleRenameReturn() {
   let before = '';
   try { before = sessionStorage.getItem('water:renameFrom') || ''; sessionStorage.removeItem('water:renameFrom'); } catch (e) {}
   const after = (Plat && Plat.user && typeof Plat.user.name === 'string') ? Plat.user.name : null;
   const r = IdentityCore.renameOutcome({ before: before, after: after });
+  const degrade = IdentityCore.trackRenameDegrade({ prev: readRenameDegrade(), outcome: r, at: Date.now() });
+  writeRenameDegrade(degrade);
   if (r.warn) {
-    RENAME_STALE_COUNT += 1;
     console.warn('[identity] 改名回跳后名字未更新:', {
       status: r.status, before: before, after: after,
       platMode: Plat ? Plat.mode : 'pending', signedIn: !!(Plat && Plat.user),
-      staleCount: RENAME_STALE_COUNT
+      streak: degrade.streak, total: degrade.total, alert: degrade.alert
     });
   }
-  toast(r.status === 'applied' ? t('idRenameApplied').replace('{n}', r.name) : t(r.msgKey));
+  if (r.status === 'applied') toast(t('idRenameApplied').replace('{n}', r.name));
+  else toast(degrade.alert ? t('idRenameDegraded') : t(r.msgKey));
   renderIdentity();
+  return { outcome: r, degrade: degrade };
 }
 /* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
 function maybePromptLogin() {

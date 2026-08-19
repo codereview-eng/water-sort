@@ -195,9 +195,42 @@
     return { status: 'stale', msgKey: 'idRenameStale', warn: true, name: after };
   }
 
+  /* 改名降级的可观测性核心（本机硬纪律：降级分支必须可计数 + 反向阈值告警）。
+     单条 warn 日志回答不了「最近发生多少次、是不是常态化了」，而改名降级恰恰是
+     「HTTP 正常、无异常抛出、功能却没生效」那一类——只能靠反向阈值发现：
+     连续降级达到阈值本身就是故障信号（多半是平台侧名字刷新一直没生效）。
+
+     纯函数：不碰 storage，由调用方把上次的记录传进来、把返回值存回去，因此可单测。
+     入参 o: { prev: 上次记录|null, outcome: renameOutcome 结果, at: 时间戳, threshold?: 连续几次告警(默认3) }
+     返回: { streak 连续降级次数, total 累计降级次数, firstAt, lastAt, lastStatus, alert 是否该告警 } */
+  function trackRenameDegrade(o) {
+    if (typeof o !== 'object' || o === null) fail('trackRenameDegrade 参数必须是对象');
+    var outcome = o.outcome;
+    if (typeof outcome !== 'object' || outcome === null) fail('trackRenameDegrade 需要 outcome');
+    var prev = (typeof o.prev === 'object' && o.prev !== null) ? o.prev : {};
+    var at = typeof o.at === 'number' ? o.at : 0;
+    var threshold = typeof o.threshold === 'number' && o.threshold > 0 ? o.threshold : 3;
+    var total = typeof prev.total === 'number' && prev.total >= 0 ? prev.total : 0;
+    if (!outcome.warn) {
+      /* 成功一次就把连续计数清零，但保留 total：不然「偶尔成功」会把常态化降级洗白 */
+      return { streak: 0, total: total, firstAt: prev.firstAt || null, lastAt: prev.lastAt || null,
+        lastStatus: outcome.status || 'applied', alert: false };
+    }
+    var streak = (typeof prev.streak === 'number' && prev.streak >= 0 ? prev.streak : 0) + 1;
+    return {
+      streak: streak,
+      total: total + 1,
+      firstAt: prev.firstAt || at || null,
+      lastAt: at || null,
+      lastStatus: outcome.status || 'unknown',
+      alert: streak >= threshold
+    };
+  }
+
   return {
     resolve: resolve,
     avatarChar: avatarChar,
+    trackRenameDegrade: trackRenameDegrade,
     renameUrl: renameUrl,
     markReturn: markReturn,
     takeRenameFlag: takeRenameFlag,

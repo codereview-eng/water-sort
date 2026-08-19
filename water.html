@@ -229,6 +229,20 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
 .profilerow .profilelabel{display:block; font-size:11px; color:var(--ink-3)}
 .profilerow .profilename{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-size:14px; font-weight:600}
 .profilerow .profilesource{color:var(--ink-4); font-size:11px; white-space:nowrap}
+/* 单栏身份行（core/identity.js + home.js 的 identity-row）：一行内只有一个名字。
+   副标题刻意不用 nowrap+ellipsis——「进度存哪 / 去哪改名」是关键语义，截断了等于没说。 */
+.idrow .idnameline{display:flex; align-items:baseline; gap:6px; min-width:0}
+.idrow .idnameline .profilename{flex:0 1 auto}
+.idrow .idsource{flex:0 0 auto; font-style:normal; font-size:10px; color:var(--ink-4); border:1px solid var(--edge); border-radius:4px; padding:0 5px; line-height:1.5}
+.idrow .idsub{display:block; margin-top:2px; font-size:11px; line-height:1.35; color:var(--ink-3); overflow-wrap:break-word}
+.idrow[data-state="cloud"] .idsub, .idrow[data-state="cloudTemp"] .idsub{color:var(--ok)}
+.idrow[data-state="expired"] .idsub{color:var(--warn)}
+.idrow .avatar{position:relative}
+.idrow .idbadge{position:absolute; right:-2px; bottom:-2px; width:13px; height:13px; border-radius:50%; border:2px solid var(--surface); background:var(--ink-4); font-style:normal; font-size:8px; line-height:9px; text-align:center; color:var(--surface)}
+.idrow[data-badge="ok"] .idbadge{background:var(--ok)}
+.idrow[data-badge="warn"] .idbadge{background:var(--warn)}
+.idrow[data-action="login"] .profilesource, .idrow[data-action="rename"] .profilesource{color:var(--accent)}
+.idrow[data-action="relogin"] .profilesource{color:var(--warn)}
 /* ---------- 排行榜 ---------- */
 .lb{width:100%; display:flex; flex-direction:column; gap:10px; padding-top:8px}
 .lb h2{margin:0; font-size:18px; display:flex; justify-content:space-between; align-items:center}
@@ -672,10 +686,11 @@ var SudokuEngine=(function(){
 <script src="./core/reward.js"></script>
 <script src="./reward.js"></script>
 <!-- 首页统一（issue #1）：config 声明 + core 模块渲染，与 mine.html 同款装配 -->
-<script id="gameConfig" type="application/json">{"id":"water","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"undo","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"addBottle","grantOn":[{"trigger":"dailyLogin","qty":1}],"unlock":[{"type":"level","n":3}]}],"weeklyEvent":{"enabled":true,"metric":"clears","period":"weekly","rewards":{"kind":"top10","tiers":[{"coins":100},{"coins":50},{"coins":25}]}},"ads":{"interstitial":{"enabled":true,"everyN":3},"geo":{"DE":{"rewarded":false}},"placements":{"pre-level-interstitial":{"format":"interstitial","capping":{"minIntervalSec":60,"maxPerDay":10}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}}},"lifetimeStats":[{"key":"bottles_poured","event":"pour","agg":"count","label":"倒了多少瓶"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_time_ms","event":"level_cleared","agg":"min","field":"timeMs","unit":"ms"},{"key":"current_streak","event":"streak_changed","agg":"last","field":"current"}],"leaderboards":[{"id":"fastest","metric":"best_time_ms","order":"asc","operator":"best","period":"none"},{"id":"streak_now","metric":"current_streak","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","settings":"Settings","undo":"Undo"},"zh":{"play":"开始","settings":"设置"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"text":"倒水排序","em":"WATER SORT"}},{"type":"energy","props":{}},{"type":"start-button","props":{"label":"开始","small":"消耗 15 体力 · 10 分钟限时"}},{"type":"weekly-event-entry","props":{}},{"type":"leaderboard-entry","props":{"boardId":"fastest"}},{"type":"homestats","props":{"items":[{"id":"stWins","label":"已通关","initial":0},{"id":"stBottles","label":"加瓶道具","initial":2}]}},{"type":"profile-row","props":{}},{"type":"account-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}}]},"result":{"modules":[{"type":"settle-summary"},{"type":"ad-double-button"}]}},"host":{"storagePrefix":"water:"},"save":{"version":1},"streak":{"enabled":true,"claimMode":"ad","policy":{"resetOnLoss":true},"tiers":[{"streak":10,"reward":{"type":"coins","amount":100}}]},"cosmetics":{"catalog":[{"id":"ocean-bg","kind":"background","unlock":[{"type":"level","n":20}]},{"id":"gold-bottle","kind":"skin","price":{"coins":50}}],"themes":{"default":{"bg":"#e8f4ff","piece":"bottle.png","sfx":"pour.mp3"},"sea":{"bg":"#8fd"},"deep":{"bg":"#046"}},"progressBackgrounds":[{"fromLevel":10,"themeId":"sea"},{"fromLevel":20,"themeId":"deep"}]},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"wins":{"col":"wins","merge":"max"},"bottles":{"col":"bottles","merge":"newest"},"undos":{"col":"undos","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
+<script id="gameConfig" type="application/json">{"id":"water","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"undo","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"addBottle","grantOn":[{"trigger":"dailyLogin","qty":1}],"unlock":[{"type":"level","n":3}]}],"weeklyEvent":{"enabled":true,"metric":"clears","period":"weekly","rewards":{"kind":"top10","tiers":[{"coins":100},{"coins":50},{"coins":25}]}},"ads":{"interstitial":{"enabled":true,"everyN":3},"geo":{"DE":{"rewarded":false}},"placements":{"pre-level-interstitial":{"format":"interstitial","capping":{"minIntervalSec":60,"maxPerDay":10}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}}},"lifetimeStats":[{"key":"bottles_poured","event":"pour","agg":"count","label":"倒了多少瓶"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_time_ms","event":"level_cleared","agg":"min","field":"timeMs","unit":"ms"},{"key":"current_streak","event":"streak_changed","agg":"last","field":"current"}],"leaderboards":[{"id":"fastest","metric":"best_time_ms","order":"asc","operator":"best","period":"none"},{"id":"streak_now","metric":"current_streak","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","settings":"Settings","undo":"Undo"},"zh":{"play":"开始","settings":"设置"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"text":"倒水排序","em":"WATER SORT"}},{"type":"energy","props":{}},{"type":"start-button","props":{"label":"开始","small":"消耗 15 体力 · 10 分钟限时"}},{"type":"weekly-event-entry","props":{}},{"type":"leaderboard-entry","props":{"boardId":"fastest"}},{"type":"homestats","props":{"items":[{"id":"stWins","label":"已通关","initial":0},{"id":"stBottles","label":"加瓶道具","initial":2}]}},{"type":"identity-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}}]},"result":{"modules":[{"type":"settle-summary"},{"type":"ad-double-button"}]}},"host":{"storagePrefix":"water:"},"save":{"version":1},"streak":{"enabled":true,"claimMode":"ad","policy":{"resetOnLoss":true},"tiers":[{"streak":10,"reward":{"type":"coins","amount":100}}]},"cosmetics":{"catalog":[{"id":"ocean-bg","kind":"background","unlock":[{"type":"level","n":20}]},{"id":"gold-bottle","kind":"skin","price":{"coins":50}}],"themes":{"default":{"bg":"#e8f4ff","piece":"bottle.png","sfx":"pour.mp3"},"sea":{"bg":"#8fd"},"deep":{"bg":"#046"}},"progressBackgrounds":[{"fromLevel":10,"themeId":"sea"},{"fromLevel":20,"themeId":"deep"}]},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"wins":{"col":"wins","merge":"max"},"bottles":{"col":"bottles","merge":"newest"},"undos":{"col":"undos","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
 <script src="./core/shell.js"></script>
 <script src="./core/home.js"></script>
 <script src="./core/platform.js"></script>
+<script src="./core/identity.js"></script>
 <script src="./water-home.js"></script>
 <script>
 /* ====================== 前 5 关固定盘面(与 levels.js 同源,内联;issue #14/#16) ======================
@@ -769,9 +784,26 @@ const I18N = {
     diffBeginner: '新手', diffEasy: '简单', diffMedium: '中等', diffHard: '困难',
     adDemo: '演示模式:模拟广告播放中…', adFail: '广告未完成,未发放奖励',
     alias: '玩家', me: '我', lbMe: '(我)', lbLoading: '加载中…',
-    profileLabel: '玩家名称', profileWeb: '网页本地 · 点击修改', profileTelegram: 'Telegram',
-    profileEditTitle: '修改玩家名称', profileEditBody: '此名称只保存在当前浏览器,用于排行榜和分享。', profilePlaceholder: '输入玩家名称',
-    profileSave: '保存', profileCancel: '取消', profileSaved: '玩家名称已保存', profileFromTelegram: '名称来自 Telegram 账号',
+    /* 单栏身份行（两栏合一）：名字只有一个,改名一律跳 run.ceo 平台改本游戏云端名称 */
+    idSrcCloud: 'run.ceo', idSrcTemp: '临时名',
+    idSubPending: '正在确认云同步状态 · 进度已存这个浏览器',
+    idSubAnon: '进度只存这个浏览器 · 登录后跨设备同步',
+    idSubCloud: '云同步已开 · 名字与排行榜全设备一致',
+    idSubCloudTemp: '云同步已开 · 现在是临时名,去 run.ceo 设正式名（所有设备通用）',
+    idSubExpired: '登录已过期 · 新进度暂存这个浏览器',
+    idSubUnsupported: '不支持云同步 · 进度存这个浏览器',
+    idActLogin: '登录', idActRelogin: '重新登录', idActRename: '去改名',
+    idPanelTitle: '账号', idPanelName: '显示名称', idPanelSource: '名称来源', idPanelStore: '进度存储',
+    idPanelSourceCloud: 'run.ceo · 本游戏', idPanelSourceTemp: '本机临时名',
+    idPanelStoreCloud: '云端 · 已同步', idPanelStoreLocal: '这个浏览器',
+    idPanelCooldown: '改名限制', idPanelCooldownVal: '7 天一次（平台规定）',
+    idPanelRename: '去 run.ceo 改名（所有设备生效）', idPanelLogout: '退出登录（进度改存这个浏览器）',
+    idRenameTitle: '去 run.ceo 改名', idRenameBody: '改的是 run.ceo 上「本游戏」的名称,所有设备和排行榜都会变。改完自动回到这里,进度不受影响。',
+    idRenameGo: '继续', idRenameCancel: '取消', idRenameNoSlug: '暂时无法打开改名页,请稍后再试',
+    idRenameApplied: '名字已更新为 {n},所有设备一致', idRenameStale: '改名已提交 · 新名字重新进入游戏后生效',
+    idRenameUnknown: '改名结果未知 · 请重新进入游戏查看',
+    idUnsupportedToast: '当前环境不支持云同步,进度存在这个浏览器,名字也改不了',
+    idPendingToast: '平台连接中…',
     lbDate: '榜单日期 {d} · 每日刷新', lbOffline: '离线榜单:网络恢复后自动同步', lbMine: '我的成绩',
     bottleEmptyTitle: '加瓶道具用完了',
     bottleEmptyBody: '看一段广告,获得 <b style="color:var(--podium)">2 个</b>加瓶道具(永久保留)。',
@@ -835,9 +867,25 @@ const I18N = {
     diffBeginner: 'Beginner', diffEasy: 'Easy', diffMedium: 'Medium', diffHard: 'Hard',
     adDemo: 'Demo mode: simulating an ad…', adFail: 'Ad not completed — no reward',
     alias: 'Player ', me: 'Me', lbMe: ' (me)', lbLoading: 'Loading…',
-    profileLabel: 'Player name', profileWeb: 'This browser · tap to edit', profileTelegram: 'Telegram',
-    profileEditTitle: 'Edit player name', profileEditBody: 'This name stays in this browser and is used for leaderboards and sharing.', profilePlaceholder: 'Enter player name',
-    profileSave: 'Save', profileCancel: 'Cancel', profileSaved: 'Player name saved', profileFromTelegram: 'Name comes from your Telegram account',
+    idSrcCloud: 'run.ceo', idSrcTemp: 'Temporary',
+    idSubPending: 'Checking cloud sync · progress is in this browser',
+    idSubAnon: 'Progress stays in this browser · sign in to sync across devices',
+    idSubCloud: 'Cloud sync on · same name everywhere, leaderboards included',
+    idSubCloudTemp: 'Cloud sync on · temporary name, set a real one on run.ceo (used on every device)',
+    idSubExpired: 'Session expired · new progress kept in this browser',
+    idSubUnsupported: 'Cloud sync unavailable · progress stays in this browser',
+    idActLogin: 'Sign in', idActRelogin: 'Sign in again', idActRename: 'Rename',
+    idPanelTitle: 'Account', idPanelName: 'Display name', idPanelSource: 'Name comes from', idPanelStore: 'Progress stored',
+    idPanelSourceCloud: 'run.ceo · this game', idPanelSourceTemp: 'Temporary local name',
+    idPanelStoreCloud: 'Cloud · synced', idPanelStoreLocal: 'This browser',
+    idPanelCooldown: 'Rename limit', idPanelCooldownVal: 'Once every 7 days (platform rule)',
+    idPanelRename: 'Rename on run.ceo (applies everywhere)', idPanelLogout: 'Sign out (progress stays in this browser)',
+    idRenameTitle: 'Rename on run.ceo', idRenameBody: 'You are changing the name for this game on run.ceo. It applies on every device and on leaderboards. You will come back here automatically and your progress is unaffected.',
+    idRenameGo: 'Continue', idRenameCancel: 'Cancel', idRenameNoSlug: 'Cannot open the rename page right now, please try again later',
+    idRenameApplied: 'Name updated to {n} — same on every device', idRenameStale: 'Rename submitted · the new name shows after you re-enter the game',
+    idRenameUnknown: 'Rename result unknown · re-enter the game to check',
+    idUnsupportedToast: 'Cloud sync is unavailable here; progress stays in this browser and the name cannot be changed',
+    idPendingToast: 'Connecting to the platform…',
     lbDate: 'Board of {d} · refreshes daily', lbOffline: 'Offline board: syncs once back online', lbMine: 'My score',
     bottleEmptyTitle: 'Out of extra bottles',
     bottleEmptyBody: 'Watch a short ad to get <b style="color:var(--podium)">2 extra bottles</b> (yours to keep).',
@@ -925,7 +973,9 @@ function applyStaticI18n() {
   q('#btnLb').innerHTML = '<span>' + t('leaderboard') + '</span><span>›</span>';
   q('#stWins').nextElementSibling.textContent = t('wins');
   q('#stBottles').nextElementSibling.textContent = t('bottlesItem');
-  q('#profileLabel').textContent = t('profileLabel');
+  /* 身份行文案不在这里刷:本函数在顶层被同步调用一次(见文件下方 applyStaticI18n() 调用点),
+     那时 Profile / Plat 这些 let 还在 TDZ,renderIdentity() 会抛 ReferenceError 并中断整段脚本
+     (实测崩过:boot、平台连接、事件监听全不执行)。首屏由 renderHome() 渲染,切语言由 applyLang() 补刷。 */
   q('#lbPage h2').innerHTML = t('leaderboard') + '<button id="btnLbBack">' + t('back') + '</button>';
   q('.topbar .title').innerHTML = t('logoMain') + ' <em>' + t('logoSub') + '</em>';
   q('#btnHome').textContent = t('home');
@@ -967,6 +1017,7 @@ function applyLang(lang) {
   document.getElementById('btnLbBack').addEventListener('click', () => show('home'));
   populateLangSel();
   if (typeof pages !== 'undefined') {
+    renderIdentity();   // pages 存在 ⇒ 已 boot 完,此处刷身份行文案是安全的
     if (!pages.home.hidden) renderHome();
     if (!pages.lb.hidden) renderLb();
   }
@@ -1270,20 +1321,19 @@ function myId() {
   return (u && u.id != null && String(u.id)) ||
     ('local:' + ((Profile.state && Profile.state.localId) || 'pending'));
 }
+/* 本机临时名:自动生成、不可编辑(定案:游戏内不提供本地改名)。
+   老用户此前设过的 alias 继续沿用,只是从此不再能改——它现在只是「临时名」。 */
+function tempName() {
+  return (Profile.state && Profile.state.alias) || '';
+}
+/* 名字的唯一优先级链(与 core/identity.js resolve 同一条):
+   run.ceo 本游戏云端名 › 浏览器临时名 › 默认「我」。
+   Telegram 那一路按定案不做——TG 身份只用于存档隔离(myId),不再作为显示名来源。 */
 function myName() {
-  // Telegram 真实昵称:first_name+last_name,退 username;非 TG 环境用本地持久化化名(issue #6)
-  // issue #20:身份来源经 tgUser() 三级兜底
-  const u = tgUser();
-  const tg = u && (((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.username);
-  return tg || (Profile.state && Profile.state.alias) || t('me');
+  const cloud = (Plat && Plat.user && typeof Plat.user.name === 'string') ? Plat.user.name.trim() : '';
+  return cloud || tempName() || t('me');
 }
-function normalizeAlias(value) {
-  return String(value == null ? '' : value)
-    .replace(/\s+/g, ' ')
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .trim()
-    .slice(0, 32);
-}
+
 /* 每日快照纯函数(与 lb.js 同源,内联;issue #11/#24/#25):UTC 日期;Top50 competition ranking;提交池随重算裁剪;
    country 字段与本国过滤(#24);分享文本组装(#25,模板走 I18N.shareTpl) */
 const Lb = (function () {
@@ -1532,11 +1582,7 @@ function renderHome() {
   document.getElementById('startLv').textContent = p.wins + 1;
   document.getElementById('stWins').textContent = p.wins;
   document.getElementById('stBottles').textContent = p.bottles;
-  const u = tgUser();
-  const name = myName();
-  document.getElementById('profileName').textContent = name;
-  document.getElementById('profileAvatar').textContent = Array.from(name)[0] || (LANG === 'zh' ? '玩' : 'P');
-  document.getElementById('profileSource').textContent = u ? t('profileTelegram') : t('profileWeb');
+  renderIdentity();
   // issue #30:每周活动入口(角标 + 主题名 + 碎片数)
   WeeklyCtl.settle();
   const th = Weekly.themeFor(Date.now());
@@ -1544,7 +1590,7 @@ function renderHome() {
   document.getElementById('wkEntryTitle').textContent = t('wkEntry', { theme: (th[LANG] || th.en).name });
   document.getElementById('wkEntrySub').textContent = t('wkEntrySub', { n: Weekly.GRAND.energy });
   document.getElementById('wkEntryFrag').textContent = t('wkFragShort', { n: WeeklyCtl.state ? WeeklyCtl.state.frags : 0 });
-  renderAccount();
+  renderIdentity();
   maybePromptLogin();
   clearInterval(homeTimer);
   if (!pages.home.hidden) homeTimer = setInterval(() => { if (!pages.home.hidden) renderHome(); }, 1000);
@@ -2028,26 +2074,8 @@ document.getElementById('btnBottle').addEventListener('click', () => {
 document.getElementById('btnHome').addEventListener('click', () => { stopTimer(); show('home'); });
 document.getElementById('btnLb').addEventListener('click', () => { show('lb'); renderLb(); });
 document.getElementById('btnLbBack').addEventListener('click', () => show('home'));
-document.getElementById('btnProfile').addEventListener('click', () => {
-  if (tgUser()) { toast(t('profileFromTelegram')); return; }
-  dialog(`<h2>${t('profileEditTitle')}</h2>
-    <p>${t('profileEditBody')}</p>
-    <input id="profileInput" maxlength="32" autocomplete="nickname" aria-label="${t('profilePlaceholder')}" placeholder="${t('profilePlaceholder')}">
-    <button class="btn" id="profileSave">${t('profileSave')}</button>
-    <button class="btn ghost" id="profileCancel">${t('profileCancel')}</button>`);
-  const input = overlay.querySelector('#profileInput');
-  input.value = Profile.state.alias || '';
-  input.focus();
-  const save = () => {
-    const alias = normalizeAlias(input.value);
-    if (!alias) { input.focus(); return; }
-    Profile.mutate((s) => { s.alias = alias; });
-    closeDialog(); renderHome(); toast(t('profileSaved'));
-  };
-  overlay.querySelector('#profileSave').addEventListener('click', save);
-  overlay.querySelector('#profileCancel').addEventListener('click', closeDialog);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-});
+/* 本地改名入口已按定案删除:名字只能在 run.ceo 改「本游戏的云端名称」,
+   入口是单栏身份行(btnIdentity → 账号面板 → 去 run.ceo 改名),游戏内不再有输入框。 */
 // issue #24:Tab 切换(会话内记住选择)
 document.getElementById('lbTabLocal').addEventListener('click', () => { LB_TAB = 'local'; renderLb(); });
 document.getElementById('lbTabGlobal').addEventListener('click', () => { LB_TAB = 'global'; renderLb(); });
@@ -2249,13 +2277,9 @@ function autoSolve() {
   const r = WaterEngine.solve(S.tubes, { capacity: S.capacity });
   if (!r.solvable) return;
   const seq = [];
-  let sim = S.tubes.map((tt) => tt.slice());   // 一次一格玩法:每个整段最优移动要点 amount 次
-      for (const mv of r.moves) {
-        const st = WaterEngine.pour(sim, mv[0], mv[1], S.capacity);
-        const amt = st ? st.amount : 1;
-        for (let k = 0; k < amt; k += 1) seq.push(mv[0], mv[1]);
-        if (st) sim = st.state;
-      }
+  // 整段倒入玩法:一个最优移动=一次点击对(选源+点目标),与 tapTube/S.moves 同口径;
+  // 旧的按 amount 重复点击会在整段倒完后多点出计划外移动,偏离最优路径。
+  for (const mv of r.moves) seq.push(mv[0], mv[1]);
   // 必须等上一步倒水动画放完再点下一下:动画期间 tapTube 会被 S.locked 挡掉,
   // 固定间隔点击会被吞掉一次,后面整条序列错位(源/目标互换,于是出现非法移动)。
   (function step(n) {
@@ -2281,7 +2305,7 @@ function newGame(level) {
   S.unlockedBottles = [];
   S.unlockingBottle = -1;
   S.capacity = lv.capacity;
-  S.par = (() => {   // 一次一格玩法:把求解器整段最优路径换算成格数;生成关(minMoves=null)仍不显示
+  S.par = (() => {   // 步数口径=点击次数:整段倒入算 1 步,与 S.moves++ 完全同口径;生成关(minMoves=null)仍不显示
     if (lv.minMoves == null) return null;
     try {
       const r = WaterEngine.solve(S.start, { capacity: S.capacity });
@@ -2417,27 +2441,129 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 /* ====================== run.ceo 平台（core/platform.js，SDK §0 两行接入）：云存档 + 登录，匿名可玩优先 ====================== */
-let Plat = null, platPrompted = false;
+/* 刻意用 var:这些状态在文件末尾声明,但 applyStaticI18n() 等顶层早期代码会调 renderIdentity()。
+   若用 let,早期调用会踩 TDZ 抛 ReferenceError,整段脚本中断(实测崩过:boot/平台连接/事件监听全不执行)。
+   var 有 hoisting,早期读到 undefined → 身份行落到「平台连接中」态,安全降级。 */
+var Plat = null, platPrompted = false;
 function platformSync() {
   if (!Plat || Plat.mode !== 'online' || !Plat.user) return;
   Plat.queueSync(() => Object.assign({}, Profile.state), {
-    onAuthLost: () => { renderAccount(); toast(LANG === 'zh' ? '登录已过期，进度暂存本机' : 'Login expired, progress saved locally'); }
+    onAuthLost: () => {
+      PLAT_EXPIRED = true; renderIdentity();
+      toast(LANG === 'zh' ? '登录已过期，进度暂存这个浏览器' : 'Session expired; progress kept in this browser');
+    }
   });
 }
-function renderAccount() {
-  if (!document.getElementById('btnAccount')) return;
-  const status = document.getElementById('accountStatus');
-  const action = document.getElementById('accountAction');
-  if (!Plat || Plat.mode !== 'online') {
-    status.textContent = Plat ? (LANG === 'zh' ? '本地存档' : 'Local save') : (LANG === 'zh' ? '连接中…' : 'Connecting…');
-    action.textContent = '';
-  } else if (Plat.user) {
-    status.textContent = LANG === 'zh' ? '已登录 · 进度云同步' : 'Signed in · cloud sync';
-    action.textContent = LANG === 'zh' ? '退出' : 'Sign out';
-  } else {
-    status.textContent = LANG === 'zh' ? '未登录 · 进度仅存本机' : 'Signed out · local only';
-    action.textContent = LANG === 'zh' ? '登录' : 'Sign in';
+/* ---- 单栏身份行:两栏合一后「我是谁 / 进度存哪 / 能做什么」只由 IdentityCore 判定一次 ---- */
+var PLAT_EXPIRED = false;      // authexpired / 401 后置起,重新登录成功清掉（var:同上,防 TDZ）
+var PLAT_LAST_NAME = '';       // 过期时保住上一次显示的名字,避免跳回陌生名
+var IDENTITY_VIEW = null;      // 最近一次 resolve 结果,btnIdentity 按它分派动作
+
+function identityState() {
+  return {
+    mode: !Plat ? 'pending' : (Plat.mode === 'online' ? 'online' : 'local'),
+    user: Plat && Plat.mode === 'online' ? Plat.user : null,
+    expired: PLAT_EXPIRED,
+    lastName: PLAT_LAST_NAME,
+    tempName: tempName(),
+    defaultKey: 'me'
+  };
+}
+
+function renderIdentity() {
+  const row = document.getElementById('btnIdentity');
+  if (!row) return;
+  const v = IdentityCore.resolve(identityState());
+  IDENTITY_VIEW = v;
+  const name = v.name || t(v.nameKey || 'me');
+  row.dataset.state = v.state;
+  row.dataset.badge = v.badge;
+  row.dataset.action = v.action.kind;
+  document.getElementById('idName').textContent = name;
+  document.getElementById('idAvatar').firstChild.nodeValue = IdentityCore.avatarChar(name) || (LANG === 'zh' ? '玩' : 'P');
+  document.getElementById('idBadge').textContent = v.badge === 'ok' ? '✓' : (v.badge === 'warn' ? '!' : '');
+  document.getElementById('idSource').textContent = v.sourceKey ? t(v.sourceKey) : '';
+  document.getElementById('idSub').textContent = t(v.subKey);
+  document.getElementById('idAction').textContent = v.action.labelKey ? t(v.action.labelKey) :
+    (v.action.kind === 'panel' ? '›' : '');
+  if (v.state === 'cloud' || v.state === 'cloudTemp') PLAT_LAST_NAME = name;
+}
+
+/* 平台顶域:play-<slug>.run.ceo → https://run.ceo(SDK 同一推断规则,见 v1.md §0) */
+function platformApex() {
+  const m = /^play-([a-z0-9-]+)\.(.+)$/i.exec(location.hostname);
+  return m ? location.protocol + '//' + m[2] + (location.port ? ':' + location.port : '') : location.origin;
+}
+
+/* 跳转去 run.ceo 改名:游戏内不做改名界面(平台契约禁止游戏源自渲染改名选择器)。
+   slug 取自 play.slug(SDK 单一来源);拿不到就不跳,免得拼出一个走不通的地址。 */
+function gotoRename() {
+  const slug = Plat && Plat.play && Plat.play.slug;
+  if (!slug) { toast(t('idRenameNoSlug')); return; }
+  let url;
+  try {
+    url = IdentityCore.renameUrl({
+      apex: platformApex(),
+      slug: slug,
+      returnTo: IdentityCore.markReturn(location.href)
+    });
+  } catch (err) {
+    console.warn('[identity] renameUrl 拼装失败:', err && err.message, { slug: slug, apex: platformApex() });
+    toast(t('idRenameNoSlug'));
+    return;
   }
+  try { sessionStorage.setItem('water:renameFrom', myName()); } catch (e) {}
+  location.href = url;
+}
+
+function openIdentityPanel() {
+  const v = IDENTITY_VIEW || IdentityCore.resolve(identityState());
+  const cloud = v.state === 'cloud' || v.state === 'cloudTemp';
+  dialog(`<h2>${t('idPanelTitle')}</h2>
+    <p><b>${t('idPanelName')}</b>: ${HomeCore.escapeHtml(v.name || t(v.nameKey || 'me'))}<br>
+    <b>${t('idPanelSource')}</b>: ${cloud && v.nameKind === 'cloud' ? t('idPanelSourceCloud') : t('idPanelSourceTemp')}<br>
+    <b>${t('idPanelStore')}</b>: ${cloud ? t('idPanelStoreCloud') : t('idPanelStoreLocal')}<br>
+    <b>${t('idPanelCooldown')}</b>: ${t('idPanelCooldownVal')}</p>
+    <button class="btn" id="dlgIdRename">${t('idPanelRename')}</button>
+    <button class="btn ghost" id="dlgIdLogout">${t('idPanelLogout')}</button>
+    <button class="btn ghost" id="dlgIdClose">${t('idRenameCancel')}</button>`);
+  overlay.querySelector('#dlgIdRename').addEventListener('click', () => { closeDialog(); confirmRename(); });
+  overlay.querySelector('#dlgIdLogout').addEventListener('click', () => {
+    Plat.logout(); Plat.user = null; PLAT_EXPIRED = false; PLAT_LAST_NAME = '';
+    closeDialog(); renderIdentity();
+    toast(LANG === 'zh' ? '已退出,进度改存这个浏览器' : 'Signed out; progress stays in this browser');
+  });
+  overlay.querySelector('#dlgIdClose').addEventListener('click', closeDialog);
+}
+
+/* 跳走之前先说清会离开游戏、改完自动回来(S9) */
+function confirmRename() {
+  dialog(`<h2>${t('idRenameTitle')}</h2>
+    <p>${t('idRenameBody')}</p>
+    <button class="btn" id="dlgRenameGo">${t('idRenameGo')}</button>
+    <button class="btn ghost" id="dlgRenameCancel">${t('idRenameCancel')}</button>`);
+  overlay.querySelector('#dlgRenameGo').addEventListener('click', () => { closeDialog(); gotoRename(); });
+  overlay.querySelector('#dlgRenameCancel').addEventListener('click', closeDialog);
+}
+
+/* 改完名字回到游戏:名字到底变了没必须判定清楚,不许静默当成功。
+   stale/unknown 都打带原因的 warn 日志 + 计数,并给用户一句能分辨的提示。 */
+var RENAME_STALE_COUNT = 0;
+function settleRenameReturn() {
+  let before = '';
+  try { before = sessionStorage.getItem('water:renameFrom') || ''; sessionStorage.removeItem('water:renameFrom'); } catch (e) {}
+  const after = (Plat && Plat.user && typeof Plat.user.name === 'string') ? Plat.user.name : null;
+  const r = IdentityCore.renameOutcome({ before: before, after: after });
+  if (r.warn) {
+    RENAME_STALE_COUNT += 1;
+    console.warn('[identity] 改名回跳后名字未更新:', {
+      status: r.status, before: before, after: after,
+      platMode: Plat ? Plat.mode : 'pending', signedIn: !!(Plat && Plat.user),
+      staleCount: RENAME_STALE_COUNT
+    });
+  }
+  toast(r.status === 'applied' ? t('idRenameApplied').replace('{n}', r.name) : t(r.msgKey));
+  renderIdentity();
 }
 /* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
 function maybePromptLogin() {
@@ -2451,26 +2577,42 @@ function maybePromptLogin() {
   overlay.querySelector('#dlgPlatLogin').addEventListener('click', () => { closeDialog(); Plat.login(); });
   overlay.querySelector('#dlgPlatLater').addEventListener('click', closeDialog);
 }
-document.getElementById('btnAccount').addEventListener('click', () => {
-  if (!Plat) { toast(LANG === 'zh' ? '平台连接中…' : 'Connecting…'); return; }
-  if (Plat.mode !== 'online') { toast(LANG === 'zh' ? '当前环境不支持云存档，进度保存在本机' : 'Cloud save unavailable here; progress stays local'); return; }
-  if (Plat.user) {
-    dialog(`<h2>${LANG === 'zh' ? '退出登录？' : 'Sign out?'}</h2>
-      <p>${LANG === 'zh' ? '本机继续保留当前进度，云端存档不受影响。' : 'Local progress stays on this device; your cloud save is unaffected.'}</p>
-      <button class="btn" id="dlgPlatOut">${LANG === 'zh' ? '退出' : 'Sign out'}</button>
-      <button class="btn ghost" id="dlgPlatKeep">${LANG === 'zh' ? '取消' : 'Cancel'}</button>`);
-    overlay.querySelector('#dlgPlatOut').addEventListener('click', () => {
-      Plat.logout(); Plat.user = null; closeDialog(); renderAccount();
-      toast(LANG === 'zh' ? '已退出，进度改存本机' : 'Signed out; progress stays local');
-    });
-    overlay.querySelector('#dlgPlatKeep').addEventListener('click', closeDialog);
-  } else Plat.login();
+/* 整行一个可点区域,按 IdentityCore 给出的 action 分派——用户不必猜"点哪半边会发生什么" */
+document.getElementById('btnIdentity').addEventListener('click', () => {
+  const v = IDENTITY_VIEW || IdentityCore.resolve(identityState());
+  switch (v.action.kind) {
+    case 'login':
+    case 'relogin':
+      Plat.login();
+      break;
+    case 'rename':
+      confirmRename();
+      break;
+    case 'panel':
+      openIdentityPanel();
+      break;
+    default:
+      /* pending / unsupported:不给假按钮,但要说清当前是什么情况 */
+      toast(v.state === 'pending' ? t('idPendingToast') : t('idUnsupportedToast'));
+  }
 });
+/* 改名回跳:进页面先认标记并抹掉(避免刷新重复提示),平台连上后再判定名字到底变了没 */
+var RENAME_RETURNED = false;
+try {
+  const flag = IdentityCore.takeRenameFlag(location.href);
+  if (flag.renamed) {
+    RENAME_RETURNED = true;
+    history.replaceState(null, '', flag.cleanUrl);
+  }
+} catch (e) { /* 非 http(s) 面（file://）无回跳场景,忽略 */ }
+
 PlatformCore.connect(GAME_CFG.platform).then((session) => {
   Plat = session;
-  renderAccount();
+  if (PLAT_EXPIRED && session.user) PLAT_EXPIRED = false;   // 重新登录成功,警示态收掉
+  renderIdentity();
+  if (RENAME_RETURNED) settleRenameReturn();
   if (session.mode !== 'online') return;
-  session.on('authexpired', renderAccount);
+  session.on('authexpired', () => { PLAT_EXPIRED = true; renderIdentity(); });
   if (!session.user) return;
   // Profile 异步加载（TG CloudStorage 场景）就绪后再合并云档
   const whenProfile = (fn) => { if (Profile.state) fn(); else setTimeout(() => whenProfile(fn), 100); };
@@ -2481,8 +2623,8 @@ PlatformCore.connect(GAME_CFG.platform).then((session) => {
       const merged = session.core.mergeSave(Profile.state, row, { localFresh }).save;
       Profile.mutate((s) => { Object.keys(merged).forEach((k) => { if (k !== 'localId') s[k] = merged[k]; }); });
       if (!pages.home.hidden) renderHome();
-      renderAccount();
-    }).catch(() => renderAccount());
+      renderIdentity();
+    }).catch(() => renderIdentity());
   });
 });
 

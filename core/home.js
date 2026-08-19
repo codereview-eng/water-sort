@@ -64,15 +64,23 @@
     return '<div class="homestats">' + cells.join('') + '</div>';
   }
 
-  function profileRow(props) {
-    var label = props.label !== undefined ? esc(String(props.label)) : '玩家名称';
-    return '<button class="profilerow" id="btnProfile">' +
-      '<span class="avatar" id="profileAvatar">玩</span>' +
-      '<span class="profileinfo">' +
-      '<span class="profilelabel" id="profileLabel">' + label + '</span>' +
-      '<span class="profilename" id="profileName">玩家</span>' +
+  /* 单栏身份行（core/identity.js 配套，替代原来的 profile-row + account-row 两行）：
+     一行之内三个槽位各有唯一职责——名字（+来源标签）、名字下面那句「进度存哪」、右侧动作。
+     两栏合一的原因见 core/identity.js 头注：原来同一个人显示两个名字、两个动作。
+     文案与状态运行时由游戏侧按 id 回填（idName/idSource/idSub/idAction），本层只出骨架。 */
+  function identityRow() {
+    return '<button class="profilerow idrow" id="btnIdentity">' +
+      '<span class="avatar" id="idAvatar">玩' +
+      '<i class="idbadge" id="idBadge" aria-hidden="true"></i>' +
       '</span>' +
-      '<span class="profilesource" id="profileSource">网页本地</span>' +
+      '<span class="profileinfo">' +
+      '<span class="idnameline">' +
+      '<span class="profilename" id="idName">玩家</span>' +
+      '<i class="idsource" id="idSource"></i>' +
+      '</span>' +
+      '<span class="idsub" id="idSub"></span>' +
+      '</span>' +
+      '<span class="profilesource" id="idAction"></span>' +
       '</button>';
   }
 
@@ -97,31 +105,16 @@
     return '<div class="hintline">' + props.lines.map(function (l) { return esc(String(l)); }).join('<br>') + '</div>';
   }
 
-  /* run.ceo 平台账号行（core/platform.js 配套）：复用 profilerow 结构；
-     登录状态/动作文案运行时由游戏侧按 id 回填（accountStatus/accountAction） */
-  function accountRow(props) {
-    var label = props.label !== undefined ? esc(String(props.label)) : 'run.ceo 账号';
-    return '<button class="profilerow" id="btnAccount">' +
-      '<span class="avatar" id="accountAvatar">☁</span>' +
-      '<span class="profileinfo">' +
-      '<span class="profilelabel" id="accountLabel">' + label + '</span>' +
-      '<span class="profilename" id="accountStatus">未登录</span>' +
-      '</span>' +
-      '<span class="profilesource" id="accountAction">登录</span>' +
-      '</button>';
-  }
-
   /* ---------- 注册表：通用模块 + 游戏扩展合并（重名 fail-fast） ---------- */
   var COMMON = {
     'logo': logo,
     'energy': energy,
     'start-button': startButton,
     'homestats': homestats,
-    'profile-row': profileRow,
+    'identity-row': identityRow,
     'sound-toggle': soundToggle,
     'lang-select': langSelect,
-    'hintline': hintline,
-    'account-row': accountRow
+    'hintline': hintline
   };
 
   function registry(extensions) {

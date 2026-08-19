@@ -175,6 +175,32 @@
         "logoutTitle": "Sign out?",
         "logoutBody": "Progress stays on this device and cloud saves are not deleted.",
         "loggedOutToast": "Signed out; progress now stays on this device"
+        ,"me": "Player"
+        ,"idSrcLocal": "This browser"
+        ,"idSrcTemp": "Temporary"
+        ,"idSrcCloud": "run.ceo"
+        ,"idSrcPending": "Checking…"
+        ,"idSubAnon": "Progress stays in this browser"
+        ,"idSubPending": "Checking platform status…"
+        ,"idSubCloud": "Cloud sync on · name and leaderboards match everywhere"
+        ,"idSubCloudTemp": "Cloud sync on · set a real name on run.ceo"
+        ,"idSubExpired": "Session expired · new progress kept in this browser"
+        ,"idSubUnsupported": "Cloud sync unavailable · progress stays in this browser"
+        ,"idActLogin": "Sign in"
+        ,"idActRelogin": "Sign in again"
+        ,"idActRename": "Rename"
+        ,"idPanelTitle": "Account"
+        ,"idPanelSource": "Name source"
+        ,"idPanelSourceCloud": "run.ceo · synced"
+        ,"idPanelSourceLocal": "This browser"
+        ,"idPanelCooldown": "Rename limit"
+        ,"idPanelCooldownVal": "Once every 7 days"
+        ,"idPanelRename": "Rename on run.ceo"
+        ,"idPanelLogout": "Sign out"
+        ,"idRenameNoSlug": "Cannot open the rename page right now. Please try again later."
+        ,"idRenameApplied": "Rename saved: {name}"
+        ,"idRenameStale": "Rename result unknown · re-open the game to refresh"
+        ,"idRenameUnknown": "Rename result unknown · please try again later"
       },
       "zh": {
         "langName": "简体中文",
@@ -251,6 +277,32 @@
         "logoutTitle": "退出登录？",
         "logoutBody": "本机继续保留当前进度，云端存档不受影响。",
         "loggedOutToast": "已退出，进度改存本机"
+        ,"me": "玩家"
+        ,"idSrcLocal": "网页本地"
+        ,"idSrcTemp": "临时"
+        ,"idSrcCloud": "run.ceo"
+        ,"idSrcPending": "检查中…"
+        ,"idSubAnon": "进度只存这个浏览器"
+        ,"idSubPending": "正在检查平台状态…"
+        ,"idSubCloud": "云同步已开 · 名字与排行榜全设备一致"
+        ,"idSubCloudTemp": "云同步已开 · 现在是临时名，去 run.ceo 设置正式名"
+        ,"idSubExpired": "登录已过期 · 新进度暂存在这个浏览器"
+        ,"idSubUnsupported": "不支持云同步 · 进度存在这个浏览器"
+        ,"idActLogin": "登录"
+        ,"idActRelogin": "重新登录"
+        ,"idActRename": "改名"
+        ,"idPanelTitle": "账号"
+        ,"idPanelSource": "名称来源"
+        ,"idPanelSourceCloud": "run.ceo · 云端"
+        ,"idPanelSourceLocal": "本浏览器"
+        ,"idPanelCooldown": "改名限制"
+        ,"idPanelCooldownVal": "7 天一次"
+        ,"idPanelRename": "去 run.ceo 改名"
+        ,"idPanelLogout": "退出登录"
+        ,"idRenameNoSlug": "暂时无法打开改名页，请稍后再试。"
+        ,"idRenameApplied": "改名已更新为：{name}"
+        ,"idRenameStale": "改名结果未知 · 请重新进入游戏查看"
+        ,"idRenameUnknown": "改名结果未知 · 请稍后再试"
       }
     }
   },
@@ -300,11 +352,7 @@
           }
         },
         {
-          "type": "profile-row",
-          "props": {}
-        },
-        {
-          "type": "account-row",
+          "type": "identity-row",
           "props": {}
         },
         {

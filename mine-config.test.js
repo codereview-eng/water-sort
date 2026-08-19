@@ -323,7 +323,20 @@ async function createPageRuntime(options) {
     console,
     document,
     navigator,
-    location: { search: '?lang=en', protocol: 'https:', origin: 'https://play-color-mines.run.ceo' },
+    location: {
+      search: '?lang=en',
+      protocol: 'https:',
+      hostname: 'play-color-mines.run.ceo',
+      origin: 'https://play-color-mines.run.ceo',
+      href: 'https://play-color-mines.run.ceo/mine.html?lang=en',
+      assign() {}
+    },
+    history: { replaceState() {} },
+    sessionStorage: {
+      getItem(key) { return storage.has('session:' + key) ? storage.get('session:' + key) : null; },
+      setItem(key, value) { storage.set('session:' + key, String(value)); },
+      removeItem(key) { storage.delete('session:' + key); }
+    },
     localStorage: {
       getItem(key) { return storage.has(key) ? storage.get(key) : null; },
       setItem(key, value) { storage.set(key, String(value)); }
@@ -432,11 +445,12 @@ async function createPageRuntime(options) {
     state() { return context.window.__mine.state(); },
     account() {
       return {
-        avatar: elements.accountAvatar.textContent,
-        status: elements.accountStatus.textContent,
-        title: elements.accountStatus.title,
-        action: elements.accountAction.textContent,
-        aria: elements.btnAccount.attributes['aria-label']
+        avatar: elements.idAvatar.firstChild ? elements.idAvatar.firstChild.nodeValue : elements.idAvatar.textContent,
+        name: elements.idName.textContent,
+        source: elements.idSource.textContent,
+        status: elements.idSub.textContent,
+        action: elements.idAction.textContent,
+        state: elements.btnIdentity.dataset.state
       };
     }
   };
@@ -451,8 +465,11 @@ test('screens.home 声明可被 ShellCore+HomeCore 完整渲染且含全部回�
   assert.strictEqual(parts.length, cfg.screens.home.modules.length);
   for (const p of parts) assert.ok(typeof p === 'string' && p.length > 0, '模块渲染产出空 markup');
   const joined = parts.join('');
-  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears', 'homeTools', 'btnProfile', 'sfxToggle', 'langSel', 'langLabel']) {
+  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears', 'homeTools', 'btnIdentity', 'idName', 'idAvatar', 'idSource', 'idSub', 'idAction', 'sfxToggle', 'langSel', 'langLabel']) {
     assert.ok(joined.includes('id="' + id + '"'), '缺回填锚点 ' + id);
+  }
+  for (const gone of ['btnProfile', 'profileLabel', 'btnAccount', 'accountStatus', 'accountAction']) {
+    assert.ok(!joined.includes('id="' + gone + '"'), '首页仍残留旧两栏锚点 ' + gone);
   }
 });
 
@@ -493,15 +510,15 @@ test('真实 HTML 按 script 标签顺序加载，首页锚点只能由 ShellCor
     './core/home.js',
     './core/reward.js',
     './core/locale.js',
+    './core/identity.js',
     './core/platform.js',
     './mine-engine.js',
     './mine-levels.js'
   ]);
   for (const id of [
     'btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears',
-    'homeTools', 'btnProfile', 'profileLabel', 'profileAvatar', 'profileName',
-    'profileSource', 'btnAccount', 'accountLabel', 'accountAvatar', 'accountStatus',
-    'accountAction', 'sfxLabel', 'sfxToggle', 'langLabel', 'langSel'
+    'homeTools', 'btnIdentity', 'idName', 'idAvatar', 'idSource', 'idSub',
+    'idAction', 'sfxLabel', 'sfxToggle', 'langLabel', 'langSel'
   ]) {
     assert.ok(page.document.getElementById(id), 'ShellCore 首页渲染缺入口锚点 ' + id);
   }
@@ -541,56 +558,52 @@ test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json �
   assert.ok(html.includes('PlatformCore.connect(CFG.platform)'), '页面未经 PlatformCore 消费 platform 配置');
   assert.ok(html.includes('<script src="./core/platform.js"></script>'), '页面未引入 core/platform.js');
   const joined = require('./core/shell.js').create(require('./core/home.js').registry(), cfg.screens).render('home', {}).join('');
-  assert.ok(joined.includes('id="btnAccount"'), '首页缺 account-row 回填锚点');
+  assert.ok(joined.includes('id="btnIdentity"'), '首页缺 identity-row 回填锚点');
+  assert.ok(html.includes('<script src="./core/identity.js"></script>'), '页面未引入 core/identity.js');
 });
 
 test('登录账号行经真实页面启动消费 PlatformCore nickname，并随语言入口重渲染', async () => {
   const name = '👩‍💻-' + 'A'.repeat(72);
   const page = await createPageRuntime({ name });
   const en = page.account();
-  assert.strictEqual(en.avatar, '👩‍💻', '账号头像必须来自真实 PlatformCore 完整首字素');
-  assert.strictEqual(en.status, name + ' · cloud sync on', '英文登录态未用 loggedInNamed 插入完整昵称');
-  assert.strictEqual(en.title, name, '英文账号 title 不得截断昵称');
-  assert.strictEqual(en.action, 'Sign out');
-  assert.ok(en.aria.includes(en.status) && en.aria.includes(en.action),
-    '英文账号 aria-label 未包含可见状态与操作');
+  assert.strictEqual(en.avatar, '👩', '账号头像必须来自 IdentityCore 的首码点规则');
+  assert.strictEqual(en.name, name, '英文登录态未展示完整昵称');
+  assert.strictEqual(en.status, 'Cloud sync on · name and leaderboards match everywhere');
+  assert.strictEqual(en.action, '');
 
   page.elements.langSel.value = 'zh';
   page.elements.langSel.dispatch('change', { target: page.elements.langSel });
   const zh = page.account();
-  assert.strictEqual(zh.avatar, '👩‍💻', '切换语言不得改变账号头像');
-  assert.strictEqual(zh.status, name + ' · 进度云同步', '中文登录态未用 loggedInNamed 插入完整昵称');
-  assert.strictEqual(zh.title, name, '中文账号 title 不得截断昵称');
-  assert.strictEqual(zh.action, '退出');
-  assert.ok(zh.aria.includes(zh.status) && zh.aria.includes(zh.action),
-    '中文账号 aria-label 未包含可见状态与操作');
+  assert.strictEqual(zh.avatar, '👩', '切换语言不得改变账号头像');
+  assert.strictEqual(zh.name, name, '中文登录态未展示完整昵称');
+  assert.strictEqual(zh.status, '云同步已开 · 名字与排行榜全设备一致');
+  assert.strictEqual(zh.action, '');
   assert.match(html, /\.profilerow \.profilename\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/,
     '长昵称只能由 CSS 单行视觉省略，DOM 文本必须保持完整');
 });
 
 test('登录跳转终止旧页面；回跳后的新页面从 SDK nickname 恢复云档与同步', async () => {
   const anonymous = await createPageRuntime({ user: null });
-  assert.strictEqual(anonymous.account().status, 'Not signed in · progress stays on this device');
+  assert.strictEqual(anonymous.account().status, 'Progress stays in this browser');
   assert.strictEqual(anonymous.account().action, 'Sign in');
-  anonymous.elements.btnAccount.dispatch('click');
+  anonymous.elements.btnIdentity.dispatch('click');
   assert.strictEqual(anonymous.session.loginCalls, 1, '匿名页必须发起一次 SDK 顶层登录跳转');
-  assert.strictEqual(anonymous.account().status, 'Not signed in · progress stays on this device',
+  assert.strictEqual(anonymous.account().status, 'Progress stays in this browser',
     '旧页面不得依赖永不 resolve 的 login Promise 伪造登录态');
   assert.strictEqual(anonymous.session.loadCloudCalls, 0,
     '旧页面终止前不得提前拉取登录用户云档');
 
   const returned = await createPageRuntime({ user: { name: 'Alice' } });
-  assert.strictEqual(returned.account().status, 'Alice · cloud sync on',
+  assert.strictEqual(returned.account().name, 'Alice',
     '登录回跳后的新页面必须立即展示 SDK nickname');
-  assert.strictEqual(returned.account().title, 'Alice');
-  assert.strictEqual(returned.account().action, 'Sign out');
+  assert.strictEqual(returned.account().action, '');
   assert.strictEqual(returned.session.loadCloudCalls, 1,
     '回跳后的新页面必须拉取一次云档');
   assert.strictEqual(returned.session.syncCalls.length, 1,
     '云档合并落本地后必须触发一次回写同步');
 
   returned.session.emit('authexpired');
-  assert.strictEqual(returned.account().status, 'Not signed in · progress stays on this device',
+  assert.strictEqual(returned.account().status, 'Session expired · new progress kept in this browser',
     '认证失效后账号行必须立即回到退出状态');
 });
 
@@ -898,6 +911,71 @@ test('每种颜色配置唯一淡色底纹，覆盖离散纹理族并由渲染�
   assert.ok(renderBoard.includes('d.style.backgroundSize = texture.size;'), '棋盘未消费底纹尺寸');
   assert.match(html, /\.cell\.safe \.mk::before\{[^}]*font-weight:900;[^}]*-webkit-text-stroke:\.035em currentColor;/s,
     '手机小格中的叉号缺少加粗描边');
+});
+
+/* 幽灵安全标记回归（真行为，非源码正则）：
+   单击会挂一个 DBL_MS 延迟计时器去标记格子；若第二次手势被取消（pointercancel / 非主指针 /
+   右键）或在别的格子抬手，那个计时器必须一并清掉。旧代码只重置双击链、留着计时器，
+   于是用户明明取消了操作，320ms 后格子仍被标成「安全 ✕」——扫雷里会诱导玩家挖到雷上。
+   本测试用假计时器把时间真正推过 DBL_MS，断言 toggleMark 未被调用（旧代码必红）。
+   真页面复验脚本：test/manual/mine-ghost-mark.mjs（CDP 合成真实 PointerEvent）。 */
+function ghostMarkSandbox() {
+  const timers = new Map();
+  let seq = 0;
+  const sandbox = {
+    DBL_MS: 320,
+    clickTimer: null,
+    lastTap: { idx: -1, t: 0 },
+    drag: null,
+    S: { done: false },
+    marked: [],
+    dug: [],
+    setTimeout(fn, ms) { seq += 1; timers.set(seq, { fn, at: ms }); return seq; },
+    clearTimeout(id) { timers.delete(id); },
+    toggleMark(idx) { sandbox.marked.push(idx); },
+    dig(idx) { sandbox.dug.push(idx); return false; },
+    vibrateCorrectMine() {},
+    applyMark() {},
+    cellIdxFromPoint(ev) { return ev.idx; },
+    Date,
+    advance() { Array.from(timers.values()).forEach((t) => t.fn()); timers.clear(); }
+  };
+  const src = ['resetTapChain', 'resetGestureState', 'samePointer', 'commitTap', 'onDragEnd']
+    .map(htmlFunction).join('\n');
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  return sandbox;
+}
+
+test('第二次手势在别的格子抬手：不得留下幽灵安全标记', () => {
+  const sb = ghostMarkSandbox();
+  // 第一次单击格子 3 —— 挂上 320ms 的延迟标记
+  sb.drag = { pointerId: 1, startIdx: 3, moved: false };
+  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 3 })', sb);
+  assert.deepStrictEqual(sb.marked, [], '延迟未到就标记，双击将无法成立');
+  // 第二次按下格子 3，却在格子 4 抬手 = 放弃这次点击
+  sb.drag = { pointerId: 1, startIdx: 3, moved: false };
+  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 4 })', sb);
+  sb.advance(); // 时间推过 DBL_MS
+  assert.deepStrictEqual(sb.marked, [], '取消的手势仍然标记了格子（幽灵安全标记）');
+});
+
+test('第二次手势被系统取消（pointercancel）：不得留下幽灵安全标记', () => {
+  const sb = ghostMarkSandbox();
+  sb.drag = { pointerId: 1, startIdx: 5, moved: false };
+  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 5 })', sb);
+  sb.drag = { pointerId: 1, startIdx: 5, moved: false };
+  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointercancel", isPrimary: true, button: 0, idx: 5 })', sb);
+  sb.advance();
+  assert.deepStrictEqual(sb.marked, [], 'pointercancel 后仍然标记了格子（幽灵安全标记）');
+});
+
+test('正常单击仍然照常标记（防止修复矫枉过正）', () => {
+  const sb = ghostMarkSandbox();
+  sb.drag = { pointerId: 1, startIdx: 7, moved: false };
+  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 7 })', sb);
+  sb.advance();
+  assert.deepStrictEqual(sb.marked, [7], '正常单击应在延迟后标记该格');
 });
 
 test('通关保持游戏页并弹出下一关或返回主页二选一', () => {

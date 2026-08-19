@@ -198,11 +198,7 @@
           }
         },
         {
-          "type": "profile-row",
-          "props": {}
-        },
-        {
-          "type": "account-row",
+          "type": "identity-row",
           "props": {}
         },
         {

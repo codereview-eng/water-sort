@@ -19,6 +19,127 @@
 
   function fail(msg) { throw new Error('platform config: ' + msg); }
 
+  /* 账号 nickname 仅作为文本展示：去掉控制/双向欺骗/default-ignorable/视觉空白，
+     保留可见名称内部合法的 ZWJ/ZWNJ/variation selector，并用 NFC 统一等价字形。 */
+  var UNICODE_MARK = null;
+  var DEFAULT_IGNORABLE = null;
+  var SUBDIVISION_FLAG_TAGS = [
+    [0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067, 0xE007F], // England
+    [0xE0067, 0xE0062, 0xE0073, 0xE0063, 0xE0074, 0xE007F], // Scotland
+    [0xE0067, 0xE0062, 0xE0077, 0xE006C, 0xE0073, 0xE007F]  // Wales
+  ];
+  try { UNICODE_MARK = new RegExp('\\p{Mark}', 'u'); } catch (err) {}
+  try { DEFAULT_IGNORABLE = new RegExp('\\p{Default_Ignorable_Code_Point}', 'u'); } catch (err) {}
+
+  function isGraphemeExtend(ch) {
+    var cp = ch.codePointAt(0);
+    return (UNICODE_MARK && UNICODE_MARK.test(ch)) ||
+      (cp >= 0x0300 && cp <= 0x036F) ||
+      (cp >= 0x1AB0 && cp <= 0x1AFF) ||
+      (cp >= 0x1DC0 && cp <= 0x1DFF) ||
+      (cp >= 0x20D0 && cp <= 0x20FF) ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      (cp >= 0xFE20 && cp <= 0xFE2F) ||
+      (cp >= 0x1F3FB && cp <= 0x1F3FF) ||
+      (cp >= 0xE0020 && cp <= 0xE007F) ||
+      (cp >= 0xE0100 && cp <= 0xE01EF);
+  }
+
+  function isAllowedNameFormat(cp) {
+    return cp === 0x200C || cp === 0x200D ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      (cp >= 0xE0100 && cp <= 0xE01EF);
+  }
+
+  function isDefaultIgnorable(ch) {
+    var cp = ch.codePointAt(0);
+    if (DEFAULT_IGNORABLE) return DEFAULT_IGNORABLE.test(ch);
+    return cp === 0x00AD || cp === 0x034F || cp === 0x061C ||
+      (cp >= 0x115F && cp <= 0x1160) ||
+      (cp >= 0x17B4 && cp <= 0x17B5) ||
+      (cp >= 0x180B && cp <= 0x180F) ||
+      (cp >= 0x200B && cp <= 0x200F) ||
+      (cp >= 0x202A && cp <= 0x202E) ||
+      (cp >= 0x2060 && cp <= 0x206F) ||
+      cp === 0x3164 ||
+      (cp >= 0xFE00 && cp <= 0xFE0F) ||
+      cp === 0xFEFF || cp === 0xFFA0 ||
+      (cp >= 0xFFF0 && cp <= 0xFFF8) ||
+      (cp >= 0x1BCA0 && cp <= 0x1BCA3) ||
+      (cp >= 0x1D173 && cp <= 0x1D17A) ||
+      (cp >= 0xE0000 && cp <= 0xE0FFF);
+  }
+
+  function isUnsafeNameCodePoint(cp) {
+    return (cp >= 0x0000 && cp <= 0x001F) ||
+      (cp >= 0x007F && cp <= 0x009F) ||
+      cp === 0x2028 || cp === 0x2029 || cp === 0x2800 ||
+      (cp >= 0xFFF9 && cp <= 0xFFFB);
+  }
+
+  function isBoundaryInvisible(ch) {
+    var cp = ch.codePointAt(0);
+    return /\s/.test(ch) || isAllowedNameFormat(cp) || isGraphemeExtend(ch);
+  }
+
+  function allowedEmojiTagIndexes(chars) {
+    var allowed = {};
+    for (var i = 0; i < chars.length; i += 1) {
+      if (chars[i].codePointAt(0) !== 0x1F3F4) continue;
+      for (var s = 0; s < SUBDIVISION_FLAG_TAGS.length; s += 1) {
+        var seq = SUBDIVISION_FLAG_TAGS[s];
+        var matches = true;
+        for (var j = 0; j < seq.length; j += 1) {
+          if (!chars[i + j + 1] || chars[i + j + 1].codePointAt(0) !== seq[j]) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) continue;
+        for (var k = 0; k < seq.length; k += 1) allowed[i + k + 1] = true;
+        break;
+      }
+    }
+    return allowed;
+  }
+
+  function normalizeAccountName(value) {
+    if (typeof value !== 'string') return '';
+    var name = value;
+    if (name && typeof name.normalize === 'function') name = name.normalize('NFC');
+    var rawChars = Array.from(name);
+    var allowedTags = allowedEmojiTagIndexes(rawChars);
+    var chars = rawChars.filter(function (ch, index) {
+      var cp = ch.codePointAt(0);
+      if (isUnsafeNameCodePoint(cp)) return false;
+      return !isDefaultIgnorable(ch) || isAllowedNameFormat(cp) || allowedTags[index];
+    });
+    while (chars.length && isBoundaryInvisible(chars[0])) chars.shift();
+    while (chars.length) {
+      var tail = chars[chars.length - 1];
+      if (/\s/.test(tail) || tail === '\u200C' || tail === '\u200D') chars.pop();
+      else break;
+    }
+    name = chars.join('').trim();
+    if (!name) return '';
+    for (var i = 0; i < chars.length; i += 1) {
+      if (!isBoundaryInvisible(chars[i])) return name;
+    }
+    return '';
+  }
+
+  function firstGrapheme(name) {
+    if (!name) return '';
+    try {
+      if (typeof Intl === 'object' && typeof Intl.Segmenter === 'function') {
+        var segments = new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(name);
+        var first = segments[Symbol.iterator]().next();
+        if (!first.done && first.value && first.value.segment) return first.value.segment;
+      }
+    } catch (err) {}
+    return '';
+  }
+
   /* ---------- 纯函数层 ---------- */
 
   function create(cfg) {
@@ -104,27 +225,27 @@
       return (state.clears || 0) >= promptAfter;
     }
 
+    /* 登录账号展示契约：只暴露安全 nickname 与首字素头像，本地化由消费方负责。 */
+    function accountPresentation(user) {
+      var name = normalizeAccountName(user && user.name);
+      return {
+        avatar: firstGrapheme(name) || '☁',
+        name: name
+      };
+    }
+
     return {
       entity: cfg.entity,
       loginPromptAfterClears: promptAfter,
       toRow: toRow,
       fromRow: fromRow,
       mergeSave: mergeSave,
-      shouldPromptLogin: shouldPromptLogin
+      shouldPromptLogin: shouldPromptLogin,
+      accountPresentation: accountPresentation
     };
   }
 
   /* ---------- 浏览器胶水层 ---------- */
-
-  /* 防抖调度的纯函数层（可 Node 测）：返回本次应该等多久再冲刷云端。
-     只有防抖没有上限时会「饿死」——倒水首页每秒结算体力都会调一次 queueSync，
-     每次都把 1.5s 防抖重新计时，于是云端一次都写不进去，道具/进度看着同步其实全丢。
-     这里按 lodash debounce({maxWait}) 的成熟做法加最长等待：从第一次排队算起最多等 maxWaitMs，
-     到点必须冲刷一次，高频写入下也保证「用了道具，几秒内一定落云端」。 */
-  function nextSyncDelay(firstQueuedAt, nowMs, debounceMs, maxWaitMs) {
-    if (!firstQueuedAt) return debounceMs;
-    return Math.max(0, Math.min(debounceMs, firstQueuedAt + maxWaitMs - nowMs));
-  }
 
   /* 同源动态加载 /__sdk/v1.js；非 http(s) 面（file://）或加载失败/超时 → null（降级 local） */
   function loadSdk(opts) {
@@ -159,16 +280,41 @@
         if (!table) return local('ENTITY_UNDECLARED', play.user);
         var rowId = null;
         var timer = null;
-        var firstQueuedAt = 0;   // 本轮防抖第一次排队的时刻（配合 maxWait 防止被高频写入饿死）
+        var currentUser = play.user || null;
+        var authExpiredListeners = [];
+        function setUser(user) {
+          currentUser = user || null;
+          return currentUser;
+        }
+        function emitAuthExpired(payload) {
+          authExpiredListeners.slice().forEach(function (fn) { fn(payload); });
+        }
+        if (typeof play.on === 'function') {
+          play.on('authexpired', function (payload) {
+            setUser(null);
+            emitAuthExpired(payload);
+          });
+        }
         var session = {
           mode: 'online',
           reason: null,
           core: P,
-          user: play.user,
           play: play,
           login: function () { return play.login(); },
-          logout: function () { play.logout(); },
-          on: function (ev, fn) { return play.on(ev, fn); },
+          logout: function () {
+            var result = play.logout();
+            setUser(null);
+            return result;
+          },
+          on: function (ev, fn) {
+            if (ev !== 'authexpired') return play.on(ev, fn);
+            if (typeof fn !== 'function') return function () {};
+            authExpiredListeners.push(fn);
+            return function () {
+              var index = authExpiredListeners.indexOf(fn);
+              if (index !== -1) authExpiredListeners.splice(index, 1);
+            };
+          },
           /* 拉取本玩家最新云档行（owner 隔离由服务端裁决） */
           loadCloud: function () {
             return table.list('-updated_ms', 1).then(function (rows) {
@@ -190,14 +336,9 @@
           queueSync: function (getSave, hooks) {
             hooks = hooks || {};
             if (!session.user) return;
-            var now = Date.now();
-            if (!timer) firstQueuedAt = now;
-            var delay = nextSyncDelay(firstQueuedAt, now,
-              opts.syncDebounceMs || 1500, opts.syncMaxWaitMs || 5000);
             if (timer) clearTimeout(timer);
             timer = setTimeout(function () {
               timer = null;
-              firstQueuedAt = 0;
               Promise.resolve().then(function () { return session.saveCloud(getSave()); })
                 .catch(function (err) {
                   if (err && err.status === 401) {
@@ -207,15 +348,20 @@
                     setTimeout(function () { session.queueSync(getSave, { onAuthLost: hooks.onAuthLost, onError: hooks.onError, __retried: true }); }, 5000);
                   } else if (hooks.onError) hooks.onError(err);
                 });
-            }, delay);
+            }, opts.syncDebounceMs || 1500);
           },
           /* 页面隐藏前尽力冲刷未落的同步 */
           flush: function (getSave) {
             if (!session.user || !timer) return;
-            clearTimeout(timer); timer = null; firstQueuedAt = 0;
+            clearTimeout(timer); timer = null;
             Promise.resolve().then(function () { return session.saveCloud(getSave()); }).catch(function () {});
           }
         };
+        Object.defineProperty(session, 'user', {
+          enumerable: true,
+          get: function () { return currentUser; },
+          set: function (user) { setUser(user); }
+        });
         return session;
       }).catch(function (err) {
         return local((err && err.code) || 'INIT_FAILED');
@@ -223,5 +369,5 @@
     });
   }
 
-  return { create: create, loadSdk: loadSdk, connect: connect, nextSyncDelay: nextSyncDelay };
+  return { create: create, loadSdk: loadSdk, connect: connect };
 });

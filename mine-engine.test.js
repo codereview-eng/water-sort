@@ -68,6 +68,13 @@ test('pickUnfoundMine: 只从未找到的雷里挑,找完返回 -1', () => {
   assert.strictEqual(E.pickUnfoundMine(b, all, rand), -1);
 });
 
+test('pickUnfoundMine: 接受页面运行时使用的 Set', () => {
+  const b = E.generate(5, 99);
+  const all = E.mineIndexes(b);
+  assert.strictEqual(E.pickUnfoundMine(b, new Set(all.slice(0, 4))), all[4]);
+  assert.strictEqual(E.pickUnfoundMine(b, new Set(all)), -1);
+});
+
 test('pickSafeCell: 只挑非雷且未排除的格子,挑光返回 -1', () => {
   const b = E.generate(5, 99);
   const mines = new Set(E.mineIndexes(b));
@@ -79,4 +86,13 @@ test('pickSafeCell: 只挑非雷且未排除的格子,挑光返回 -1', () => {
   assert.strictEqual(E.pickSafeCell(b, allSafe, rand), -1);
   const leftOne = allSafe.slice(1);
   assert.strictEqual(E.pickSafeCell(b, leftOne, rand), allSafe[0]);
+});
+
+test('pickSafeCell: 接受页面运行时使用的 Set', () => {
+  const b = E.generate(5, 99);
+  const mines = new Set(E.mineIndexes(b));
+  const allSafe = [];
+  for (let i = 0; i < 25; i++) if (!mines.has(i)) allSafe.push(i);
+  assert.strictEqual(E.pickSafeCell(b, new Set(allSafe)), -1);
+  assert.strictEqual(E.pickSafeCell(b, new Set(allSafe.slice(1))), allSafe[0]);
 });

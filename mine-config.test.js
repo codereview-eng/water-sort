@@ -7,6 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('node:vm');
 const Shell = require('./core/shell.js');
 const Home = require('./core/home.js');
 const RewardCore = require('./core/reward.js');
@@ -14,11 +15,442 @@ const LocaleCore = require('./core/locale.js');
 
 const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/mine/game.config.json'), 'utf8'));
 const html = fs.readFileSync(path.join(__dirname, 'mine.html'), 'utf8');
+const I18n = LocaleCore.createI18n(cfg.i18n);
 
 function embedded() {
   const m = html.match(/<script id="gameConfig" type="application\/json">([\s\S]*?)<\/script>/);
   assert.ok(m, 'mine.html 缺内嵌 gameConfig JSON 块');
   return JSON.parse(m[1]);
+}
+
+function htmlFunction(name) {
+  const m = html.match(new RegExp('  function ' + name + '\\([^\\n]*\\) \\{[\\s\\S]*?\\n  \\}'));
+  assert.ok(m, 'mine.html 缺函数 ' + name);
+  return m[0].trim();
+}
+
+function htmlArray(name) {
+  const m = html.match(new RegExp('var ' + name + ' = (\\[[\\s\\S]*?\\]);'));
+  assert.ok(m, 'mine.html 缺数组 ' + name);
+  return vm.runInNewContext(m[1]);
+}
+
+function pageScripts() {
+  return Array.from(html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g), match => {
+    const attrs = match[1];
+    const src = attrs.match(/\bsrc=(["'])(.*?)\1/);
+    const type = attrs.match(/\btype=(["'])(.*?)\1/);
+    return {
+      src: src ? src[2] : '',
+      type: type ? type[2] : '',
+      source: match[2]
+    };
+  });
+}
+
+class FakeClassList {
+  constructor(owner) { this.owner = owner; }
+  tokens() { return new Set(String(this.owner.className || '').split(/\s+/).filter(Boolean)); }
+  write(tokens) { this.owner.className = Array.from(tokens).join(' '); }
+  add(...names) {
+    const tokens = this.tokens();
+    names.forEach(name => tokens.add(name));
+    this.write(tokens);
+  }
+  remove(...names) {
+    const tokens = this.tokens();
+    names.forEach(name => tokens.delete(name));
+    this.write(tokens);
+  }
+  toggle(name, force) {
+    const tokens = this.tokens();
+    const add = force === undefined ? !tokens.has(name) : !!force;
+    if (add) tokens.add(name);
+    else tokens.delete(name);
+    this.write(tokens);
+    return add;
+  }
+  contains(name) { return this.tokens().has(name); }
+}
+
+class FakeElement {
+  constructor(tagName, id, document) {
+    this.tagName = String(tagName || 'div').toUpperCase();
+    this.id = id || '';
+    this.ownerDocument = document;
+    this.className = '';
+    this.classList = new FakeClassList(this);
+    this.dataset = {};
+    this.style = {};
+    this.attributes = {};
+    this.children = [];
+    this.childNodes = [];
+    this.listeners = new Map();
+    this.parentNode = null;
+    this.textContent = '';
+    this.title = '';
+    this.hidden = false;
+    this.disabled = false;
+    this.value = '';
+    this.selected = false;
+    this.onclick = null;
+    this.onpointerdown = null;
+    this.queries = new Map();
+    this._innerHTML = '';
+  }
+  set innerHTML(value) {
+    this._innerHTML = String(value);
+    this.children = [];
+    this.childNodes = [];
+    if (this._innerHTML && this.ownerDocument) {
+      this.ownerDocument.mountMarkup(this, this._innerHTML);
+    }
+  }
+  get innerHTML() { return this._innerHTML; }
+  appendChild(child) {
+    child.parentNode = this;
+    this.children.push(child);
+    this.childNodes.push(child);
+    if (child.id) this.ownerDocument.register(child);
+    return child;
+  }
+  contains(node) {
+    if (node === this) return true;
+    return this.children.some(child => child.contains && child.contains(node));
+  }
+  closest(selector) {
+    for (let node = this; node; node = node.parentNode) {
+      if (selector === '.cell' && node.classList && node.classList.contains('cell')) return node;
+    }
+    return null;
+  }
+  querySelector(selector) { return this.queries.get(selector) || null; }
+  setQuery(selector, value) { this.queries.set(selector, value); }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) { return this.attributes[name]; }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  dispatch(type, init) {
+    const event = Object.assign({
+      type,
+      target: this,
+      currentTarget: this,
+      preventDefault() {}
+    }, init || {});
+    const property = this['on' + type];
+    if (typeof property === 'function') property.call(this, event);
+    for (const fn of this.listeners.get(type) || []) fn.call(this, event);
+    return event;
+  }
+}
+
+class FakeDocument {
+  constructor() {
+    this.byId = new Map();
+    this.listeners = new Map();
+    this.queries = new Map();
+    this.queryLists = new Map();
+    this.documentElement = { lang: '' };
+    this.title = '';
+    this.hidden = false;
+    this.pointElement = null;
+  }
+  register(element) {
+    if (element.id) this.byId.set(element.id, element);
+    return element;
+  }
+  mountMarkup(owner, markup) {
+    const tagRe = /<([a-z][\w-]*)\b([^>]*)>/gi;
+    let match;
+    while ((match = tagRe.exec(markup))) {
+      const attrs = match[2];
+      const id = attrs.match(/\bid=(["'])(.*?)\1/);
+      if (!id) continue;
+      const element = new FakeElement(match[1], id[2], this);
+      const className = attrs.match(/\bclass=(["'])(.*?)\1/);
+      if (className) element.className = className[2];
+      owner.appendChild(element);
+    }
+
+    if (owner.id === 'home') {
+      const logo = new FakeElement('div', '', this);
+      const logoEm = new FakeElement('em', '', this);
+      logo.childNodes.push({ nodeValue: '' });
+      logo.appendChild(logoEm);
+      logo.setQuery('em', logoEm);
+      if (/class=(["'])logo\1/.test(markup)) this.queries.set('#home .logo', logo);
+
+      if (/class=(["'])hintline\1/.test(markup)) {
+        this.queries.set('#home .hintline', new FakeElement('div', '', this));
+      }
+      if (/class=(["'])max mono\1/.test(markup)) {
+        this.queries.set('.energy .max', new FakeElement('span', '', this));
+      }
+      const labels = Array.from(markup.matchAll(/<div class=(["'])st\1>[\s\S]*?<span>([\s\S]*?)<\/span><\/div>/g));
+      this.queryLists.set('#home .homestats .st span',
+        labels.map(() => new FakeElement('span', '', this)));
+    }
+
+    if (owner.id === 'btnStart') {
+      const leading = markup.split(/<span\b/i)[0].replace(/<[^>]+>/g, '');
+      owner.childNodes.unshift({ nodeValue: leading });
+      const smallMatch = markup.match(/<small>([\s\S]*?)<\/small>/i);
+      if (smallMatch) {
+        const small = new FakeElement('small', '', this);
+        small.textContent = smallMatch[1];
+        owner.setQuery('small', small);
+      }
+    }
+  }
+  createElement(tagName) { return new FakeElement(tagName, '', this); }
+  getElementById(id) { return this.byId.get(id) || null; }
+  querySelector(selector) { return this.queries.get(selector) || null; }
+  querySelectorAll(selector) { return this.queryLists.get(selector) || []; }
+  elementFromPoint() { return this.pointElement; }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push(fn);
+  }
+  dispatch(type, init) {
+    const event = Object.assign({ type, target: this }, init || {});
+    for (const fn of this.listeners.get(type) || []) fn.call(this, event);
+    return event;
+  }
+}
+
+function makePageDocument() {
+  const document = new FakeDocument();
+  const ids = [
+    'gameConfig',
+    'home', 'game', 'btnBack', 'hearts', 'hudLv', 'hudLeft', 'hudTime', 'board',
+    'toolMine', 'cntMine', 'toolSafe', 'cntSafe', 'toast', 'overlay', 'dlgTitle',
+    'dlgBody', 'dlgMain', 'dlgSub'
+  ];
+  const elements = {};
+  for (const id of ids) elements[id] = document.register(new FakeElement('div', id, document));
+  elements.gameConfig.textContent = JSON.stringify(cfg);
+  elements.home.hidden = false;
+  elements.game.hidden = true;
+
+  function textNode(value) { return { nodeValue: value || '' }; }
+  function decorated(selector) {
+    const root = new FakeElement('div', '', document);
+    const em = new FakeElement('em', '', document);
+    root.childNodes.push(textNode(''));
+    root.appendChild(em);
+    root.setQuery('em', em);
+    document.queries.set(selector, root);
+    return root;
+  }
+  decorated('#game .title');
+  document.queries.set('#game .hintline', new FakeElement('div', '', document));
+  document.queryLists.set('#game .hud .box .k',
+    [0, 1, 2].map(() => new FakeElement('span', '', document)));
+  elements.toolMine.childNodes.push(textNode(''));
+  elements.toolSafe.childNodes.push(textNode(''));
+  return { document, elements };
+}
+
+async function createPageRuntime(options) {
+  options = options || {};
+  const { document, elements } = makePageDocument();
+  const vibrations = [];
+  const storage = new Map();
+  let now = 1000;
+  let nextTimer = 1;
+  const timeouts = new Map();
+  const intervals = new Map();
+  const windowListeners = new Map();
+  const sessionListeners = new Map();
+  const hasInitialUser = Object.prototype.hasOwnProperty.call(options, 'user');
+  const session = {
+    mode: 'online',
+    user: hasInitialUser ? options.user : { name: options.name || 'Alice' },
+    core: null,
+    loadCloudCalls: 0,
+    syncCalls: [],
+    loadCloud() {
+      this.loadCloudCalls += 1;
+      return Promise.resolve(options.cloudRow || null);
+    },
+    saveCloud() { return Promise.resolve(); },
+    queueSync(getSave) { this.syncCalls.push(getSave()); },
+    flush() {},
+    on(event, fn) {
+      sessionListeners.set(event, fn);
+      return function () { sessionListeners.delete(event); };
+    },
+    loginCalls: 0,
+    login() {
+      this.loginCalls += 1;
+      return new Promise(function () {});
+    },
+    logout() { this.user = null; },
+    emit(event, payload) {
+      if (event === 'authexpired') this.user = null;
+      const fn = sessionListeners.get(event);
+      if (fn) fn(payload);
+    }
+  };
+  class FakeDate extends Date {
+    static now() { return now; }
+  }
+  class FakeAudioContext {
+    constructor() { this.currentTime = 0; this.destination = {}; }
+    createOscillator() {
+      return { type: '', frequency: { value: 0 }, connect() {}, start() {}, stop() {} };
+    }
+    createGain() {
+      return {
+        gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect() {}
+      };
+    }
+  }
+  const navigator = { language: 'en-US' };
+  if (options.vibrate !== null) {
+    navigator.vibrate = options.vibrate || function (ms) {
+      vibrations.push(ms);
+      return true;
+    };
+  }
+  const sandbox = {
+    console,
+    document,
+    navigator,
+    location: {
+      search: '?lang=en',
+      protocol: 'https:',
+      hostname: 'play-color-mines.run.ceo',
+      origin: 'https://play-color-mines.run.ceo',
+      href: 'https://play-color-mines.run.ceo/mine.html?lang=en',
+      assign() {}
+    },
+    history: { replaceState() {} },
+    sessionStorage: {
+      getItem(key) { return storage.has('session:' + key) ? storage.get('session:' + key) : null; },
+      setItem(key, value) { storage.set('session:' + key, String(value)); },
+      removeItem(key) { storage.delete('session:' + key); }
+    },
+    localStorage: {
+      getItem(key) { return storage.has(key) ? storage.get(key) : null; },
+      setItem(key, value) { storage.set(key, String(value)); }
+    },
+    Date: FakeDate,
+    AudioContext: FakeAudioContext,
+    webkitAudioContext: FakeAudioContext,
+    prompt() { return null; },
+    setTimeout(fn) {
+      const id = nextTimer++;
+      timeouts.set(id, fn);
+      return id;
+    },
+    clearTimeout(id) { timeouts.delete(id); },
+    setInterval(fn) {
+      const id = nextTimer++;
+      intervals.set(id, fn);
+      return id;
+    },
+    clearInterval(id) { intervals.delete(id); },
+    addEventListener(type, fn) {
+      if (!windowListeners.has(type)) windowListeners.set(type, []);
+      windowListeners.get(type).push(fn);
+    }
+  };
+  sandbox.window = sandbox;
+  sandbox.self = sandbox;
+  sandbox.globalThis = sandbox;
+  const context = vm.createContext(sandbox);
+  const loadedScripts = [];
+  let mainScripts = 0;
+  for (const script of pageScripts()) {
+    if (script.type === 'application/json') continue;
+    if (script.src) {
+      assert.match(script.src, /^\.\//, 'mine.html 外部脚本必须使用仓内相对路径: ' + script.src);
+      const filename = path.resolve(__dirname, script.src);
+      assert.ok(filename.startsWith(__dirname + path.sep), 'mine.html 外部脚本越出仓根: ' + script.src);
+      vm.runInContext(fs.readFileSync(filename, 'utf8'), context, { filename: script.src });
+      loadedScripts.push(script.src);
+      if (!session.core && context.PlatformCore && typeof context.PlatformCore.create === 'function') {
+        const browserPlatform = context.PlatformCore;
+        session.core = browserPlatform.create(cfg.platform);
+        context.PlatformCore = Object.assign({}, browserPlatform, {
+          connect() { return Promise.resolve(session); }
+        });
+      }
+      continue;
+    }
+    if (!script.source.trim()) continue;
+    if (script.source.includes('window.__mine = {') && script.source.includes('boardEl.onpointerdown = onTap')) {
+      mainScripts += 1;
+    }
+    vm.runInContext(script.source, context, { filename: 'mine.html:inline' });
+  }
+  assert.strictEqual(mainScripts, 1, 'mine.html 必须且只能有一个真实主 inline IIFE');
+  assert.ok(session.core, 'mine.html 的真实脚本链未加载 PlatformCore');
+  for (const [id, element] of document.byId) elements[id] = element;
+  await new Promise(resolve => setImmediate(resolve));
+  await Promise.resolve();
+
+  function pointer(type, idx, event) {
+    const board = elements.board;
+    const target = idx == null ? null : board.children[idx];
+    document.pointElement = event && Object.prototype.hasOwnProperty.call(event, 'pointTarget')
+      ? event.pointTarget
+      : target;
+    const init = Object.assign({
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: idx == null ? -1 : idx,
+      clientY: 0,
+      target
+    }, event || {});
+    delete init.pointTarget;
+    if (type === 'pointerdown') return board.dispatch(type, init);
+    return document.dispatch(type, init);
+  }
+
+  return {
+    context,
+    document,
+    elements,
+    loadedScripts,
+    vibrations,
+    session,
+    advance(ms) { now += ms; },
+    flushTimeouts() {
+      const callbacks = Array.from(timeouts.values());
+      timeouts.clear();
+      callbacks.forEach(fn => fn());
+    },
+    start() {
+      elements.btnStart.dispatch('click');
+      assert.strictEqual(typeof elements.board.onpointerdown, 'function',
+        '页面启动后未安装 board pointerdown');
+      for (const type of ['pointermove', 'pointerup', 'pointercancel']) {
+        assert.ok((document.listeners.get(type) || []).length > 0,
+          '页面启动后未安装 document ' + type);
+      }
+      assert.ok(context.window.__mine && typeof context.window.__mine.solve === 'function',
+        '页面启动后未安装 window.__mine');
+    },
+    pointer,
+    state() { return context.window.__mine.state(); },
+    account() {
+      return {
+        avatar: elements.idAvatar.firstChild ? elements.idAvatar.firstChild.nodeValue : elements.idAvatar.textContent,
+        name: elements.idName.textContent,
+        source: elements.idSource.textContent,
+        status: elements.idSub.textContent,
+        action: elements.idAction.textContent,
+        state: elements.btnIdentity.dataset.state
+      };
+    }
+  };
 }
 
 test('mine.html 内嵌 GameConfig 与 games/mine/game.config.json 逐字段一致', () => {

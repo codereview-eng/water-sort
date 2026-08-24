@@ -50,11 +50,12 @@ console.log('index.html ' + (Buffer.byteLength(inlined) / 1024).toFixed(0) + ' K
   + (bytes / 1048576).toFixed(3) + ' MiB → /tmp/cm-publish-payload.json');
 if (bytes > 1048576) throw new Error('payload 超 1 MiB，需要瘦身');
 /* 4) 关键内容自检：新代码确实进了产物 */
-const MARKERS = ['StockCore', 'nextSyncDelay', 'tool_mine_spent', 'Array.from(S.found)', 'cheer()',
+const MARKERS = ['StockCore', 'err.retryable && !hooks.__retried', 'tool_mine_spent', 'Array.from(S.found)', 'cheer()',
   'CoinsCore', 'coins_earned', 'homeCoins',
   'LocaleCore.createI18n(CFG.i18n)', 'LocaleCore.resolveLang(', 'applyStaticI18n', 'langName',
   'Stock.reconcile(save, onDisk)',
-  'WeeklyCore.create(CFG.weekly)', 'AdPlayCore.create(', 'function watchAdFor', 'core/adplay.js'];
+  'WeeklyCore.create(CFG.weekly)', 'AdPlayCore.create(', 'function watchAdFor', 'core/adplay.js',
+  'WinStreakCore.create(CFG.winstreak', 'streak-keep', 'streak-claim'];
 for (const marker of MARKERS) {
   if (!inlined.includes(marker)) throw new Error('产物缺少本次修复标记: ' + marker);
 }

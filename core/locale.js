@@ -69,6 +69,45 @@
     return m ? m[1].toUpperCase() : null;
   }
 
+  /* ---- 语言选择：把「用哪种语言」这条决策链做成一份共用代码 ----
+     优先级（与 water.html 既有实现同源，抽到 core 供两个游戏共用）：
+       ?lang=xx 调试参数（最高，仅本次会话，不写持久化）
+       → saved 手动选择（持久化）
+       → Telegram 客户端语言
+       → 浏览器语言
+       → 默认语言
+     available = 可用语言标签数组（取自 i18n 字典键）。
+     匹配规则同 RFC 4647 lookup：先精确命中，再按基础语言（截断区域）命中，
+     所以 'zh-CN' 能落到 'zh'、'en-US' 能落到 'en'。 */
+  function matchLang(want, available) {
+    if (!want) return null;
+    var tag = String(want);
+    if (available.indexOf(tag) !== -1) return tag;
+    var base = tag.split(/[-_]/)[0].toLowerCase();
+    for (var i = 0; i < available.length; i++) {
+      if (String(available[i]).split(/[-_]/)[0].toLowerCase() === base) return available[i];
+    }
+    return null;
+  }
+
+  function resolveLang(inputs, available, def) {
+    inputs = inputs || {};
+    if (!Array.isArray(available) || available.length === 0) fail('resolveLang: available 必须是非空数组');
+    if (available.indexOf(def) === -1) fail('resolveLang: 默认语言 "' + def + '" 不在 available 里');
+    var q = /[?&]lang=([A-Za-z-]+)/.exec(inputs.search || '');
+    var chain = [q && q[1], inputs.saved, inputs.tgLanguageCode, inputs.navigatorLanguage];
+    for (var i = 0; i < chain.length; i++) {
+      var hit = matchLang(chain[i], available);
+      if (hit) return hit;
+    }
+    return def;
+  }
+
+  /* HTML lang 属性值：zh → zh-CN，其它原样（给 <html lang> 用，影响字体/断行/朗读） */
+  function htmlLang(tag) {
+    return String(tag) === 'zh' ? 'zh-CN' : String(tag);
+  }
+
   function resolveCountry(inputs) {
     inputs = inputs || {};
     if (inputs.override) return String(inputs.override).toUpperCase();
@@ -102,6 +141,9 @@
     createI18n: createI18n,
     resolveCountry: resolveCountry,
     createGeoAllow: createGeoAllow,
-    GEO_MODES: GEO_MODES
+    GEO_MODES: GEO_MODES,
+    resolveLang: resolveLang,
+    matchLang: matchLang,
+    htmlLang: htmlLang
   };
 });

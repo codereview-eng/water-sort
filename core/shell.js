@@ -48,7 +48,8 @@
       render: function (screen, ctx) {
         var sc = screensCfg[screen];
         if (!sc) throw new Error('shell: 未声明 screen "' + screen + '"');
-        return sc.modules.map(function (m) { return registry.get(m.type)(m.props || {}, ctx); });
+        // 第三个参数传注册表本身：容器类模块（如 row）据此递归渲染子模块
+        return sc.modules.map(function (m) { return registry.get(m.type)(m.props || {}, ctx, registry); });
       }
     };
   }

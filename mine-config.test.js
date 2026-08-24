@@ -12,9 +12,6 @@ const Shell = require('./core/shell.js');
 const Home = require('./core/home.js');
 const RewardCore = require('./core/reward.js');
 const LocaleCore = require('./core/locale.js');
-const PlatformCore = require('./core/platform.js');
-const MineEngine = require('./mine-engine.js');
-const MineLevels = require('./mine-levels.js');
 
 const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/mine/game.config.json'), 'utf8'));
 const html = fs.readFileSync(path.join(__dirname, 'mine.html'), 'utf8');
@@ -465,82 +462,87 @@ test('screens.home 声明可被 ShellCore+HomeCore 完整渲染且含全部回�
   assert.strictEqual(parts.length, cfg.screens.home.modules.length);
   for (const p of parts) assert.ok(typeof p === 'string' && p.length > 0, '模块渲染产出空 markup');
   const joined = parts.join('');
-  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears', 'homeTools', 'btnIdentity', 'idName', 'idAvatar', 'idSource', 'idSub', 'idAction', 'sfxToggle', 'langSel', 'langLabel']) {
+  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears', 'btnBag',
+    'btnIdentity', 'idAvatar', 'idBadge', 'idName', 'idSource', 'idSub', 'idAction', 'sfxToggle']) {
     assert.ok(joined.includes('id="' + id + '"'), '缺回填锚点 ' + id);
   }
-  for (const gone of ['btnProfile', 'profileLabel', 'btnAccount', 'accountStatus', 'accountAction']) {
-    assert.ok(!joined.includes('id="' + gone + '"'), '首页仍残留旧两栏锚点 ' + gone);
+  for (const oldId of ['btnProfile', 'accountStatus', 'accountAction']) {
+    assert.ok(!joined.includes('id="' + oldId + '"'), '首页仍残留旧身份锚点 ' + oldId);
   }
+  // 道具格改成图标按钮：首页不再显示道具数量（数量在背包窗口里看）
+  assert.ok(!joined.includes('id="homeTools"'), '首页仍残留旧的道具数量格 homeTools');
+  assert.ok(/<button[^>]*id="btnBag"/.test(joined), '道具格必须是可点按钮（不是静态数值格）');
+  assert.ok(/id="btnBag"[\s\S]*?class="sticon"/.test(joined), '道具按钮必须带图标');
 });
 
-test('i18n 配置覆盖顾客可见核心文案，且 en/zh 均有完整值', () => {
-  const I18n = LocaleCore.createI18n(cfg.i18n);
-  assert.deepStrictEqual(I18n.locales().sort(), ['en', 'zh']);
-  const required = [
-    'langName', 'title', 'logoMain', 'logoSub', 'start', 'startCost',
-    'homeProgress', 'homeClears', 'homeTools', 'profileLabel', 'player',
-    'profileSource', 'sfxLabel', 'sfxOn', 'sfxOff', 'langLabel',
-    'homeHint1', 'homeHint2', 'back', 'hudLevel', 'hudMines', 'hudTime',
-    'boardAria', 'toolMine', 'toolSafe', 'gameHint', 'energyFull',
-    'energyRefill', 'notMine', 'safeHint', 'accountLabel', 'loggedIn',
-    'loggedInNamed', 'loggedOut', 'login', 'logout'
-  ];
-  for (const locale of ['en', 'zh']) {
-    for (const key of required) {
-      assert.strictEqual(typeof cfg.i18n.locales[locale][key], 'string', locale + ' 缺 i18n key ' + key);
-      assert.ok(cfg.i18n.locales[locale][key].length > 0, locale + ' i18n key 为空 ' + key);
+test('道具元数据齐全：背包窗口能显示每个道具的图标/名称/说明', () => {
+  const items = cfg.stock.items;
+  for (const [key, it] of Object.entries(items)) {
+    assert.ok(typeof it.icon === 'string' && it.icon, `stock.items.${key} 缺 icon（背包窗口要显示）`);
+    assert.ok(typeof it.name === 'string' && it.name, `stock.items.${key} 缺 name`);
+    assert.ok(typeof it.desc === 'string' && it.desc, `stock.items.${key} 缺 desc（说明这道具干什么用）`);
+  }
+  // 页面必须真的接线：按钮 → 打开背包 → 用 Stock.list 取清单
+  const html = fs.readFileSync(path.join(__dirname, 'mine.html'), 'utf8');
+  assert.ok(html.includes("$('btnBag').addEventListener('click', openBag)"), '道具按钮没接上打开背包');
+  assert.ok(/function openBag\(\)[\s\S]{0,900}Stock\.list\(save, \[Coins\.coinsKey\]\)/.test(html),
+    '背包必须用 Stock.list 取清单并排除金币');
+});
+
+/* ---- 多语言（core/locale.js 共用能力 + 页面接线 + 反硬编码门禁）---- */
+const htmlSrc = () => fs.readFileSync(path.join(__dirname, 'mine.html'), 'utf8');
+
+test('i18n 字典过 LocaleCore 校验，且各语言 key 集合完全一致（防漏翻）', () => {
+  assert.ok(cfg.i18n, 'config 缺 i18n 段');
+  const i18n = LocaleCore.createI18n(cfg.i18n);       // 内含「默认语言必须全量」校验
+  const langs = i18n.locales();
+  assert.ok(langs.length >= 2, '至少要有两种语言，实际：' + langs.join(','));
+  const base = Object.keys(cfg.i18n.locales[cfg.i18n.default]).sort();
+  for (const lang of langs) {
+    const keys = Object.keys(cfg.i18n.locales[lang]).sort();
+    assert.deepStrictEqual(keys, base, `语言 ${lang} 的 key 集合与默认语言不一致（漏翻或多写）`);
+  }
+  // 占位符必须两侧一致，否则插值会失效
+  for (const key of base) {
+    const want = (cfg.i18n.locales[cfg.i18n.default][key].match(/\{\w+\}/g) || []).sort();
+    for (const lang of langs) {
+      const got = (cfg.i18n.locales[lang][key].match(/\{\w+\}/g) || []).sort();
+      assert.deepStrictEqual(got, want, `key "${key}" 在 ${lang} 里的占位符与默认语言不一致`);
     }
   }
 });
 
-test('mine.html 消费 LocaleCore 并接通语言选择、即时切换和本地持久化', () => {
-  assert.ok(html.includes('<script src="./core/locale.js"></script>'), '页面未加载 core/locale.js');
-  assert.ok(html.includes('LocaleCore.createI18n(CFG.i18n)'), '页面未消费 GameConfig i18n');
-  assert.ok(html.includes("var LANG_KEY = 'mine_lang'"), '页面未声明独立语言持久化键');
-  assert.ok(html.includes("$('langSel').addEventListener('change'"), '语言选择器未绑定 change');
-  assert.ok(html.includes('function populateLangSel()'), '页面未从配置生成语言选项');
-  assert.ok(html.includes('function applyLang(lang)'), '页面未实现即时整页语言切换');
-  assert.ok(html.includes('document.documentElement.lang'), '切换语言未同步 html lang');
+test('页面真的接了 i18n：走 core/locale.js，不自造第二套实现', () => {
+  const html = htmlSrc();
+  assert.ok(html.includes('./core/locale.js'), '没引入 core/locale.js');
+  assert.ok(html.includes('LocaleCore.createI18n(CFG.i18n)'), '没用 core 建 i18n 实例');
+  assert.ok(html.includes('LocaleCore.resolveLang('), '语言选择没走 core 的 resolveLang（禁止各写一套）');
+  assert.ok(html.includes('function applyStaticI18n'), '缺静态文案回填');
+  assert.ok(html.includes('function setLang'), '缺语言切换');
+  // 切换语言会重建首页 DOM，必须重绑事件——漏了按钮全成死的（本轮真跑抓到过）
+  assert.ok(/function setLang[\s\S]{0,600}buildHome\(\); bindHome\(\);/.test(html),
+    'setLang 必须在重建 DOM 后重绑事件');
+  // 语言下拉走 core 内置模块，不自己拼 HTML
+  assert.ok(cfg.screens.home.modules.some((m) => m.type === 'lang-select'), '首页缺 lang-select 模块');
 });
 
-test('真实 HTML 按 script 标签顺序加载，首页锚点只能由 ShellCore 渲染结果生成', async () => {
-  const page = await createPageRuntime();
-  assert.deepStrictEqual(page.loadedScripts, [
-    './core/shell.js',
-    './core/home.js',
-    './core/reward.js',
-    './core/locale.js',
-    './core/identity.js',
-    './core/platform.js',
-    './mine-engine.js',
-    './mine-levels.js'
-  ]);
-  for (const id of [
-    'btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears',
-    'homeTools', 'btnIdentity', 'idName', 'idAvatar', 'idSource', 'idSub',
-    'idAction', 'sfxLabel', 'sfxToggle', 'langLabel', 'langSel'
-  ]) {
-    assert.ok(page.document.getElementById(id), 'ShellCore 首页渲染缺入口锚点 ' + id);
-  }
-});
-
-test('初始语言解析：无效 URL 参数继续回退到已保存语言和浏览器语言', () => {
-  const normalize = html.match(/  function normalizeLang\(lang\) \{[\s\S]*?\n  \}/);
-  const resolve = html.match(/  function resolveInitialLang\(\) \{[\s\S]*?\n  \}/);
-  assert.ok(normalize && resolve, '页面缺初始语言解析函数');
-  function run(search, saved, browserLang) {
-    return vm.runInNewContext(normalize[0] + '\n' + resolve[0] + '\nresolveInitialLang();', {
-      I18n: { locales: () => ['en', 'zh'] },
-      CFG: { i18n: { default: 'en' } },
-      LANG_KEY: 'mine_lang',
-      location: { search },
-      localStorage: { getItem: () => saved },
-      navigator: { language: browserLang }
-    });
-  }
-  assert.strictEqual(run('?lang=en', 'zh', 'zh-CN'), 'en', '有效 URL 参数应优先');
-  assert.strictEqual(run('?lang=fr', 'zh', 'en-US'), 'zh', '无效 URL 参数不应覆盖已保存语言');
-  assert.strictEqual(run('?lang=fr', 'fr', 'zh-CN'), 'zh', 'URL 与存档均无效时应继续使用浏览器语言');
+test('反回归：主脚本里不得再出现面向用户的中文字面量', () => {
+  const html = htmlSrc();
+  let body = html.replace(/<script id="gameConfig"[\s\S]*?<\/script>/, '');
+  /* #selftest 调试面板（grantCoins 充值按钮）只有开发者看得到，不参与翻译：
+     按【整个函数体】排除，而不是逐行匹配关键字——函数内部多数行并不含 selftest 字样。 */
+  body = body.replace(/function grantCoins\(\)[\s\S]*?\n  \}\n/, '\n');
+  const offenders = [];
+  body.split('\n').forEach((line, i) => {
+    if (/^\s*(\/\*|\*|\/\/)/.test(line)) return;                    // 注释不算
+    if (/console\.(warn|error|log)/.test(line)) return;             // 控制台日志不面向用户
+    if (/selftest|stGrant|stOut|GRANT_AMOUNT|grantCoins/.test(line)) return;  // 内部调试面板不翻译
+    if (/throw new Error\(/.test(line)) return;   // 开发者向的配置错误信息，不是给玩家看的文案
+    for (const m of line.matchAll(/'([^']*[\u4e00-\u9fa5][^']*)'/g)) {
+      offenders.push(`L${i + 1}: ${m[1].slice(0, 40)}`);
+    }
+  });
+  assert.deepStrictEqual(offenders, [], '发现硬编码中文（应改走 t(key)）：\n  ' + offenders.join('\n  '));
 });
 
 test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json 实体一致，页面经 connect 消费', () => {
@@ -562,49 +564,24 @@ test('platform 配置过 PlatformCore 校验：字段映射列与 schema.json �
   assert.ok(html.includes('<script src="./core/identity.js"></script>'), '页面未引入 core/identity.js');
 });
 
-test('登录账号行经真实页面启动消费 PlatformCore nickname，并随语言入口重渲染', async () => {
-  const name = '👩‍💻-' + 'A'.repeat(72);
-  const page = await createPageRuntime({ name });
-  const en = page.account();
-  assert.strictEqual(en.avatar, '👩', '账号头像必须来自 IdentityCore 的首码点规则');
-  assert.strictEqual(en.name, name, '英文登录态未展示完整昵称');
-  assert.strictEqual(en.status, 'Cloud sync on · name and leaderboards match everywhere');
-  assert.strictEqual(en.action, '');
-
-  page.elements.langSel.value = 'zh';
-  page.elements.langSel.dispatch('change', { target: page.elements.langSel });
-  const zh = page.account();
-  assert.strictEqual(zh.avatar, '👩', '切换语言不得改变账号头像');
-  assert.strictEqual(zh.name, name, '中文登录态未展示完整昵称');
-  assert.strictEqual(zh.status, '云同步已开 · 名字与排行榜全设备一致');
-  assert.strictEqual(zh.action, '');
-  assert.match(html, /\.profilerow \.profilename\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/,
-    '长昵称只能由 CSS 单行视觉省略，DOM 文本必须保持完整');
-});
-
-test('登录跳转终止旧页面；回跳后的新页面从 SDK nickname 恢复云档与同步', async () => {
-  const anonymous = await createPageRuntime({ user: null });
-  assert.strictEqual(anonymous.account().status, 'Progress stays in this browser');
-  assert.strictEqual(anonymous.account().action, 'Sign in');
-  anonymous.elements.btnIdentity.dispatch('click');
-  assert.strictEqual(anonymous.session.loginCalls, 1, '匿名页必须发起一次 SDK 顶层登录跳转');
-  assert.strictEqual(anonymous.account().status, 'Progress stays in this browser',
-    '旧页面不得依赖永不 resolve 的 login Promise 伪造登录态');
-  assert.strictEqual(anonymous.session.loadCloudCalls, 0,
-    '旧页面终止前不得提前拉取登录用户云档');
-
-  const returned = await createPageRuntime({ user: { name: 'Alice' } });
-  assert.strictEqual(returned.account().name, 'Alice',
-    '登录回跳后的新页面必须立即展示 SDK nickname');
-  assert.strictEqual(returned.account().action, '');
-  assert.strictEqual(returned.session.loadCloudCalls, 1,
-    '回跳后的新页面必须拉取一次云档');
-  assert.strictEqual(returned.session.syncCalls.length, 1,
-    '云档合并落本地后必须触发一次回写同步');
-
-  returned.session.emit('authexpired');
-  assert.strictEqual(returned.account().status, 'Session expired · new progress kept in this browser',
-    '认证失效后账号行必须立即回到退出状态');
+test('身份显示：单栏身份行接线齐全，游戏内没有任何本地改名入口', () => {
+  for (const hook of ['IdentityCore.resolve', 'function renderIdentity', "$('btnIdentity')",
+    'IdentityCore.renameUrl', 'IdentityCore.markReturn', 'IdentityCore.takeRenameFlag',
+    'IdentityCore.renameOutcome']) {
+    assert.ok(html.includes(hook), '页面缺身份行接线 ' + hook);
+  }
+  for (const banned of ['profileInput', 'profileEditTitle', 'normalizeAlias', 'window.prompt',
+    'renderAccount(', "$('btnProfile')", "$('btnAccount')"]) {
+    assert.ok(!html.includes(banned), '页面仍残留本地改名/旧账号行代码 ' + banned);
+  }
+  const Identity = require('./core/identity.js');
+  const url = Identity.renameUrl({
+    apex: 'https://run.ceo',
+    slug: 'mine',
+    returnTo: 'https://play-mine.run.ceo/'
+  });
+  assert.ok(url.startsWith('https://run.ceo/coder/play/nickname?'), '改名地址不是平台改名页');
+  assert.ok(url.includes('scope=perGame'), '改名默认必须是 perGame');
 });
 
 test('reward 配置过 RewardCore 校验且页面经 CFG 消费、手写首页已移除', () => {
@@ -617,457 +594,129 @@ test('reward 配置过 RewardCore 校验且页面经 CFG 消费、手写首页�
   assert.ok(!/<div class="homestats">/.test(html), '仍有手写 homestats markup（首页必须由模块渲染）');
 });
 
-test('叉号与雷按格子宽度响应式缩放，小格同步缩小且不再固定为 12/15px', () => {
-  assert.match(html, /\.cell\{[^}]*container-type:inline-size;/s, 'cell 未建立自身尺寸容器');
-  assert.match(html, /\.cell \.mk::before\{[^}]*font-size:32px;[^}]*line-height:1;/s, '普通格缺响应式不支持时的符号保底尺寸');
-  assert.match(html, /\.cell\.small \.mk::before\{[^}]*font-size:20px;/s, '小格缺响应式不支持时的符号保底尺寸');
-  assert.match(html, /@supports \(font-size:1cqi\)\{[\s\S]*?\.cell \.mk::before\{font-size:clamp\(18px,58cqi,48px\);\}[\s\S]*?\.cell\.small \.mk::before\{font-size:clamp\(12px,58cqi,30px\);\}/,
-    '容器单位必须写在符号子元素上，才能相对自身格子缩放');
-  assert.doesNotMatch(html, /@supports \(font-size:1cqi\)\{[\s\S]*?\.cell\{font-size:[^}]*cqi[^}]*\}/,
-    '容器自身不能用自身 cqi 计算字号，否则会退回视口单位');
-  assert.doesNotMatch(html, /\.cell\.mine \.mk::before\{[^}]*font-size:\.95em;/s, '雷仍被额外缩小');
-  assert.match(html, /@media \(min-width:700px\)\{[\s\S]*?\.hintline\{font-size:13px; color:#b9c5d3; line-height:1\.65;\}[\s\S]*?\.hud \.k,\.topbar \.backbtn\{color:#aeb9c8;\}/,
-    '桌面说明和次级标签缺少可读性增强');
-});
+/* ---- 每周活动：机制在 core，奖励各游戏自己配（2026-08-21）----
+   背景：原来这套逻辑有四份副本（core/weekly.js、weekly.js、water.html 内联 ×2），
+   已合并成 core/weekly.js 一份。下面这些断言防止再各写一套。 */
+const WeeklyCore = require('./core/weekly.js');
 
-test('真实事件接线仅在第二次有效 pointerup 后挖正确雷并轻震一次 18ms', async () => {
-  const data = MineLevels.get(1);
-  const mines = [];
-  data.board.mines.forEach((col, row) => mines.push(row * data.size + col));
-  const mine = mines[0];
-  const safe = Array.from({ length: data.size * data.size }, (_, idx) => idx)
-    .find(idx => !mines.includes(idx));
-
-  const correct = await createPageRuntime();
-  correct.start();
-  correct.pointer('pointerdown', mine);
-  correct.pointer('pointerup', mine);
-  correct.advance(100);
-  correct.pointer('pointerdown', mine);
-  assert.deepStrictEqual(Array.from(correct.state().found), [],
-    '第二次 pointerdown 尚未完成手势，不得提前挖雷');
-  assert.deepStrictEqual(correct.vibrations, [], '第二次 pointerdown 不得提前震动');
-  correct.pointer('pointerup', mine);
-  assert.deepStrictEqual(Array.from(correct.state().found), [mine], '有效第二次 pointerup 未执行真实 dig');
-  assert.deepStrictEqual(correct.vibrations, [18], '正确雷双击必须精确触发一次 18ms 轻震');
-
-  const secondary = await createPageRuntime();
-  secondary.start();
-  secondary.pointer('pointerdown', mine, { isPrimary: false });
-  secondary.pointer('pointerup', mine, { isPrimary: false });
-  secondary.advance(100);
-  secondary.pointer('pointerdown', mine, { isPrimary: false });
-  secondary.pointer('pointerup', mine, { isPrimary: false });
-  assert.deepStrictEqual(Array.from(secondary.state().found), [], '非主指针不得挖格');
-  assert.deepStrictEqual(secondary.vibrations, [], '非主指针不得震动');
-
-  const rightButton = await createPageRuntime();
-  rightButton.start();
-  rightButton.pointer('pointerdown', mine, { button: 2 });
-  rightButton.pointer('pointerup', mine, { button: 2 });
-  rightButton.advance(100);
-  rightButton.pointer('pointerdown', mine, { button: 2 });
-  rightButton.pointer('pointerup', mine, { button: 2 });
-  assert.deepStrictEqual(Array.from(rightButton.state().found), [], '右键不得挖格');
-  assert.deepStrictEqual(rightButton.vibrations, [], '右键不得震动');
-
-  for (const invalidRelease of [
-    { isPrimary: false, label: '非主指针抬起' },
-    { button: 2, label: '右键抬起' }
-  ]) {
-    const release = await createPageRuntime();
-    release.start();
-    release.pointer('pointerdown', mine);
-    release.pointer('pointerup', mine);
-    release.advance(100);
-    release.pointer('pointerdown', mine);
-    release.pointer('pointerup', mine, invalidRelease);
-    assert.deepStrictEqual(Array.from(release.state().found), [],
-      invalidRelease.label + '不得提交第二次挖格');
-    assert.deepStrictEqual(release.vibrations, [],
-      invalidRelease.label + '不得触发震动');
+test('weekly 配置能被 core 接受，且奖励内容是本游戏自己的（不是倒水那套）', () => {
+  assert.ok(cfg.weekly, 'config 缺 weekly 段');
+  const w = WeeklyCore.create(cfg.weekly);
+  assert.ok(w.enabled, '彩雷应开启周活动');
+  // 奖励类型必须都在本游戏的经济体系里（金币 / 账本里的道具），否则线上会发出无法入账的奖
+  const known = ['coins'].concat(Object.keys(cfg.stock.items));
+  for (const p of w.rewardPool) {
+    assert.ok(known.includes(p.type), `奖励类型 ${p.type} 不在本游戏经济体系里（${known.join('/')}）`);
   }
-
-  const otherPointer = await createPageRuntime();
-  otherPointer.start();
-  otherPointer.pointer('pointerdown', mine, { pointerId: 1 });
-  otherPointer.pointer('pointerup', mine, { pointerId: 1 });
-  otherPointer.advance(100);
-  otherPointer.pointer('pointerdown', mine, { pointerId: 1 });
-  otherPointer.pointer('pointerup', mine, { pointerId: 2 });
-  assert.deepStrictEqual(Array.from(otherPointer.state().found), [],
-    '不同 pointerId 的 pointerup 不得提交挖格');
-  assert.deepStrictEqual(otherPointer.vibrations, [],
-    '不同 pointerId 的 pointerup 不得触发震动');
-  otherPointer.pointer('pointercancel', mine, { pointerId: 1 });
-  otherPointer.pointer('pointerdown', mine, { pointerId: 1 });
-  otherPointer.pointer('pointerup', mine, { pointerId: 1 });
-  assert.deepStrictEqual(Array.from(otherPointer.state().found), [],
-    '取消原指针后的一次合法点击不得误完成陈旧双击');
-  assert.deepStrictEqual(otherPointer.vibrations, [],
-    '取消原指针后的合法单击不得触发震动');
-
-  const wrongCellRelease = await createPageRuntime();
-  wrongCellRelease.start();
-  wrongCellRelease.pointer('pointerdown', mine);
-  wrongCellRelease.pointer('pointerup', mine);
-  wrongCellRelease.advance(100);
-  wrongCellRelease.pointer('pointerdown', mine);
-  wrongCellRelease.pointer('pointerup', safe);
-  assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [],
-    '未发生 pointermove 的错格 pointerup 不得提交挖格');
-  assert.deepStrictEqual(wrongCellRelease.vibrations, [],
-    '未发生 pointermove 的错格 pointerup 不得触发震动');
-  wrongCellRelease.pointer('pointerdown', mine);
-  wrongCellRelease.pointer('pointerup', mine);
-  assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [],
-    '错格抬起后首次复击原雷格不得误完成陈旧双击');
-  assert.strictEqual(wrongCellRelease.state().lives, 3,
-    '错格抬起后首次复击原雷格不得误扣生命');
-  assert.deepStrictEqual(wrongCellRelease.vibrations, [],
-    '错格抬起后首次复击原雷格不得触发震动');
-  wrongCellRelease.advance(100);
-  wrongCellRelease.pointer('pointerdown', mine);
-  wrongCellRelease.pointer('pointerup', mine);
-  assert.deepStrictEqual(Array.from(wrongCellRelease.state().found), [mine],
-    '清除陈旧 tap chain 后，新的第二次合法点击应正常挖雷');
-  assert.deepStrictEqual(wrongCellRelease.vibrations, [18],
-    '新的合法双击只应震动一次');
-});
-
-test('未完成单击与 tap chain 不得跨重开操作新的棋盘', async () => {
-  const data = MineLevels.get(1);
-  const mines = [];
-  data.board.mines.forEach((col, row) => mines.push(row * data.size + col));
-  const mine = mines[0];
-  const safe = Array.from({ length: data.size * data.size }, (_, idx) => idx)
-    .find(idx => !mines.includes(idx));
-
-  const pendingSingle = await createPageRuntime();
-  pendingSingle.start();
-  pendingSingle.pointer('pointerdown', safe);
-  pendingSingle.pointer('pointerup', safe);
-  pendingSingle.context.window.__mine.start();
-  pendingSingle.flushTimeouts();
-  assert.strictEqual(pendingSingle.elements.board.children[safe].classList.contains('safe'), false,
-    '旧棋盘未完成的单击计时器不得在新棋盘补标记');
-
-  const staleChain = await createPageRuntime();
-  staleChain.start();
-  staleChain.pointer('pointerdown', mine);
-  staleChain.pointer('pointerup', mine);
-  staleChain.context.window.__mine.home();
-  staleChain.context.window.__mine.start();
-  staleChain.advance(100);
-  staleChain.pointer('pointerdown', mine);
-  staleChain.pointer('pointerup', mine);
-  assert.deepStrictEqual(Array.from(staleChain.state().found), [],
-    '重开后的第一次同格点击不得接续旧棋盘 tap chain');
-  assert.deepStrictEqual(staleChain.vibrations, [],
-    '重开后的第一次同格点击不得震动');
-});
-
-test('真实页面 move/cancel、单击、错误格、两类道具与 window.__mine 均不误震', async () => {
-  const data = MineLevels.get(1);
-  const mines = [];
-  data.board.mines.forEach((col, row) => mines.push(row * data.size + col));
-  const mine = mines[0];
-  const safe = Array.from({ length: data.size * data.size }, (_, idx) => idx)
-    .find(idx => !mines.includes(idx));
-
-  const moved = await createPageRuntime();
-  moved.start();
-  moved.pointer('pointerdown', mine);
-  moved.pointer('pointerup', mine);
-  moved.advance(100);
-  moved.pointer('pointerdown', mine);
-  moved.pointer('pointermove', safe);
-  moved.pointer('pointerup', safe);
-  assert.deepStrictEqual(Array.from(moved.state().found), [], '第二次手势移动后不得挖雷');
-  assert.deepStrictEqual(moved.vibrations, [], '第二次手势移动后不得震动');
-
-  const cancelled = await createPageRuntime();
-  cancelled.start();
-  cancelled.pointer('pointerdown', mine);
-  cancelled.pointer('pointerup', mine);
-  cancelled.advance(100);
-  cancelled.pointer('pointerdown', mine);
-  cancelled.pointer('pointercancel', mine);
-  assert.deepStrictEqual(Array.from(cancelled.state().found), [], '第二次手势取消后不得挖雷');
-  assert.deepStrictEqual(cancelled.vibrations, [], '第二次手势取消后不得震动');
-
-  const single = await createPageRuntime();
-  single.start();
-  single.pointer('pointerdown', safe);
-  single.pointer('pointerup', safe);
-  single.flushTimeouts();
-  assert.strictEqual(single.elements.board.children[safe].classList.contains('safe'), true,
-    '单击计时完成后应从真实页面入口标记安全格');
-  assert.deepStrictEqual(single.vibrations, [], '单击标记不得震动');
-
-  const wrong = await createPageRuntime();
-  wrong.start();
-  wrong.pointer('pointerdown', safe);
-  wrong.pointer('pointerup', safe);
-  wrong.advance(100);
-  wrong.pointer('pointerdown', safe);
-  wrong.pointer('pointerup', safe);
-  assert.strictEqual(wrong.state().lives, 2, '错误格双击应扣一次生命');
-  assert.deepStrictEqual(wrong.vibrations, [], '错误格双击不得震动');
-
-  const direct = await createPageRuntime();
-  direct.start();
-  assert.strictEqual(direct.context.window.__mine.dig(mine), true, '真实 window.__mine.dig 应返回命中雷结果');
-  assert.ok(Array.from(direct.state().found).includes(mine), '真实 window.__mine.dig 未完成找雷');
-  assert.deepStrictEqual(direct.vibrations, [], 'window.__mine.dig 程序化入口不得震动');
-
-  const solved = await createPageRuntime();
-  solved.start();
-  solved.context.window.__mine.solve();
-  assert.strictEqual(solved.state().found.length, data.size, '真实 window.__mine.solve 未找完本关雷');
-  assert.deepStrictEqual(solved.vibrations, [], 'window.__mine.solve 程序化入口不得震动');
-
-  const tools = await createPageRuntime();
-  tools.start();
-  assert.ok((tools.elements.toolMine.listeners.get('click') || []).length > 0, 'toolMine 未安装真实点击入口');
-  assert.ok((tools.elements.toolSafe.listeners.get('click') || []).length > 0, 'toolSafe 未安装真实点击入口');
-  tools.elements.toolMine.dispatch('click');
-  tools.elements.toolSafe.dispatch('click');
-  assert.deepStrictEqual(tools.vibrations, [], 'toolMine 与 toolSafe 实际入口均不得震动');
-
-  const missingApi = await createPageRuntime({ vibrate: null });
-  missingApi.start();
-  assert.doesNotThrow(() => {
-    missingApi.pointer('pointerdown', mine);
-    missingApi.pointer('pointerup', mine);
-    missingApi.advance(100);
-    missingApi.pointer('pointerdown', mine);
-    missingApi.pointer('pointerup', mine);
-  }, '无 Vibration API 时正确雷双击不应报错');
-
-  const rejectedApi = await createPageRuntime({ vibrate() { throw new Error('blocked'); } });
-  rejectedApi.start();
-  assert.doesNotThrow(() => {
-    rejectedApi.pointer('pointerdown', mine);
-    rejectedApi.pointer('pointerup', mine);
-    rejectedApi.advance(100);
-    rejectedApi.pointer('pointerdown', mine);
-    rejectedApi.pointer('pointerup', mine);
-  }, '浏览器拒绝震动时不应阻断正确雷双击');
-});
-
-test('每种颜色配置唯一淡色底纹，覆盖离散纹理族并由渲染完整消费', () => {
-  const colors = htmlArray('COLORS');
-  const textures = htmlArray('REGION_TEXTURES');
-  const expectedColors = [
-    '#7f9cf5', '#f56d6d', '#f5c66d', '#6dd3a8', '#c98df0', '#6dc4f0',
-    '#f09db8', '#a8d36d', '#f0a56d', '#8f8ff0', '#6df0d8'
-  ];
-  const expectedTextures = [
-    { image: 'repeating-linear-gradient(45deg, rgba(15,22,32,.11) 0 1.4px, transparent 1.4px 8px)', size: 'auto' },
-    { image: 'repeating-linear-gradient(-45deg, rgba(15,22,32,.11) 0 1.4px, transparent 1.4px 8px)', size: 'auto' },
-    { image: 'repeating-linear-gradient(0deg, rgba(15,22,32,.12) 0 1.2px, transparent 1.2px 7px)', size: 'auto' },
-    { image: 'repeating-linear-gradient(90deg, rgba(15,22,32,.12) 0 1.2px, transparent 1.2px 7px)', size: 'auto' },
-    { image: 'repeating-linear-gradient(45deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px), repeating-linear-gradient(-45deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px)', size: 'auto' },
-    { image: 'repeating-linear-gradient(0deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px), repeating-linear-gradient(90deg, rgba(15,22,32,.08) 0 1px, transparent 1px 9px)', size: 'auto' },
-    { image: 'radial-gradient(circle, rgba(15,22,32,.14) 0 1.25px, transparent 1.5px)', size: '7px 7px' },
-    { image: 'radial-gradient(circle at 25% 25%, rgba(15,22,32,.12) 0 1.15px, transparent 1.4px), radial-gradient(circle at 75% 75%, rgba(15,22,32,.12) 0 1.15px, transparent 1.4px)', size: '12px 12px' },
-    { image: 'repeating-radial-gradient(circle at center, rgba(15,22,32,.10) 0 1px, transparent 1px 5px)', size: 'auto' },
-    { image: 'conic-gradient(from 45deg, rgba(15,22,32,.10) 25%, transparent 0 50%, rgba(15,22,32,.10) 0 75%, transparent 0)', size: '8px 8px' },
-    { image: 'repeating-linear-gradient(60deg, rgba(15,22,32,.11) 0 1.2px, transparent 1.2px 11px), repeating-linear-gradient(-60deg, rgba(15,22,32,.06) 0 1px, transparent 1px 11px)', size: 'auto' }
-  ];
-  assert.deepStrictEqual(Array.from(colors), expectedColors, '彩雷 11 色区域色板发生漂移');
-  assert.deepStrictEqual(Array.from(textures, texture => ({
-    image: texture.image,
-    size: texture.size
-  })), expectedTextures, '彩雷 11 组区域底纹发生漂移');
-  assert.strictEqual(new Set(colors).size, 11, '11 种区域颜色必须互不重复');
-  assert.strictEqual(textures.length, colors.length, '每种颜色都必须有对应底纹');
-  assert.strictEqual(new Set(textures.map(texture => texture.image + '|' + texture.size)).size,
-    textures.length, '不同颜色的底纹必须可区分');
-  for (const texture of textures) {
-    assert.strictEqual(typeof texture.image, 'string', '底纹缺 image');
-    assert.strictEqual(typeof texture.size, 'string', '底纹缺 background-size');
-    assert.match(texture.image, /gradient\(/, '底纹必须使用可缩放 CSS gradient');
-    const alphas = [...texture.image.matchAll(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/g)].map(m => Number(m[1]));
-    assert.ok(alphas.length > 0 && Math.max(...alphas) <= 0.14, '底纹透明度必须克制，不能盖过底色');
+  for (const k of Object.keys(w.grand)) {
+    assert.ok(known.includes(k), `大奖 ${k} 不在本游戏经济体系里`);
   }
-  assert.ok(textures.some(texture => /repeating-linear-gradient\(0deg/.test(texture.image)),
-    '底纹缺水平线编码');
-  assert.ok(textures.some(texture => /repeating-linear-gradient\(90deg/.test(texture.image)),
-    '底纹缺垂直线编码');
-  assert.ok(textures.some(texture => /(^|,\s*)radial-gradient\(circle/.test(texture.image)),
-    '底纹缺点阵编码');
-  assert.ok(textures.some(texture => texture.image.includes('repeating-radial-gradient(')),
-    '底纹缺环纹编码');
-  assert.ok(textures.some(texture => texture.image.includes('conic-gradient(')),
-    '底纹缺块状编码');
-  assert.ok(textures.some(texture => (texture.image.match(/gradient\(/g) || []).length >= 2),
-    '底纹缺交叉线或网格等叠层编码');
-  const renderBoard = htmlFunction('renderBoard');
-  assert.ok(renderBoard.includes('d.style.backgroundColor = COLORS[region];'), '棋盘未消费颜色配置');
-  assert.ok(renderBoard.includes('var texture = REGION_TEXTURES[region];'), '棋盘未读取底纹配置');
-  assert.ok(renderBoard.includes('d.style.backgroundImage = texture.image;'), '棋盘未消费底纹图案');
-  assert.ok(renderBoard.includes('d.style.backgroundSize = texture.size;'), '棋盘未消费底纹尺寸');
-  assert.match(html, /\.cell\.safe \.mk::before\{[^}]*font-weight:900;[^}]*-webkit-text-stroke:\.035em currentColor;/s,
-    '手机小格中的叉号缺少加粗描边');
+  // 每个奖励类型都要有对应的展示文案（rwCoins / rwToolMine …），否则玩家看到的是空白
+  const langs = Object.keys(cfg.i18n.locales);
+  for (const type of new Set([...w.rewardPool.map((p) => p.type), ...Object.keys(w.grand)])) {
+    const key = 'rw' + type.charAt(0).toUpperCase() + type.slice(1);
+    for (const lang of langs) {
+      assert.ok(cfg.i18n.locales[lang][key], `${lang} 缺奖励文案 ${key}`);
+    }
+  }
 });
 
-/* 改名回跳接线（页面级，非纯函数自证）：
-   纯函数测试全绿也挡不住「页面读了一个不存在的字段」——本轮就出过 outcome.after（实际叫 name），
-   成功改名会 toast 出 undefined。这里把 settleRenameReturn 抽进沙箱真跑一遍。 */
-function renameReturnSandbox(platUser) {
-  const Identity = require('./core/identity.js');
-  const store = new Map();
-  const toasts = [];
-  const sandbox = {
-    IdentityCore: Identity,
-    Plat: { mode: 'online', user: platUser },
-    RENAME_BEFORE: '玩家3271',
-    PLAT_LAST_NAME: '玩家3271',
-    DEGRADE_KEY: 'mine:renameDegrade',
-    Date,
-    JSON,
-    console: { warn() {} },
-    localStorage: {
-      getItem: (k) => (store.has(k) ? store.get(k) : null),
-      setItem: (k, v) => store.set(k, v)
-    },
-    toast(msg) { toasts.push(msg); },
-    renderIdentity() {},
-    I18n,          // 真实词典
-    LANG: 'zh'
-  };
-  /* 连页面真实的 t() 一起抽进来：LocaleCore.t 本身不插值，插值逻辑在页面这层，
-     测试桩自己实现插值等于绕开被测代码 */
-  const src = ['t', 'readRenameDegrade', 'writeRenameDegrade', 'settleRenameReturn'].map(htmlFunction).join('\n');
-  vm.createContext(sandbox);
-  vm.runInContext(src, sandbox);
-  return { sandbox, toasts, store };
-}
-
-test('改名成功回跳：提示里必须出现新名字（不能是 undefined），并更新展示名', () => {
-  const { sandbox, toasts } = renameReturnSandbox({ name: '朱克锋' });
-  const r = vm.runInContext('settleRenameReturn()', sandbox);
-  assert.strictEqual(r.outcome.status, 'applied');
-  assert.strictEqual(toasts.length, 1);
-  assert.ok(toasts[0].includes('朱克锋'), '成功提示未包含新名字: ' + toasts[0]);
-  assert.ok(!/undefined/.test(toasts[0]), '成功提示出现 undefined（字段名接错）: ' + toasts[0]);
-  assert.strictEqual(sandbox.PLAT_LAST_NAME, '朱克锋', '展示名未更新');
+test('周活动机制走 core，页面不得自带第二份实现', () => {
+  const html = htmlSrc();
+  assert.ok(html.includes('<script src="./core/weekly.js"></script>'), '未引入 core/weekly.js');
+  assert.ok(html.includes('WeeklyCore.create(CFG.weekly)'), '未用 core 建实例（奖励配置就无法生效）');
+  // 不许把 core 的机制又抄一遍到页面里
+  assert.ok(!/function\s+(picStatus|grandStatus|claimGrand|newlyUnlocked|weekIndex)\s*\(/.test(html),
+    '页面重新实现了 core 已有的周活动机制（应直接调 core）');
+  assert.ok(!/const\s+THRESHOLDS\s*=|var\s+THRESHOLDS\s*=/.test(html), '页面写死了阈值（应由 config 声明）');
+  // 首页入口用 core 内置模块
+  assert.ok(cfg.screens.home.modules.some((m) => m.type === 'weekly-event-entry'), '首页缺周活动入口模块');
+  // 奖励入账必须走只增账本（云端同步与多标签页保护才会自动生效）
+  assert.ok(/function grantWeeklyReward[\s\S]{0,400}Stock\.grant\(save, Coins\.coinsKey/.test(html),
+    '金币奖励未走 Stock.grant（会绕过云端同步与多标签页保护）');
 });
 
-test('改名未生效：连续降级到阈值后升级为可分辨的告警提示，且计数跨会话累计', () => {
-  const { sandbox, toasts, store } = renameReturnSandbox({ name: '玩家3271' }); // 名字没变 = stale
-  for (let i = 0; i < 3; i += 1) vm.runInContext('settleRenameReturn()', sandbox);
-  const state = JSON.parse(store.get('mine:renameDegrade'));
-  assert.strictEqual(state.streak, 3, '降级必须累计，单条日志看不出常态化');
-  assert.strictEqual(state.total, 3);
-  assert.strictEqual(state.alert, true, '连续降级达阈值必须告警');
-  assert.notStrictEqual(toasts[2], toasts[0], '告警态提示必须与普通降级提示可区分');
-  assert.strictEqual(toasts[2], I18n.t('zh', 'idRenameDegraded'));
+test('两个游戏共用同一份 core 周活动，但奖励互不相同（同源+可配 双向断言）', () => {
+  const waterCfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'games/water/game.config.json'), 'utf8'));
+  const mine = WeeklyCore.create(cfg.weekly);
+  const water = WeeklyCore.create(waterCfg.weekly);
+  // 同源：周界必须完全一致（否则两个游戏的「本周」会错位）
+  const now = Date.UTC(2026, 7, 21, 12);
+  assert.strictEqual(mine.weekKey(now), water.weekKey(now), '两个游戏的活动周必须同步');
+  assert.strictEqual(mine.weekEnd(now), water.weekEnd(now));
+  // 可配：奖励内容确实不同，证明不是硬编码同一套
+  assert.notDeepStrictEqual(mine.grand, water.grand, '两个游戏的大奖应各自配置');
+  assert.notDeepStrictEqual(mine.thresholds, water.thresholds, '两个游戏的阈值应各自配置');
+  // 两边页面都必须引入 core（不许一个走 core、一个自己抄）
+  const waterHtml = fs.readFileSync(path.join(__dirname, 'water.html'), 'utf8');
+  for (const [name, src] of [['mine.html', htmlSrc()], ['water.html', waterHtml]]) {
+    assert.ok(src.includes('./core/weekly.js'), name + ' 未引入 core/weekly.js');
+    assert.ok(/WeeklyCore\.create\(/.test(src), name + ' 未用 core 建实例');
+  }
+  assert.ok(!/const Weekly = \(function/.test(waterHtml), 'water.html 仍残留内联的周活动实现');
 });
 
-test('改名结果未知（未登录/读不到名字）：不谎报成功', () => {
-  const { sandbox, toasts } = renameReturnSandbox(null);
-  const r = vm.runInContext('settleRenameReturn()', sandbox);
-  assert.strictEqual(r.outcome.status, 'unknown');
-  assert.strictEqual(toasts[0], I18n.t('zh', 'idRenameUnknown'));
-  assert.strictEqual(sandbox.PLAT_LAST_NAME, '玩家3271', '结果未知时不得改动展示名');
+/* ---- 广告接入（2026-08-21 RCA：此前「看广告」是假按钮，从未引入广告 core）---- */
+const AdPlayCore = require('./core/adplay.js');
+const PlacementsCore = require('./core/placements.js');
+
+test('广告走 core，页面不得再有「点一下直接发奖」的假广告', () => {
+  const html = htmlSrc();
+  assert.ok(html.includes('<script src="./core/adplay.js"></script>'), '未引入 core/adplay.js');
+  assert.ok(html.includes('<script src="./core/placements.js"></script>'), '未引入 core/placements.js');
+  assert.ok(html.includes('AdPlayCore.create('), '未用 core 建广告实例');
+  assert.ok(html.includes('function watchAdFor'), '缺统一广告入口 watchAdFor');
+  // 所有「看广告」入口都必须经过 watchAdFor —— 数量对得上才算没有漏网的假广告
+  const adEntries = (html.match(/watchAdFor\('/g) || []).length;
+  assert.ok(adEntries >= 5, `看广告入口应全部走 core，实际只有 ${adEntries} 处`);
+  // 旧的假广告注释/直接发奖路径必须消失
+  assert.ok(!/假广告路径/.test(html), '仍残留假广告路径');
+  assert.ok(!/模拟播放/.test(html), '仍残留「模拟播放」占位实现');
 });
 
-/* 幽灵安全标记回归（真行为，非源码正则）：
-   单击会挂一个 DBL_MS 延迟计时器去标记格子；若第二次手势被取消（pointercancel / 非主指针 /
-   右键）或在别的格子抬手，那个计时器必须一并清掉。旧代码只重置双击链、留着计时器，
-   于是用户明明取消了操作，320ms 后格子仍被标成「安全 ✕」——扫雷里会诱导玩家挖到雷上。
-   本测试用假计时器把时间真正推过 DBL_MS，断言 toggleMark 未被调用（旧代码必红）。
-   真页面复验脚本：test/manual/mine-ghost-mark.mjs（CDP 合成真实 PointerEvent）。 */
-function ghostMarkSandbox() {
-  const timers = new Map();
-  let seq = 0;
-  const sandbox = {
-    DBL_MS: 320,
-    clickTimer: null,
-    lastTap: { idx: -1, t: 0 },
-    drag: null,
-    S: { done: false },
-    marked: [],
-    dug: [],
-    setTimeout(fn, ms) { seq += 1; timers.set(seq, { fn, at: ms }); return seq; },
-    clearTimeout(id) { timers.delete(id); },
-    toggleMark(idx) { sandbox.marked.push(idx); },
-    dig(idx) { sandbox.dug.push(idx); return false; },
-    vibrateCorrectMine() {},
-    applyMark() {},
-    cellIdxFromPoint(ev) { return ev.idx; },
-    Date,
-    advance() { Array.from(timers.values()).forEach((t) => t.fn()); timers.clear(); }
-  };
-  const src = ['resetTapChain', 'resetGestureState', 'samePointer', 'commitTap', 'onDragEnd']
-    .map(htmlFunction).join('\n');
-  vm.createContext(sandbox);
-  vm.runInContext(src, sandbox);
-  return sandbox;
-}
-
-test('第二次手势在别的格子抬手：不得留下幽灵安全标记', () => {
-  const sb = ghostMarkSandbox();
-  // 第一次单击格子 3 —— 挂上 320ms 的延迟标记
-  sb.drag = { pointerId: 1, startIdx: 3, moved: false };
-  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 3 })', sb);
-  assert.deepStrictEqual(sb.marked, [], '延迟未到就标记，双击将无法成立');
-  // 第二次按下格子 3，却在格子 4 抬手 = 放弃这次点击
-  sb.drag = { pointerId: 1, startIdx: 3, moved: false };
-  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 4 })', sb);
-  sb.advance(); // 时间推过 DBL_MS
-  assert.deepStrictEqual(sb.marked, [], '取消的手势仍然标记了格子（幽灵安全标记）');
+test('广告配置能被 core 接受，且每个游戏可以配自己的广告源', () => {
+  assert.ok(cfg.ads && cfg.ads.play, 'config 缺 ads.play（广告源声明）');
+  const a = AdPlayCore.create(cfg.ads.play, { houseAd: (s, done) => done(true) });
+  assert.ok(a.sources.length > 0);
+  // house 必须在链尾兜底：否则没有第三方广告时玩家会卡住拿不到奖励
+  assert.strictEqual(a.sources[a.sources.length - 1], 'house', '最后一个源必须是 house 兜底');
+  // placements 表也要能被 core 接受（格式/onFail/频控声明合法）
+  const pl = PlacementsCore.create(cfg.ads.placements, () => true);
+  for (const id of pl.ids()) assert.ok(pl.has(id));
+  // 页面引用的 placement id 必须在 config 里存在（防止写错 id 导致广告位永远不生效）
+  const html = htmlSrc();
+  for (const m of html.matchAll(/watchAdFor\('([^']+)'/g)) {
+    assert.ok(pl.has(m[1]), `页面用了未声明的广告位 "${m[1]}"`);
+  }
 });
 
-test('第二次手势被系统取消（pointercancel）：不得留下幽灵安全标记', () => {
-  const sb = ghostMarkSandbox();
-  sb.drag = { pointerId: 1, startIdx: 5, moved: false };
-  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 5 })', sb);
-  sb.drag = { pointerId: 1, startIdx: 5, moved: false };
-  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointercancel", isPrimary: true, button: 0, idx: 5 })', sb);
-  sb.advance();
-  assert.deepStrictEqual(sb.marked, [], 'pointercancel 后仍然标记了格子（幽灵安全标记）');
+test('奖励只在广告真看完后发放（RCA 核心：不能点一下就给）', () => {
+  const html = htmlSrc();
+  // 每个 watchAdFor 的发奖动作必须在回调里，而不是紧跟调用之后
+  for (const m of html.matchAll(/watchAdFor\('[^']+',\s*function\s*\(\)\s*\{/g)) {
+    assert.ok(m[0].includes('function'), '发奖必须写在 watchAdFor 的回调里');
+  }
+  // core 侧：没看完一律不 granted
+  const a = AdPlayCore.create({ sources: ['house'] }, { houseAd: (s, done) => done(false) });
+  const pl = PlacementsCore.create({ x: { format: 'rewarded', onFail: 'deny' } }, () => true);
+  return a.playPlacement(pl, 'x', {}).then((r) => {
+    assert.strictEqual(r.granted, false, '没看完必须不发奖');
+  });
 });
 
-test('正常单击仍然照常标记（防止修复矫枉过正）', () => {
-  const sb = ghostMarkSandbox();
-  sb.drag = { pointerId: 1, startIdx: 7, moved: false };
-  vm.runInContext('onDragEnd({ pointerId: 1, type: "pointerup", isPrimary: true, button: 0, idx: 7 })', sb);
-  sb.advance();
-  assert.deepStrictEqual(sb.marked, [7], '正常单击应在延迟后标记该格');
-});
-
-test('通关保持游戏页并弹出下一关或返回主页二选一', () => {
-  const onWin = htmlFunction('onWin');
-  let args = null;
-  let nextLevel = null;
-  let wentHome = false;
-  let gestureResets = 0;
-  const sandbox = {
-    S: { done: false, lv: 7, size: 9 },
-    save: { level: 7, clears: 2 },
-    resetGestureState() { gestureResets += 1; },
-    stopTimer() {},
-    persist() {},
-    dialog(...values) { args = values; },
-    startLevel(level) { nextLevel = level; },
-    showHome() { wentHome = true; },
-    t(key) { return I18n.t('zh', key); }
-  };
-  vm.runInNewContext(onWin + '\nonWin();', sandbox);
-  assert.strictEqual(gestureResets, 1, '通关时必须清除未完成手势状态');
-  assert.strictEqual(wentHome, false, '通关弹窗出现前不应自动返回主页');
-  assert.strictEqual(sandbox.S.done, true);
-  assert.strictEqual(sandbox.save.level, 8);
-  assert.strictEqual(sandbox.save.clears, 3);
-  assert.ok(args, '通关未弹出选择');
-  assert.strictEqual(args[2], '下一关');
-  assert.strictEqual(args[4], '返回首页');
-  args[3]();
-  assert.strictEqual(nextLevel, 8, '主操作未进入下一关');
-  args[5]();
-  assert.strictEqual(wentHome, true, '次操作未返回主页');
+test('Monetag 站点验证标签必须留在原始 HTML 的 head 里（删了验证会掉线）', () => {
+  const v = cfg.ads.verification;
+  assert.ok(v && v.monetag, 'config 缺 ads.verification.monetag');
+  const html = htmlSrc();
+  const m = html.match(/<meta name="monetag" content="([^"]+)"\s*\/?>/);
+  assert.ok(m, '<head> 里缺 Monetag 验证 meta 标签');
+  assert.strictEqual(m[1], v.monetag, 'meta 标签与 config 登记的值不一致（改了一处忘了另一处）');
+  // 必须在 head 内、且在原始 HTML 里（Monetag 验证器抓源码、不执行 JS，所以不能靠 JS 注入）
+  const headEnd = html.indexOf('</head>');
+  assert.ok(html.indexOf('name="monetag"') < headEnd, 'meta 标签必须在 </head> 之前');
+  assert.ok(!/createElement\('meta'\)[\s\S]{0,200}monetag/.test(html),
+    'Monetag 验证标签不能用 JS 注入（验证器不执行 JS）');
+  // 注册的站点应是本游戏自己的子域，而不是平台根域
+  assert.strictEqual(v.site, 'play-color-mines.run.ceo',
+    '应注册本游戏自己的子域（run.ceo 首页属于平台，我们无法改它的 head）');
 });

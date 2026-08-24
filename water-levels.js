@@ -120,7 +120,22 @@
     return out;
   }
 
-  // 生成关最多锁一根空瓶；只有移除该瓶后仍可解才配置，避免把解锁做成强制付费门。
+  // 辅助位地板：每关至少 2 根「看广告/道具解锁」的锁定空瓶。第 4 关这类零锁瓶关，
+  // 非最优解或失误的玩家没有任何降难出口，只能硬找最优解。不足 2 根的在盘面末尾
+  // 追加空管并锁定——追加瓶不进「不开瓶可解」口径（par/minMoves/离线标定全部不变），
+  // 已有 ≥2 根（主题关 2-3 根爬坡）的关保持原样。
+  const ASSIST_LOCKED_MIN = 2;
+  function withAssistBottles(layout, lockedBottleIndexes) {
+    const locked = lockedBottleIndexes.slice();
+    while (locked.length < ASSIST_LOCKED_MIN) {
+      layout.push([]);
+      locked.push(layout.length - 1);
+    }
+    return locked;
+  }
+
+  // 生成关的「盘面内」锁瓶最多一根；只有移除该瓶后仍可解才配置，避免把解锁做成
+  // 强制付费门（辅助位地板由 withAssistBottles 在此之上追加补足）。
   function generatedLockedBottleIndexes(layout, solveFn, capacity) {
     if (typeof solveFn !== 'function') return [];
     const empty = [];
@@ -164,12 +179,13 @@
     }
     if (!layout) throw new Error('无法为第 ' + level + ' 关生成可用盘面（含放宽空管后）');
 
-    const lockedBottleIndexes = generatedLockedBottleIndexes(layout, solveFn, spec.capacity);
+    const lockedBottleIndexes =
+      withAssistBottles(layout, generatedLockedBottleIndexes(layout, solveFn, spec.capacity));
     return {
       id: level,
       capacity: spec.capacity,
       colors: COLOR_ORDER.slice(0, spec.colors),
-      empty,
+      empty: layout.filter((t) => t.length === 0).length,
       layout,
       lockedBottleIndexes,
       minMoves: null,                            // 生成关不标定最短解（端上不跑全量 BFS）
@@ -610,13 +626,16 @@
     const n = Math.max(1, level | 0);
     if (n <= FIXED_LEVELS.length) {
       const fx = FIXED_LEVELS[n - 1];
+      const layout = fx.layout.map((t) => t.slice());
+      const lockedBottleIndexes =
+        withAssistBottles(layout, normalizeLockedBottleIndexes(fx.lockedBottleIndexes, fx.layout));
       return {
         id: n,
         capacity: CAPACITY,
         colors: COLOR_ORDER.slice(0, fx.colors),
-        empty: fx.empty,
-        layout: fx.layout.map((t) => t.slice()),
-        lockedBottleIndexes: normalizeLockedBottleIndexes(fx.lockedBottleIndexes, fx.layout),
+        empty: layout.filter((t) => t.length === 0).length,
+        layout,
+        lockedBottleIndexes,
         minMoves: fx.minMoves,
         generated: false,
       };
@@ -625,7 +644,7 @@
   }
 
   return {
-    CAPACITY, PALETTE, COLOR_ORDER, FIXED_LEVELS,
+    CAPACITY, PALETTE, COLOR_ORDER, FIXED_LEVELS, ASSIST_LOCKED_MIN,
     levelSpec, levelSeed, rng, scramble, isTidy, buildLayout,
     normalizeLockedBottleIndexes, generatedLockedBottleIndexes, genLevel, forLevel,
   };

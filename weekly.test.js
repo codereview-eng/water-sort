@@ -84,26 +84,26 @@ test('weekly: 结转与周对账', () => {
   assert.deepStrictEqual(W.normalize({ week: wk1, frags: 5, claimed: [true] }, wk1), W.blank(wk1)); // claimed 结构坏 → 重置
 });
 
-test('weekly: 领取幂等 — claimed 标记后不重复发', () => {
-  // 模拟控制器逻辑:发放序列由 newlyUnlocked + claimed 共同保证幂等
-  const st = W.blank('w1');
-  const grant = [];
-  const add = (n) => {
-    const before = st.frags;
-    st.frags += n;
-    for (const i of W.newlyUnlocked(before, st.frags)) {
-      if (st.claimed[i]) continue;
-      st.claimed[i] = true;
-      grant.push(i);
-    }
-    if (st.frags >= W.GOAL && !st.grand) { st.grand = true; grant.push('grand'); }
-  };
-  add(100);            // 解锁 ①
-  add(0); add(0);      // 幂等:不重发
-  assert.deepStrictEqual(grant, [0]);
-  add(500);            // 一次到 600:②-⑥ + 大奖
-  assert.deepStrictEqual(grant, [0, 1, 2, 3, 4, 5, 'grand']);
-  add(100);            // 超额只涨碎片,不再发
-  assert.deepStrictEqual(grant, [0, 1, 2, 3, 4, 5, 'grand']);
+test('weekly: 手动领取(issue #1) — 解锁只进可领取,领取/幂等由 core 状态机把关', () => {
+  const WC = require('./core/weekly.js');
+  // 双源同步守卫:core 与 weekly 的阈值/大奖口径必须一致(防两处常量漂移)
+  assert.deepStrictEqual(WC.THRESHOLDS, W.THRESHOLDS);
+  assert.strictEqual(WC.GOAL, W.GOAL);
+  assert.deepStrictEqual(WC.GRAND, W.GRAND);
+  let st = W.blank('w1');
+  st.frags += 100;     // 解锁 ①:只进「可领取」,不自动发奖
+  assert.deepStrictEqual(st.claimed, [false, false, false, false, false, false]);
+  assert.deepStrictEqual(WC.claimable(st), [0]);
+  const res = WC.claim(st, 0, () => W.rollReward(0, 0));
+  st = res.state;
+  assert.deepStrictEqual(res.reward, { type: 'energy', n: 10 });
+  assert.throws(() => WC.claim(st, 0, () => W.rollReward(0, 0)), /已领取/); // 幂等:不能重复领
+  st.frags += 500;     // 一次到 600:②-⑥ + 大奖全部进入可领取,均不自动发
+  assert.deepStrictEqual(WC.claimable(st), [1, 2, 3, 4, 5]);
+  assert.strictEqual(WC.grandStatus(st), 'claimable');
+  assert.strictEqual(st.grand, false);
+  st = WC.claimGrand(st).state;   // 大奖也必须显式领取
+  assert.strictEqual(st.grand, true);
+  st.frags += 100;     // 超额只涨碎片,结转口径不变
   assert.strictEqual(W.carry(st.frags), 100);
 });

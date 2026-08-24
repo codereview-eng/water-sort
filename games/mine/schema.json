@@ -8,11 +8,22 @@
         "clears": "number",
         "tool_mine": "number",
         "tool_safe": "number",
+        "tool_mine_granted": "number",
+        "tool_mine_spent": "number",
+        "tool_safe_granted": "number",
+        "tool_safe_spent": "number",
+        "coins_earned": "number",
+        "coins_spent": "number",
         "energy": "number",
         "energy_ts": "number",
         "alias": "string",
         "sfx": "boolean",
-        "updated_ms": "number"
+        "updated_ms": "number",
+        "ws_cur": "number",
+        "ws_pend": "number",
+        "ws_cyc": "number",
+        "ws_earned": "number",
+        "ws_claimed": "number"
       }
     }
   }

@@ -86,6 +86,65 @@
         "capping": {
           "maxPerDay": 3
         }
+      },
+      "undo-refill": {
+        "format": "rewarded",
+        "onFail": "deny"
+      },
+      "bottle-unlock": {
+        "format": "rewarded",
+        "onFail": "deny"
+      },
+      "energy-refill": {
+        "format": "rewarded",
+        "onFail": "deny"
+      },
+      "weekly-frags": {
+        "format": "rewarded",
+        "onFail": "deny",
+        "capping": {
+          "maxPerDay": 20
+        }
+      },
+      "streak-keep": {
+        "format": "rewarded",
+        "onFail": "grant",
+        "capping": {
+          "maxPerDay": 20
+        }
+      }
+    },
+    "play": {
+      "sources": [
+        {
+          "type": "telegram",
+          "env": "telegram"
+        },
+        {
+          "type": "monetag",
+          "zoneId": "11440777",
+          "env": "telegram"
+        },
+        {
+          "type": "directlink",
+          "url": "https://omg10.com/4/11622862",
+          "env": "web"
+        },
+        {
+          "type": "house"
+        }
+      ],
+      "houseSeconds": 6,
+      "timeoutMs": 25000
+    },
+    "passive": {
+      "multitag": {
+        "src": "https://quge5.com/88/tag.min.js",
+        "zone": "271963",
+        "env": "web",
+        "screens": [
+          "home"
+        ]
       }
     }
   },
@@ -171,6 +230,10 @@
           }
         },
         {
+          "type": "streak-card",
+          "props": {}
+        },
+        {
           "type": "weekly-event-entry",
           "props": {}
         },
@@ -193,6 +256,11 @@
                 "id": "stBottles",
                 "label": "加瓶道具",
                 "initial": 2
+              },
+              {
+                "id": "stCoins",
+                "label": "金币",
+                "initial": 0
               }
             ]
           }
@@ -304,6 +372,30 @@
         "col": "undos",
         "merge": "newest"
       },
+      "bottlesGranted": {
+        "col": "bottles_granted",
+        "merge": "max"
+      },
+      "bottlesSpent": {
+        "col": "bottles_spent",
+        "merge": "max"
+      },
+      "undosGranted": {
+        "col": "undos_granted",
+        "merge": "max"
+      },
+      "undosSpent": {
+        "col": "undos_spent",
+        "merge": "max"
+      },
+      "coinsEarned": {
+        "col": "coins_earned",
+        "merge": "max"
+      },
+      "coinsSpent": {
+        "col": "coins_spent",
+        "merge": "max"
+      },
       "energy": {
         "col": "energy",
         "merge": "newest"
@@ -319,7 +411,105 @@
       "sfx": {
         "col": "sfx",
         "merge": "newest"
+      },
+      "wsCur": {
+        "col": "ws_cur",
+        "merge": "newest"
+      },
+      "wsPend": {
+        "col": "ws_pend",
+        "merge": "newest"
+      },
+      "wsCyc": {
+        "col": "ws_cyc",
+        "merge": "newest"
+      },
+      "wsEarned": {
+        "col": "ws_earned",
+        "merge": "max"
+      },
+      "wsClaimed": {
+        "col": "ws_claimed",
+        "merge": "max"
       }
+    }
+  },
+  "coins": {
+    "earnPerClear": 2,
+    "shop": {
+      "bottles": {
+        "price": 200,
+        "amount": 1
+      },
+      "undos": {
+        "price": 150,
+        "amount": 2
+      }
+    }
+  },
+  "stock": {
+    "items": {
+      "coins": {
+        "granted": "coinsEarned",
+        "spent": "coinsSpent",
+        "initial": 0
+      },
+      "bottles": {
+        "granted": "bottlesGranted",
+        "spent": "bottlesSpent",
+        "legacy": "bottles",
+        "initial": 2
+      },
+      "undos": {
+        "granted": "undosGranted",
+        "spent": "undosSpent",
+        "legacy": "undos",
+        "initial": 3
+      }
+    }
+  },
+  "weekly": {
+    "enabled": true,
+    "thresholds": [
+      100,
+      200,
+      300,
+      400,
+      500,
+      600
+    ],
+    "goal": 600,
+    "frags": {
+      "win": 10,
+      "ad": 10
+    },
+    "grand": {
+      "energy": 60,
+      "hints": 5
+    },
+    "rewardPool": [
+      {
+        "type": "energy",
+        "min": 10,
+        "max": 60,
+        "weight": 1
+      },
+      {
+        "type": "hints",
+        "min": 1,
+        "max": 3,
+        "weight": 1
+      }
+    ]
+  },
+  "winstreak": {
+    "enabled": true,
+    "keepMinPrompt": 3,
+    "every": 10,
+    "rewards": {
+      "energy": 60,
+      "coins": 10,
+      "frags": 10
     }
   }
 }

@@ -11,6 +11,49 @@ test('默认配置 = 无此系统（i18n 未配置取词即抛；geo 未配置�
   assert.equal(L.createGeoAllow(null)('KP'), true);
 });
 
+/* ---- 语言选择决策链（两个游戏共用，抽自 water.html 既有实现）---- */
+const AVAIL = ['zh', 'en'];
+
+test('resolveLang 优先级：?lang= > 已保存 > Telegram > 浏览器 > 默认', () => {
+  // ?lang= 调试参数最高，压过一切
+  assert.equal(L.resolveLang({ search: '?lang=en', saved: 'zh', tgLanguageCode: 'zh', navigatorLanguage: 'zh-CN' }, AVAIL, 'en'), 'en');
+  // 没有 ?lang= 时，用户手动选择（持久化）优先于自动检测
+  assert.equal(L.resolveLang({ saved: 'en', tgLanguageCode: 'zh', navigatorLanguage: 'zh-CN' }, AVAIL, 'zh'), 'en');
+  // 没保存过 → Telegram 客户端语言
+  assert.equal(L.resolveLang({ tgLanguageCode: 'zh-hans', navigatorLanguage: 'en-US' }, AVAIL, 'en'), 'zh');
+  // 再退浏览器语言
+  assert.equal(L.resolveLang({ navigatorLanguage: 'zh-TW' }, AVAIL, 'en'), 'zh');
+  // 全都没有/都不认识 → 默认语言
+  assert.equal(L.resolveLang({ navigatorLanguage: 'fr-FR' }, AVAIL, 'en'), 'en');
+  assert.equal(L.resolveLang({}, AVAIL, 'zh'), 'zh');
+});
+
+test('resolveLang 忽略不可用语言，继续往下退（不会返回没有字典的语言）', () => {
+  // ?lang=fr 无字典 → 跳过，落到已保存的 zh
+  assert.equal(L.resolveLang({ search: '?lang=fr', saved: 'zh' }, AVAIL, 'en'), 'zh');
+  // 保存过一个后来被删掉的语言 → 跳过，落到浏览器语言
+  assert.equal(L.resolveLang({ saved: 'de', navigatorLanguage: 'en-GB' }, AVAIL, 'zh'), 'en');
+});
+
+test('matchLang 按 RFC 4647 lookup：精确 → 基础语言（截断区域）', () => {
+  assert.equal(L.matchLang('zh', AVAIL), 'zh');
+  assert.equal(L.matchLang('zh-CN', AVAIL), 'zh', '区域变体落到基础语言');
+  assert.equal(L.matchLang('EN-us', AVAIL), 'en', '大小写不敏感');
+  assert.equal(L.matchLang('fr', AVAIL), null, '没有就是没有，不瞎猜');
+  assert.equal(L.matchLang('', AVAIL), null);
+  assert.equal(L.matchLang('zh-Hant', ['zh-Hant', 'zh', 'en']), 'zh-Hant', '精确优先于基础语言');
+});
+
+test('resolveLang fail-fast：available 为空或默认语言不在其中，加载期就抛', () => {
+  assert.throws(() => L.resolveLang({}, [], 'en'), /available 必须是非空数组/);
+  assert.throws(() => L.resolveLang({}, AVAIL, 'fr'), /默认语言 "fr" 不在 available/);
+});
+
+test('htmlLang：zh → zh-CN（给 <html lang> 用，影响字体与朗读）', () => {
+  assert.equal(L.htmlLang('zh'), 'zh-CN');
+  assert.equal(L.htmlLang('en'), 'en');
+});
+
 test('i18n：回退链 具体 locale → 基础语言 → 默认语言，回退记 telemetry', () => {
   const i = L.createI18n({
     default: 'en',

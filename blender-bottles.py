@@ -17,18 +17,19 @@ import sys
 
 import bpy
 
-# 瓶型参数（比例对齐参考图：瓶身细长，肩部快速收颈，瓶口一圈白环）
+# 瓶型参数（Q 版矮胖瓶：总高约原细长瓶一半，圆角底更大、颈/环相对更粗，显得更萌；
+# 旧细长版参数留档：R_NECK .26 / R_RING .335 / BOTTOM_R .16 / Z 2.35/2.72/2.95/3.22 / RES 250x800）
 R_BODY = 0.50          # 瓶身半径
-R_NECK = 0.26          # 颈部半径
-R_RING = 0.335         # 瓶口环外半径
-BOTTOM_R = 0.16        # 底部圆角
-Z_BODY_TOP = 2.35      # 直筒身顶（液体只装到这里）
-Z_SHOULDER = 2.72      # 肩部结束/颈部开始
-Z_NECK_TOP = 2.95      # 颈部顶（白环从这里往上）
-Z_TOP = 3.22           # 瓶口顶
+R_NECK = 0.29          # 颈部半径
+R_RING = 0.37          # 瓶口环外半径
+BOTTOM_R = 0.22        # 底部圆角
+Z_BODY_TOP = 1.10      # 直筒身顶（液体只装到这里）
+Z_SHOULDER = 1.36      # 肩部结束/颈部开始
+Z_NECK_TOP = 1.52      # 颈部顶（白环从这里往上）
+Z_TOP = 1.70           # 瓶口顶
 WALL = 0.035
 CAP = 4
-RES_X, RES_Y = 250, 800
+RES_X, RES_Y = 250, 400
 
 
 def argv_after_dashes():

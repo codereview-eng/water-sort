@@ -69,7 +69,15 @@
       return true;
     }
 
-    return {
+    var api = {
+      /* 换一个 provider、复用同一张 placement 表与频控语义。
+         用途：真实广告是异步的，宿主先 await 播放结果，再用「返回已知结果」的 provider
+         驱动这里的判定链（core/adplay.js 的 playPlacement 就这么用），避免把频控与
+         onFail 策略在宿主侧重写一遍。 */
+      withProvider: function (nextProvider) {
+        if (typeof nextProvider !== 'function') fail('withProvider 需要函数');
+        return create(cfg, nextProvider);
+      },
       ids: function () { return Array.from(table.keys()); },
       has: function (id) { return table.has(id); },
       assertId: mustGet,
@@ -92,6 +100,7 @@
         return { shown: true, granted: ok || p.onFail === 'grant', retry: !ok && p.onFail === 'retry', state: next };
       }
     };
+    return api;
   }
 
   return { create: create, FORMATS: FORMATS, ON_FAIL: ON_FAIL };

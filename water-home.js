@@ -27,8 +27,9 @@
   }
 
   function extensions() {
+    /* weekly-event-entry 已于 2026-08-21 提到 core/home.js（两个游戏共用），
+       这里不再重复注册 —— core 的 registry 对重名是 fail-fast 的。 */
     return new Map([
-      ['weekly-event-entry', weeklyEventEntry],
       ['leaderboard-entry', leaderboardEntry]
     ]);
   }

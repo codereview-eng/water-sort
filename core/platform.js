@@ -116,6 +116,16 @@
 
   /* ---------- 浏览器胶水层 ---------- */
 
+  /* 防抖调度的纯函数层（可 Node 测）：返回本次应该等多久再冲刷云端。
+     只有防抖没有上限时会「饿死」——倒水首页每秒结算体力都会调一次 queueSync，
+     每次都把 1.5s 防抖重新计时，于是云端一次都写不进去，道具/进度看着同步其实全丢。
+     这里按 lodash debounce({maxWait}) 的成熟做法加最长等待：从第一次排队算起最多等 maxWaitMs，
+     到点必须冲刷一次，高频写入下也保证「用了道具，几秒内一定落云端」。 */
+  function nextSyncDelay(firstQueuedAt, nowMs, debounceMs, maxWaitMs) {
+    if (!firstQueuedAt) return debounceMs;
+    return Math.max(0, Math.min(debounceMs, firstQueuedAt + maxWaitMs - nowMs));
+  }
+
   /* 同源动态加载 /__sdk/v1.js；非 http(s) 面（file://）或加载失败/超时 → null（降级 local） */
   function loadSdk(opts) {
     opts = opts || {};
@@ -149,6 +159,7 @@
         if (!table) return local('ENTITY_UNDECLARED', play.user);
         var rowId = null;
         var timer = null;
+        var firstQueuedAt = 0;   // 本轮防抖第一次排队的时刻（配合 maxWait 防止被高频写入饿死）
         var session = {
           mode: 'online',
           reason: null,
@@ -179,9 +190,14 @@
           queueSync: function (getSave, hooks) {
             hooks = hooks || {};
             if (!session.user) return;
+            var now = Date.now();
+            if (!timer) firstQueuedAt = now;
+            var delay = nextSyncDelay(firstQueuedAt, now,
+              opts.syncDebounceMs || 1500, opts.syncMaxWaitMs || 5000);
             if (timer) clearTimeout(timer);
             timer = setTimeout(function () {
               timer = null;
+              firstQueuedAt = 0;
               Promise.resolve().then(function () { return session.saveCloud(getSave()); })
                 .catch(function (err) {
                   if (err && err.status === 401) {
@@ -191,12 +207,12 @@
                     setTimeout(function () { session.queueSync(getSave, { onAuthLost: hooks.onAuthLost, onError: hooks.onError, __retried: true }); }, 5000);
                   } else if (hooks.onError) hooks.onError(err);
                 });
-            }, opts.syncDebounceMs || 1500);
+            }, delay);
           },
           /* 页面隐藏前尽力冲刷未落的同步 */
           flush: function (getSave) {
             if (!session.user || !timer) return;
-            clearTimeout(timer); timer = null;
+            clearTimeout(timer); timer = null; firstQueuedAt = 0;
             Promise.resolve().then(function () { return session.saveCloud(getSave()); }).catch(function () {});
           }
         };
@@ -207,5 +223,5 @@
     });
   }
 
-  return { create: create, loadSdk: loadSdk, connect: connect };
+  return { create: create, loadSdk: loadSdk, connect: connect, nextSyncDelay: nextSyncDelay };
 });

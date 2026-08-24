@@ -7,7 +7,9 @@ const L = require('./water-levels.js');
 test('固定关：数量与形态（非空管根根装满，空管数符合设计）', () => {
   // 5 关教学爬坡 + 25 关主题关（basic/tight/crowd/master，pick-theme-levels.mjs 产出）
   assert.strictEqual(L.FIXED_LEVELS.length, 30);
-  const expectedLocks = [[4], [3], [5], [], []];
+  // 辅助位地板：每关至少 2 根锁定空瓶（不足的由 withAssistBottles 在盘面末尾追加），
+  // 让非最优解玩家能靠「看广告解锁空瓶」降难通关，而不是必须打出最优解。
+  const expectedLocks = [[4, 5], [3, 5], [5, 6], [6, 7], [7, 8]];
   for (let i = 1; i <= L.FIXED_LEVELS.length; i += 1) {
     const lv = L.forLevel(i);
     assert.strictEqual(lv.generated, false);
@@ -23,7 +25,7 @@ test('固定关：数量与形态（非空管根根装满，空管数符合设�
       // L6-30 主题关：锁瓶是挑关脚本的构造约束——只锁盘面末尾的空管，
       // 1-3 根随章节爬坡（对应「看广告解锁空瓶」的可选辅助位）。
       const n = lv.lockedBottleIndexes.length;
-      assert.ok(n >= 1 && n <= 3, `L${i} 锁瓶数出设计带`);
+      assert.ok(n >= L.ASSIST_LOCKED_MIN && n <= 3, `L${i} 锁瓶数出设计带（辅助位地板=2）`);
       const tail = Array.from({ length: n }, (_, k) => lv.layout.length - n + k);
       assert.deepStrictEqual(lv.lockedBottleIndexes, tail, `L${i} 锁必须落在盘面末尾`);
     }
@@ -36,7 +38,7 @@ test('固定关：数量与形态（非空管根根装满，空管数符合设�
 test('固定关：锁配置返回独立副本，旧关卡缺省时不自动锁空瓶', () => {
   const lv = L.forLevel(1);
   lv.lockedBottleIndexes.push(3);
-  assert.deepStrictEqual(L.forLevel(1).lockedBottleIndexes, [4]);
+  assert.deepStrictEqual(L.forLevel(1).lockedBottleIndexes, [4, 5]);
   assert.deepStrictEqual(L.normalizeLockedBottleIndexes([], [['mint'], []]), []);
   assert.deepStrictEqual(L.normalizeLockedBottleIndexes(undefined, [['mint'], []]), []);
   assert.deepStrictEqual(
@@ -52,16 +54,16 @@ test('固定关：可解，且 minMoves 快照与 BFS 标定一致（改盘面�
   const expect = [5, 8, 10, 14, 15];
   for (let i = 1; i <= expect.length; i += 1) {
     const lv = L.forLevel(i);
-    const r = E.solve(lv.layout, { capacity: lv.capacity });
-    assert.strictEqual(r.solvable, true, `L${i} 不可解`);
+    // 标定口径 = 不开瓶盘面（排除全部锁定辅助位），与游戏内 par 同口径
+    const playable = lv.layout.filter((_, tubeIndex) => !lv.lockedBottleIndexes.includes(tubeIndex));
+    const r = E.solve(playable, { capacity: lv.capacity });
+    assert.strictEqual(r.solvable, true, `L${i} 不开瓶不可解——广告开瓶成了通关必需`);
     assert.strictEqual(r.minMoves, lv.minMoves, `L${i} 标定漂移`);
     assert.strictEqual(lv.minMoves, expect[i - 1], `L${i} 快照变了`);
-    for (const lockedIndex of lv.lockedBottleIndexes) {
-      const playable = lv.layout.filter((_, tubeIndex) => tubeIndex !== lockedIndex);
-      const withoutLockedBottle = E.solve(playable, { capacity: lv.capacity });
-      assert.strictEqual(withoutLockedBottle.solvable, true, `L${i} 锁瓶后不可解`);
-      assert.strictEqual(withoutLockedBottle.minMoves, lv.minMoves, `L${i} 锁瓶改变最少步数`);
-    }
+    // 开瓶（解锁全部辅助位）只会更容易：仍可解，且最少步数不变多
+    const open = E.solve(lv.layout, { capacity: lv.capacity });
+    assert.strictEqual(open.solvable, true, `L${i} 开瓶后反而不可解`);
+    assert.ok(open.minMoves <= lv.minMoves, `L${i} 开瓶反而更难`);
   }
 });
 
@@ -100,18 +102,22 @@ test('生成关硬门：31-41 关必须可解、形态整齐、颜色守恒', ()
     const full = lv.layout.filter((t) => t.length);
     assert.strictEqual(full.length, lv.colors.length, `L${i} 非空管数`);
     for (const t of full) assert.strictEqual(t.length, lv.capacity, `L${i} 有半满管`);
-    const r = E.solve(lv.layout, { capacity: lv.capacity, maxVisited: 150000 });
-    assert.strictEqual(r.solvable, true, `L${i} 生成了不可解的关`);
-    assert.ok(lv.lockedBottleIndexes.length <= 1, `L${i} 最多配置一根锁瓶`);
+    // 开盘可解不再单独全量 BFS：辅助位地板追加 2 根空管后，开盘（8 色 + 4 空管）
+    // 分支爆炸会让 150k visited 假阴性；由下面的「不开瓶可解」硬门蕴含
+    // （开盘只是多几根空管，解集只增不减）。
+    assert.strictEqual(
+      lv.lockedBottleIndexes.length, L.ASSIST_LOCKED_MIN,
+      `L${i} 辅助位地板漂移（生成关=盘面内锁瓶≤1 + 追加补足到 2）`,
+    );
     for (const index of lv.lockedBottleIndexes) {
       assert.strictEqual(lv.layout[index].length, 0, `L${i} 只能锁空瓶`);
-      const playable = lv.layout.filter((_, tubeIndex) => tubeIndex !== index);
-      assert.strictEqual(
-        E.solve(playable, { capacity: lv.capacity, maxVisited: 150000 }).solvable,
-        true,
-        `L${i} 锁瓶后必须仍可解`,
-      );
     }
+    const playable = lv.layout.filter((_, tubeIndex) => !lv.lockedBottleIndexes.includes(tubeIndex));
+    assert.strictEqual(
+      E.solve(playable, { capacity: lv.capacity, maxVisited: 150000 }).solvable,
+      true,
+      `L${i} 不开瓶必须仍可解——广告开瓶成了通关必需`,
+    );
   }
 });
 

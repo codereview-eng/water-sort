@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>彩色扫雷 · Color Mines</title>
+<!-- Monetag 站点所有权验证。必须留在原始 HTML 的 <head> 里：验证器抓页面源码、不执行 JS，
+     且 Monetag 要求验证通过后不要移除（用于持续确认所有权）。
+     注册的站点应是本游戏自己的子域 play-color-mines.run.ceo —— 不是 run.ceo
+     （run.ceo 首页属于平台，我们改不了它的 <head>，也不该声称拥有整个平台）。 -->
+<meta name="monetag" content="2f9e3e08b43a9d525e226b36d0a22368">
+<title>Color Mines</title>
 <style>
   :root{
     --bg:#141a24; --surface:#1e2735; --ink:#f2f5f9; --ink-2:#9fb0c3; --ink-3:#6b7a8d;
@@ -66,8 +71,13 @@
   .overlay{position:fixed; inset:0; background:rgba(8,12,18,.66); display:none;
     align-items:center; justify-content:center; z-index:30; padding:20px;}
   .overlay.show{display:flex;}
-  .dialog{background:var(--surface); border:1px solid var(--edge); border-radius:16px;
+  .dialog{position:relative; background:var(--surface); border:1px solid var(--edge); border-radius:16px;
     padding:20px; width:100%; max-width:320px; display:flex; flex-direction:column; gap:12px; text-align:center;}
+  /* 关闭入口：任何弹窗都必须能退出（硬规则：禁止出现用户无法返回的窗口） */
+  .dlgx{position:absolute; top:6px; right:8px; width:32px; height:32px; padding:0; border:0;
+    border-radius:9px; background:transparent; color:var(--ink-3); font-size:16px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;}
+  .dlgx:hover{background:rgba(255,255,255,.07); color:var(--ink);}
   .dialog h2{margin:0; font-size:18px;}
   .dialog p{margin:0; font-size:13px; color:var(--ink-2); line-height:1.6;}
   .dialog .btn{border:0; border-radius:10px; padding:11px; font-size:14px; font-weight:800; cursor:pointer;}
@@ -77,6 +87,73 @@
     background:#0d1420; border:1px solid var(--edge); color:var(--ink); border-radius:10px;
     padding:8px 14px; font-size:13px; opacity:0; transition:.25s; pointer-events:none; z-index:40; white-space:nowrap;}
   .toast.show{opacity:1; transform:translateX(-50%);}
+
+  /* 兜底广告卡（house 源）：没有第三方广告可放时也要真的"看"一段，
+     否则「看广告拿奖励」就退化成白送 —— 这正是本次 RCA 的问题所在。 */
+  .admask{position:fixed; inset:0; z-index:60; background:rgba(4,8,14,.92);
+    display:flex; align-items:center; justify-content:center; padding:22px;}
+  .adbox{width:100%; max-width:340px; background:var(--surface); border:1px solid var(--edge);
+    border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:12px; text-align:center;}
+  .adbox .adlab{font-size:11px; color:var(--ink-3); letter-spacing:.12em; text-transform:uppercase;}
+  .adbox .adart{height:150px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    font-size:40px; background:linear-gradient(135deg,#1d2836,#0f1620); border:1px solid var(--edge);}
+  .adbox .adtip{font-size:12px; color:var(--ink-2);}
+  .adbox .adcd{font-size:15px; font-weight:800; color:var(--accent);}
+  .adbox button{border:0; border-radius:10px; padding:10px; font-size:13px; font-weight:700; cursor:pointer;
+    background:rgba(127,127,127,.18); color:var(--ink-2);}
+  .adbox button:disabled{opacity:.45; cursor:default;}
+
+  /* 首页周活动入口按钮（骨架由 core/home.js 的 weekly-event-entry 产出） */
+  .eventbtn{display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
+    background:var(--surface); border:1px solid var(--edge); border-radius:14px; padding:12px 14px;
+    font:inherit; color:var(--ink); cursor:pointer; position:relative;}
+  .eventbtn:hover{border-color:var(--accent);}
+  .eventbtn .left{display:flex; align-items:center; gap:10px; min-width:0;}
+  .eventbtn .ic{font-size:20px; color:var(--accent);}
+  .eventbtn .t{display:flex; flex-direction:column; text-align:left; min-width:0;}
+  .eventbtn .t b{font-size:14px;}
+  .eventbtn .t span{font-size:11px; color:var(--ink-3);}
+  .eventbtn .frag{font-size:13px; font-weight:800; color:var(--accent); flex:0 0 auto;}
+  .eventbtn .badge{position:absolute; top:-6px; right:10px; background:#e5484d; color:#fff;
+    font-size:10px; font-weight:800; border-radius:9px; padding:2px 6px;}
+
+  /* 每周活动（机制在 core/weekly.js，奖励内容由 game.config.json 的 weekly 段配置） */
+  .wk{padding:14px 16px 30px; display:flex; flex-direction:column; gap:14px;}
+  .wktop{display:flex; align-items:center; gap:10px;}
+  .wktop button{background:transparent; border:0; color:var(--ink-2); font-size:14px; cursor:pointer; padding:4px 2px;}
+  .wktop .wkh{flex:1; text-align:center; font-size:15px; font-weight:800; color:var(--ink);}
+  .wkcard{background:var(--surface); border:1px solid var(--edge); border-radius:14px; padding:14px;
+    display:flex; flex-direction:column; gap:10px;}
+  .wkcard .wkth{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+  .wkcard .wkth b{font-size:16px; color:var(--ink);}
+  .wkcard .wkth span{font-size:11px; color:var(--ink-3);}
+  .wkfrag{display:flex; align-items:baseline; justify-content:space-between;}
+  .wkfrag .lab{font-size:12px; color:var(--ink-3);}
+  .wkfrag .num{font-size:20px; font-weight:800; color:var(--accent);}
+  .wkbar{height:8px; border-radius:6px; background:rgba(127,127,127,.22); overflow:hidden;}
+  .wkbar i{display:block; height:100%; background:var(--accent); border-radius:6px; transition:width .3s;}
+  .wkcarry{font-size:11px; color:var(--ink-3);}
+  .wkgrid{display:flex; flex-direction:column; gap:10px;}
+  .wkpic{display:flex; align-items:center; gap:10px; background:var(--surface);
+    border:1px solid var(--edge); border-radius:12px; padding:10px 12px;}
+  .wkpic .ico{font-size:20px; width:26px; text-align:center; flex:0 0 auto;}
+  .wkpic .info{flex:1 1 auto; min-width:0;}
+  .wkpic .info b{display:block; font-size:14px; color:var(--ink);}
+  .wkpic .info span{font-size:11px; color:var(--ink-3);}
+  .wkpic.locked{opacity:.55;}
+  .wkpic.claimed .info b{color:var(--ink-3);}
+  .wkpic button{flex:0 0 auto; border:0; border-radius:9px; padding:7px 12px; font-size:12px;
+    font-weight:700; cursor:pointer; background:var(--accent); color:#1a1205;}
+  .wkpic button[disabled]{background:rgba(127,127,127,.2); color:var(--ink-3); cursor:default;}
+  .wkgrand{border-color:var(--accent);}
+  .wknote{font-size:11px; color:var(--ink-3); line-height:1.7; text-align:center;}
+
+  /* 隐藏工具面板（仅 URL 带 #selftest 时显示，普通玩家看不到） */
+  .selftest{position:fixed; left:10px; right:10px; bottom:10px; z-index:50; background:#0d1420;
+    border:1px solid var(--edge); border-radius:12px; padding:10px; display:flex;
+    flex-direction:column; gap:8px;}
+  .selftest pre{margin:0; font-size:11px; line-height:1.55; color:var(--ink-2); white-space:pre-wrap;
+    word-break:break-all; max-height:46vh; overflow:auto; user-select:text; -webkit-user-select:text;}
 
   /* ---------- 首页（与 water.html home 同款布局） ---------- */
   [hidden]{display:none !important;}
@@ -88,11 +165,37 @@
     padding:10px 12px; text-align:center;}
   .homestats .st b{display:block; font-size:20px; color:var(--ink); margin-bottom:2px;}
   .homestats .st span{font-size:11px; color:var(--ink-3);}
+  /* 道具格 = 图标按钮（数量不在首页显示，点开背包窗口看） */
+  .homestats .stbtn{font:inherit; cursor:pointer; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px;}
+  .homestats .stbtn:hover{border-color:var(--accent);}
+  .homestats .stbtn .sticon{font-size:20px; line-height:1.15; margin-bottom:2px;}
+  /* 背包窗口内的道具行 */
+  .bagrow{display:flex; align-items:center; gap:10px; text-align:left;
+    background:var(--bg-2, rgba(255,255,255,.04)); border:1px solid var(--edge);
+    border-radius:10px; padding:10px 12px;}
+  .bagrow .bagicon{font-size:22px; line-height:1; flex:0 0 auto;}
+  .bagrow .baginfo{flex:1 1 auto; min-width:0;}
+  .bagrow .baginfo b{display:block; font-size:14px; color:var(--ink);}
+  .bagrow .baginfo span{font-size:11px; color:var(--ink-3);}
+  .bagrow .bagqty{flex:0 0 auto; font-size:16px; font-weight:800; color:var(--accent);}
+  .bagrow.empty .bagqty{color:var(--ink-3);}
+  .bagempty{font-size:12px; color:var(--ink-3); line-height:1.6;}
   .bigbtn{border:0; border-radius:14px; padding:16px; font-size:17px; font-weight:800; cursor:pointer;
     background:var(--accent); color:#20160a;}
   .bigbtn small{display:block; font-weight:600; font-size:11px; margin-top:3px; opacity:.75;}
   .energy{display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--edge);
     border-radius:12px; padding:10px 12px;}
+  /* 并排行：体力条 + 金币牌同一行（体力不再独占整行） */
+  .hrow{display:flex; gap:10px; align-items:stretch;}
+  .hrow .rowcell{min-width:0;}                       /* 允许收缩，长数字不撑破布局 */
+  .hrow .rowcell > *{height:100%; box-sizing:border-box;}
+  .coinbox{display:flex; gap:8px; align-items:center; justify-content:center;
+    background:var(--surface); border:1px solid var(--edge); border-radius:12px; padding:10px 12px;}
+  .coinbox .icon{font-size:20px;}
+  .coinbox .info{display:flex; flex-direction:column; line-height:1.15; min-width:0;}
+  .coinbox .info b{font-size:17px; font-weight:800; color:var(--ink);}
+  .coinbox .info span{font-size:11px; color:var(--ink-3);}
   .energy .icon{font-size:22px;}
   .energy .info{flex:1;}
   .energy .val{font-size:15px; font-weight:800; color:var(--ink);}
@@ -100,6 +203,18 @@
   .energy .sub{font-size:11px; color:var(--ink-3); margin:2px 0 4px;}
   .energy .bar{height:5px; border-radius:3px; background:rgba(255,255,255,.08); overflow:hidden;}
   .energy .bar i{display:block; height:100%; background:var(--accent); border-radius:3px;}
+  /* 双连胜卡(2026-08-24 · core/winstreak.js) */
+  .streakcard{display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--edge);
+    border-radius:12px; padding:10px 12px;}
+  .streakcard .ic{font-size:22px;}
+  .streakcard .info{flex:1; min-width:0;}
+  .streakcard .val{font-size:15px; font-weight:800; color:var(--ink);}
+  .streakcard .val span{color:var(--ink-3); font-weight:600; font-size:11px;}
+  .streakcard .sub{font-size:11px; color:var(--ink-3); margin:2px 0 4px; display:flex; justify-content:space-between; gap:8px;}
+  .streakcard .bar{height:5px; border-radius:3px; background:rgba(255,255,255,.08); overflow:hidden;}
+  .streakcard .bar i{display:block; height:100%; background:var(--ok); border-radius:3px; transition:width .3s;}
+  .streakcard .wsclaim{background:var(--accent); color:#20160a; border-radius:9px; padding:9px 11px;
+    font-size:12px; font-weight:800; white-space:nowrap;}
   .profilerow{display:flex; gap:10px; align-items:center; background:var(--surface); border:1px solid var(--edge);
     border-radius:12px; padding:10px 12px; cursor:pointer; color:var(--ink); font-size:13px; text-align:left; width:100%;}
   .profilerow .avatar{width:32px; height:32px; border-radius:50%; background:var(--accent); color:#20160a;
@@ -107,6 +222,22 @@
   .profilerow .profileinfo{flex:1; display:flex; flex-direction:column; gap:1px;}
   .profilerow .profilelabel{font-size:11px; color:var(--ink-3);}
   .profilerow .profilesource{font-size:11px; color:var(--ink-3);}
+  .idrow .avatar{position:relative;}
+  .idnameline{display:flex; align-items:center; gap:6px; min-width:0;}
+  .idnameline .profilename{font-weight:800; min-width:0; overflow-wrap:anywhere;}
+  .idsource{display:none; flex:none; font-style:normal; font-size:10px; font-weight:600; color:var(--ink-3);
+    border:1px solid var(--edge); border-radius:999px; padding:1px 5px;}
+  .idsource.show{display:inline-block;}
+  .idsub{font-size:11px; color:var(--ink-3); line-height:1.4; white-space:normal; overflow-wrap:anywhere;}
+  .idrow #idAction{flex:none; max-width:88px; text-align:right; color:var(--ink-2);}
+  .idbadge{position:absolute; right:-2px; bottom:-2px; width:14px; height:14px; border-radius:50%;
+    border:2px solid var(--surface); display:flex; align-items:center; justify-content:center;
+    font-style:normal; font-size:9px; font-weight:900; line-height:1;}
+  .idbadge.off{background:var(--surface); box-shadow:inset 0 0 0 1px var(--ink-3);}
+  .idbadge.ok{background:var(--ok); color:var(--surface);}
+  .idbadge.ok::after{content:'✓';}
+  .idbadge.warn{background:var(--accent); color:var(--surface);}
+  .idbadge.warn::after{content:'!';}
   .langrow{display:flex; align-items:center; justify-content:space-between; background:var(--surface);
     border:1px solid var(--edge); border-radius:12px; padding:10px 12px; font-size:13px; color:var(--ink-2);}
   .sfxbtn{border:1px solid var(--edge); background:transparent; color:var(--ink); border-radius:8px;
@@ -123,44 +254,88 @@
   <!-- ============ 游戏页 ============ -->
   <div class="game" id="game" hidden>
   <div class="topbar">
-    <button class="backbtn" id="btnBack">‹ 返回</button>
-    <div class="title">彩色扫雷 <em>COLOR MINES</em></div>
+    <button class="backbtn" id="btnBack"></button>
+    <div class="title" id="gameTitle">彩色扫雷 <em>COLOR MINES</em></div>
     <div class="hearts" id="hearts"></div>
   </div>
 
   <div class="hud">
-    <div class="box"><span class="k">关卡</span><b class="v" id="hudLv">1</b></div>
-    <div class="box"><span class="k">剩余雷</span><b class="v" id="hudLeft">0</b></div>
-    <div class="box"><span class="k">时间</span><b class="v" id="hudTime">--:--</b></div>
+    <div class="box"><span class="k" id="hudLvK"></span><b class="v" id="hudLv">1</b></div>
+    <div class="box"><span class="k" id="hudLeftK"></span><b class="v" id="hudLeft">0</b></div>
+    <div class="box"><span class="k" id="hudTimeK"></span><b class="v" id="hudTime">--:--</b></div>
   </div>
 
   <div class="boardwrap"><div class="board" id="board" aria-label="扫雷棋盘"></div></div>
 
   <div class="tools">
-    <button class="tool" id="toolMine">🎯 找一个雷 <span class="cnt" id="cntMine">0</span></button>
-    <button class="tool" id="toolSafe">🛡 排一个安全格 <span class="cnt" id="cntSafe">0</span></button>
+    <button class="tool" id="toolMine"><span id="toolMineLbl"></span> <span class="cnt" id="cntMine">0</span></button>
+    <button class="tool" id="toolSafe"><span id="toolSafeLbl"></span> <span class="cnt" id="cntSafe">0</span></button>
   </div>
-  <div class="hintline">单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开 · 每种颜色 / 每行 / 每列恰好一颗雷，雷与雷互不相邻</div>
+  <div class="hintline" id="gameHint"></div>
   </div>
 </div>
 
 <div class="overlay" id="overlay">
   <div class="dialog">
+    <button class="dlgx" id="dlgX" type="button" aria-label="关闭" title="关闭">✕</button>
     <h2 id="dlgTitle"></h2>
     <p id="dlgBody"></p>
+    <div id="dlgList" hidden></div>
     <button class="btn primary" id="dlgMain"></button>
     <button class="btn ghost" id="dlgSub"></button>
   </div>
 </div>
+<div class="wk" id="wkPage" hidden>
+  <div class="wktop">
+    <button id="btnWkBack" type="button"></button>
+    <div class="wkh" id="wkH"></div>
+    <span class="mono" id="wkCd" style="font-size:11px;color:var(--ink-3)"></span>
+  </div>
+  <div class="wkcard">
+    <div class="wkth"><b id="wkTheme"></b><span id="wkGoalLab"></span></div>
+    <div class="wkfrag"><span class="lab" id="wkFragLab"></span><span class="num mono" id="wkFragNum"></span></div>
+    <div class="wkbar"><i id="wkBar"></i></div>
+    <div class="wkcarry" id="wkCarry" hidden></div>
+  </div>
+  <div class="wkgrid" id="wkGrid"></div>
+  <div class="wkpic wkgrand" id="wkGrandRow">
+    <span class="ico">🏆</span>
+    <span class="info"><b id="wkGrandName"></b><span id="wkGrandDesc"></span></span>
+    <button id="wkGrandBtn" type="button"></button>
+  </div>
+  <button class="btn ad" id="wkAdBtn" type="button"></button>
+  <div class="wknote" id="wkNote"></div>
+</div>
+<div class="admask" id="adMask" hidden>
+  <div class="adbox">
+    <div class="adlab" id="adLab"></div>
+    <div class="adart" id="adArt">🎬</div>
+    <div class="adtip" id="adTip"></div>
+    <div class="adcd" id="adCd"></div>
+    <button id="adSkip" type="button"></button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
+<div class="selftest" id="selftest" hidden>
+  <button class="btn primary" id="stGrant" type="button">💰 充值 10000 金币（本账号）</button>
+  <pre id="stOut">点上面的按钮开始。结果可长按复制。</pre>
+</div>
 
-<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny"},"fail-revive":{"format":"rewarded","onFail":"retry"},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","hint":"Hint"},"zh":{"play":"开始","hint":"提示"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"icon":"💣","text":"彩色扫雷","em":"COLOR MINES"}},{"type":"energy","props":{}},{"type":"homestats","props":{"items":[{"id":"homeLv","label":"当前进度","initial":1},{"id":"homeClears","label":"累计通关"},{"id":"homeTools","label":"道具"}]}},{"type":"start-button","props":{"label":"开始 第","small":"消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"}},{"type":"profile-row","props":{}},{"type":"account-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"hintline","props":{"lines":["单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","雷与雷互不相邻，先推理再动手"]}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"level":{"col":"level","merge":"max"},"clears":{"col":"clears","merge":"max"},"toolMine":{"col":"tool_mine","merge":"newest"},"toolSafe":{"col":"tool_safe","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
+<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny","capping":{"maxPerDay":20}},"fail-revive":{"format":"rewarded","onFail":"retry","capping":{"maxPerDay":20}},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}},"streak-keep":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":20}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}},"play":{"sources":[{"type":"telegram","env":"telegram"},{"type":"monetag","zoneId":"11440777","env":"telegram"},{"type":"directlink","url":"https://omg10.com/4/11622862","env":"web"},{"type":"house"}],"houseSeconds":5,"timeoutMs":20000},"verification":{"monetag":"2f9e3e08b43a9d525e226b36d0a22368","site":"play-color-mines.run.ceo"},"passive":{"multitag":{"src":"https://quge5.com/88/tag.min.js","zone":"271963","env":"web","screens":["home"]}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"zh","locales":{"zh":{"langName":"中文","docTitle":"彩色扫雷 · Color Mines","logoMain":"彩色扫雷","logoSub":"COLOR MINES","back":"‹ 返回","hudLevel":"关卡","hudMines":"剩余雷","hudTime":"时间","toolMineBtn":"🎯 找一个雷","toolSafeBtn":"🛡 排一个安全格","tipLine1":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开","tipLine2":"雷与雷互不相邻，先推理再动手","statLevel":"当前进度","statClears":"累计通关","statTools":"道具","statCoins":"金币","sfxLabel":"音效","langLabel":"语言","on":"开","off":"关","startBtn":"开始 第 {n}","startSub":"消耗 {n} 体力 · 每种颜色 / 每行 / 每列恰好一颗雷","energyFull":"体力已满","energyRegen":"+1 体力 {n} 秒后","levelGenFail":"关卡生成失败","notMine":"不是雷！剩余 {n} 条命","cellNotMine":"这个格子不是雷","allMinesFound":"雷已经全部找到了","noHintLeft":"没有可提示的格子了","itemToolMineName":"找一个雷","itemToolMineDesc":"直接点出一颗还没找到的雷","itemToolSafeName":"排一个安全格","itemToolSafeDesc":"标记一格「这里没有雷」","itemCoinsName":"金币","itemCoinsDesc":"通关累积，可直接兑换道具","notEnoughCoins":"金币不够","boughtWithCoins":"已用 {n} 金币购买「{name}」","buyWithCoins":"用 {n} 金币购买","adGrant":"看广告 +{n}","toolRefilled":"已补充道具","toolEmptyTitle":"道具用完了","toolEmptyBuy":"用 {price} 金币直接补 {amount} 个「{name}」，不用看广告。当前金币 {balance} 枚。","toolEmptyAd":"看一段广告，补 {n} 个「{name}」道具。","toolEmptySave":"当前金币 {balance} 枚，攒到 {price} 就能直接买、不用看广告。","cancel":"取消","winTitle":"🎉 第 {n} 关通过！","winBody":"全部 {n} 颗雷都找到了。","winCoins":"金币 +{n}，共 {total} 枚。","nextLevel":"下一关","toHome":"返回首页","deadTitle":"💥 没有生命了","deadBody":"看一段广告复活（恢复 1 条命，进度保留），或重开本关。","adRevive":"看广告复活","restart":"重开本关","timeUpTitle":"⏰ 时间到","timeUpBody":"看一段广告 +{n} 秒继续，或重开本关。","quitTitle":"退出本关？","quitBody":"本关进度不保留，下次从第 {n} 关重新开始。","quit":"退出","keepPlaying":"继续玩","energyLowTitle":"体力不足","energyLowBody":"当前体力 {have}，进关需要 {need}。看一段广告补 {grant} 体力。","energyRefilled":"已补充体力","bagTitle":"🎒 我的道具","bagBody":"关卡里点道具按钮即可使用。","bagEmpty":"还没有任何道具。","gotIt":"知道了","defaultPlayer":"我","playerPrefix":"玩家","srcCloud":"run.ceo 云端","srcLocal":"本机临时名","idConnecting":"正在连接 run.ceo，进度暂存本机","idAnon":"未登录，进度仅保存在本机","idSynced":"已登录，进度在所有设备云同步","idSyncedNoName":"已登录，进度已云同步；平台尚未设置名称","idExpired":"登录已过期，新进度暂存本机","idUnsupported":"当前环境不支持云存档，进度保存在本机","login":"登录","reLogin":"重新登录","goRename":"去改名","accountEntry":"账号 ›","platformConnecting":"平台连接中…","accountTitle":"run.ceo 账号","accountBody":"已登录，当前进度会在所有设备同步。改名只修改本游戏的云端名称，所有设备生效，7 天一次。","goRenameCloud":"去 run.ceo 改名","logout":"退出登录","loggedOut":"已退出，进度改存本机","loginExpiredToast":"登录已过期，进度暂存本机","noGameId":"暂时拿不到本游戏标识，请稍后重试","renamePageFail":"暂时无法打开改名页，请稍后重试","nameUpdated":"名字已更新","nameUnchanged":"平台仍返回改名前的名字","noUsableName":"平台没有返回可用名字","renameSubmitted":"改名已提交，重新进入游戏后生效","cloudPromptTitle":"进度存到云端？","cloudPromptBody":"你已通关 {n} 盘。登录 run.ceo 账号后，进度、道具、体力跨设备同步，换浏览器不丢档。","later":"稍后","gameHint":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开 · 每种颜色 / 每行 / 每列恰好一颗雷，雷与雷互不相邻","wkEntry":"每周活动","wkEntrySub":"集碎片换奖励","wkTitle":"每周活动","wkBack":"‹ 返回","wkFragLab":"本周碎片","wkGoal":"目标 {n}","wkCarry":"上周结转 +{n}","wkCd":"{d}天{h}小时后重置","wkNote":"每通关一盘 +{n} 碎片","wkAd":"看广告 +{n} 碎片","wkAdBtn":"看广告领碎片","wkLocked":"还需 {n} 碎片","wkClaimable":"可领取","wkClaimed":"已领取","wkClaim":"领取","wkGrand":"大奖","wkGrandLocked":"集满 {n} 碎片解锁","wkGrandClaim":"领取大奖","wkUnlockToast":"解锁「{pic}」，可以领奖了","wkGrandToast":"大奖已解锁，快去领取","wkGot":"获得 {text}","wkFragGot":"+{n} 碎片","rwCoins":"{n} 金币","rwToolMine":"{n} 个「找一个雷」","rwToolSafe":"{n} 个「排一个安全格」","adTitle":"广告","adWatching":"广告播放中… {n} 秒","adSkip":"跳过（不领奖励）","adClose":"关闭","adReward":"看完可得奖励","adFailed":"广告没看完，奖励未发放","adNone":"暂时没有可播的广告，请稍后再试","adCapped":"这个奖励今天看得够多了，明天再来","close":"关闭","boardLabel":"扫雷棋盘","wsLabel":"连胜","wsCycLabel":"每 {n} 连胜奖励","wsClaimBtn":"🎁 看广告领取","wsKeepTitle":"🔥 {n} 连胜断了!","wsKeepBody":"看一段广告保持 {n} 连胜;放弃则从 0 重新累积。","wsKeepAd":"看广告保持连胜","wsKeepDrop":"放弃连胜并继续","wsKept":"🔥 连胜已保持:{n}","wsDropped":"连胜已清零","wsTicketToast":"🔥 {n} 连胜达成!看广告领奖励","wsClaimGot":"🎁 已领取 {r}"},"en":{"langName":"English","docTitle":"Color Mines","logoMain":"Color Mines","logoSub":"COLOR MINES","back":"‹ Back","hudLevel":"LEVEL","hudMines":"MINES","hudTime":"TIME","toolMineBtn":"🎯 Reveal a mine","toolSafeBtn":"🛡 Clear a safe cell","tipLine1":"Tap = mark \"no mine\" ✕ (tap again to undo) · Drag = mark in bulk · Double-tap = dig","tipLine2":"No two mines touch — reason it out before you dig","statLevel":"Progress","statClears":"Cleared","statTools":"Items","statCoins":"Coins","sfxLabel":"Sound","langLabel":"Language","on":"On","off":"Off","startBtn":"Start level {n}","startSub":"Costs {n} energy · exactly one mine per color / row / column","energyFull":"Energy full","energyRegen":"+1 energy in {n}s","levelGenFail":"Could not generate the level","notMine":"Not a mine! {n} lives left","cellNotMine":"No mine in this cell","allMinesFound":"All mines already found","noHintLeft":"No cell left to hint","itemToolMineName":"Reveal a mine","itemToolMineDesc":"Instantly reveal one mine you have not found","itemToolSafeName":"Clear a safe cell","itemToolSafeDesc":"Mark one cell as \"no mine here\"","itemCoinsName":"Coins","itemCoinsDesc":"Earned by clearing levels — spend them on items","notEnoughCoins":"Not enough coins","boughtWithCoins":"Bought \"{name}\" for {n} coins","buyWithCoins":"Buy for {n} coins","adGrant":"Watch ad · +{n}","toolRefilled":"Items refilled","toolEmptyTitle":"Out of items","toolEmptyBuy":"Spend {price} coins for {amount}× \"{name}\" — no ad needed. You have {balance} coins.","toolEmptyAd":"Watch an ad for {n}× \"{name}\".","toolEmptySave":"You have {balance} coins. Reach {price} to buy items without watching ads.","cancel":"Cancel","winTitle":"🎉 Level {n} cleared!","winBody":"You found all {n} mines.","winCoins":"+{n} coins — {total} total.","nextLevel":"Next level","toHome":"Back to home","deadTitle":"💥 Out of lives","deadBody":"Watch an ad to revive (+1 life, progress kept), or restart this level.","adRevive":"Watch ad · revive","restart":"Restart level","timeUpTitle":"⏰ Time's up","timeUpBody":"Watch an ad for +{n}s, or restart this level.","quitTitle":"Quit this level?","quitBody":"Progress in this level is lost — you will restart from level {n}.","quit":"Quit","keepPlaying":"Keep playing","energyLowTitle":"Not enough energy","energyLowBody":"You have {have} energy, {need} needed. Watch an ad for +{grant} energy.","energyRefilled":"Energy refilled","bagTitle":"🎒 My items","bagBody":"Tap an item button during a level to use it.","bagEmpty":"No items yet.","gotIt":"Got it","defaultPlayer":"Me","playerPrefix":"Player","srcCloud":"run.ceo cloud","srcLocal":"local name","idConnecting":"Connecting to run.ceo — progress kept on this device","idAnon":"Not signed in — progress stays on this device","idSynced":"Signed in — progress syncs across your devices","idSyncedNoName":"Signed in and syncing; no name set on the platform yet","idExpired":"Session expired — new progress kept on this device","idUnsupported":"Cloud save is unavailable here — progress stays on this device","login":"Sign in","reLogin":"Sign in again","goRename":"Change name","accountEntry":"Account ›","platformConnecting":"Connecting…","accountTitle":"run.ceo account","accountBody":"Signed in — progress syncs across all your devices. Renaming changes your cloud name for this game only, applies everywhere, once every 7 days.","goRenameCloud":"Change name on run.ceo","logout":"Sign out","loggedOut":"Signed out — progress now stays on this device","loginExpiredToast":"Session expired — progress kept on this device","noGameId":"Game id unavailable right now, please retry","renamePageFail":"Could not open the rename page, please retry","nameUpdated":"Name updated","nameUnchanged":"The platform still returns your previous name","noUsableName":"The platform returned no usable name","renameSubmitted":"Rename submitted — it applies next time you open the game","cloudPromptTitle":"Save progress to the cloud?","cloudPromptBody":"You've cleared {n} levels. Sign in with run.ceo to sync progress, items and energy across devices.","later":"Later","gameHint":"Tap = mark \"no mine\" ✕ (tap again to undo) · Drag = mark in bulk · Double-tap = dig · exactly one mine per color / row / column, and no two mines touch","wkEntry":"Weekly event","wkEntrySub":"Collect shards for rewards","wkTitle":"Weekly Event","wkBack":"‹ Back","wkFragLab":"Shards this week","wkGoal":"Goal {n}","wkCarry":"Carried over +{n}","wkCd":"Resets in {d}d {h}h","wkNote":"+{n} shards per level cleared","wkAd":"Watch ad · +{n} shards","wkAdBtn":"Watch ad for shards","wkLocked":"{n} more shards","wkClaimable":"Ready","wkClaimed":"Claimed","wkClaim":"Claim","wkGrand":"Grand prize","wkGrandLocked":"Unlock at {n} shards","wkGrandClaim":"Claim grand prize","wkUnlockToast":"\"{pic}\" unlocked — reward ready","wkGrandToast":"Grand prize unlocked!","wkGot":"Got {text}","wkFragGot":"+{n} shards","rwCoins":"{n} coins","rwToolMine":"{n}× Reveal a mine","rwToolSafe":"{n}× Clear a safe cell","adTitle":"Advertisement","adWatching":"Ad playing… {n}s","adSkip":"Skip (no reward)","adClose":"Close","adReward":"Watch to earn your reward","adFailed":"Ad not finished — no reward given","adNone":"No ad available right now, try again later","adCapped":"You have claimed this reward enough today — come back tomorrow","close":"Close","boardLabel":"Minesweeper board","wsLabel":"win streak","wsCycLabel":"Reward every {n} wins","wsClaimBtn":"🎁 Watch ad · claim","wsKeepTitle":"🔥 Your {n}-win streak broke!","wsKeepBody":"Watch a short ad to keep your {n}-win streak, or give it up and restart from 0.","wsKeepAd":"Watch ad · keep streak","wsKeepDrop":"Give up & continue","wsKept":"🔥 Streak kept: {n}","wsDropped":"Streak reset","wsTicketToast":"🔥 {n} wins in a row! Watch an ad to claim your reward","wsClaimGot":"🎁 Claimed {r}"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"icon":"💣","text":"彩色扫雷","em":"COLOR MINES"}},{"type":"row","props":{"items":[{"type":"energy","props":{},"flex":2},{"type":"coins","props":{"id":"homeCoins","icon":"💰","label":"金币","initial":0},"flex":1}]}},{"type":"homestats","props":{"items":[{"id":"homeLv","label":"当前进度","initial":1},{"id":"homeClears","label":"累计通关"},{"id":"btnBag","label":"道具","icon":"🎒","action":"bag"}]}},{"type":"start-button","props":{"label":"开始 第","small":"消耗 15 体力 · 每种颜色 / 每行 / 每列恰好一颗雷"}},{"type":"streak-card","props":{}},{"type":"weekly-event-entry","props":{"icon":"✦"}},{"type":"identity-row","props":{}},{"type":"sound-toggle","props":{"label":"音效"}},{"type":"lang-select","props":{"label":"语言"}},{"type":"hintline","props":{"lines":["单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","雷与雷互不相邻，先推理再动手"]}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"level":{"col":"level","merge":"max"},"clears":{"col":"clears","merge":"max"},"toolMine":{"col":"tool_mine","merge":"newest"},"toolSafe":{"col":"tool_safe","merge":"newest"},"toolMineGranted":{"col":"tool_mine_granted","merge":"max"},"toolMineSpent":{"col":"tool_mine_spent","merge":"max"},"toolSafeGranted":{"col":"tool_safe_granted","merge":"max"},"toolSafeSpent":{"col":"tool_safe_spent","merge":"max"},"coinsEarned":{"col":"coins_earned","merge":"max"},"coinsSpent":{"col":"coins_spent","merge":"max"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"},"wsCur":{"col":"ws_cur","merge":"newest"},"wsPend":{"col":"ws_pend","merge":"newest"},"wsCyc":{"col":"ws_cyc","merge":"newest"},"wsEarned":{"col":"ws_earned","merge":"max"},"wsClaimed":{"col":"ws_claimed","merge":"max"}}},"stock":{"items":{"coins":{"granted":"coinsEarned","spent":"coinsSpent","initial":0,"icon":"💰","name":"金币","desc":"通关累积，可直接兑换道具","nameKey":"itemCoinsName","descKey":"itemCoinsDesc"},"toolMine":{"granted":"toolMineGranted","spent":"toolMineSpent","legacy":"toolMine","initial":2,"icon":"🎯","name":"找一个雷","desc":"直接点出一颗还没找到的雷","nameKey":"itemToolMineName","descKey":"itemToolMineDesc"},"toolSafe":{"granted":"toolSafeGranted","spent":"toolSafeSpent","legacy":"toolSafe","initial":2,"icon":"🛡","name":"排一个安全格","desc":"标记一格「这里没有雷」","nameKey":"itemToolSafeName","descKey":"itemToolSafeDesc"}}},"weekly":{"enabled":true,"thresholds":[60,150,300],"goal":300,"frags":{"win":20,"ad":15},"grand":{"coins":500,"toolMine":2,"toolSafe":2},"rewardPool":[{"type":"coins","min":50,"max":200,"weight":3},{"type":"toolMine","min":1,"max":2,"weight":1},{"type":"toolSafe","min":1,"max":2,"weight":1}]},"winstreak":{"enabled":true,"keepMinPrompt":3,"every":10,"rewards":{"energy":60,"coins":10,"frags":10}}}</script>
 <script src="./core/shell.js"></script>
 <script src="./core/home.js"></script>
+<script src="./core/identity.js"></script>
 <script src="./core/reward.js"></script>
 <script src="./core/platform.js"></script>
 <script src="./mine-engine.js"></script>
 <script src="./mine-levels.js"></script>
+<script src="./core/stock.js"></script>
+<script src="./core/coins.js"></script>
+<script src="./core/locale.js"></script>
+<script src="./core/weekly.js"></script>
+<script src="./core/placements.js"></script>
+<script src="./core/adplay.js"></script>
+<script src="./core/winstreak.js"></script>
 <script>
 (function () {
   'use strict';
@@ -169,30 +344,213 @@
   var KEY = 'mine_save_v1';
   var COLORS = ['#7f9cf5','#f56d6d','#f5c66d','#6dd3a8','#c98df0','#6dc4f0',
                 '#f09db8','#a8d36d','#f0a56d','#8f8ff0','#6df0d8'];  // 11 色恰好覆盖 11×11
-  var AD_TOOL_GRANT = 1;               // 看广告补 1 个道具（演示：模拟播放）
+  var AD_TOOL_GRANT = 1;               // 看完一次激励广告补 1 个道具（广告链见 core/adplay.js）
   var AD_TIME_BONUS = 60;              // 看广告加 60 秒
   /* GameConfig 内嵌：与 games/mine/game.config.json 逐字段一致（mine-config.test.js 校验）；
      reward 参数经 RewardCore fail-fast 校验，screens.home 声明驱动首页渲染 */
   var CFG = JSON.parse(document.getElementById('gameConfig').textContent);
   var Reward = RewardCore.create(CFG.reward);
-  var save = Object.assign({ level: 1, clears: 0, toolMine: 2, toolSafe: 2,
+  var save = Object.assign({ level: 1, clears: 0,
     energy: Reward.E_MAX, lastTs: Date.now(), alias: '', sfx: true }, load() || {});
+  /* 道具库存走单调账本（core/stock.js）：只存 granted/spent 两个只增计数，库存 = granted - spent。
+     旧做法是存「库存数」+ 按 updatedMs 取新合并，而 updatedMs 会被体力恢复/昵称/音效等无关写入刷新，
+     于是任一端拿着默认库存做一次无关保存就把已消耗的道具复活——正是「用了道具，重新登录又变回默认 4 个」的根因。 */
+  /* ===== 多语言：字典在 config（games/mine/game.config.json 的 i18n 段），
+     语言选择走 core/locale.js 的 resolveLang（与倒水同一份实现，不再各写一套）。
+     优先级：?lang= 调试参数 → 手动选择(持久化) → Telegram 语言 → 浏览器语言 → 默认。
+     注意顺序：这段必须在任何调用 t() 的代码之前跑完，否则会踩顶层 TDZ（整段 script 静默中断）。 */
+  var I18n = LocaleCore.createI18n(CFG.i18n);
+  var LANG_KEY = 'mine_lang';
+  var savedLang = null;
+  try { savedLang = window.localStorage.getItem(LANG_KEY); } catch (e) {}   // 隐私模式会抛
+  var tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe
+    && window.Telegram.WebApp.initDataUnsafe.user) || {};
+  var LANG = LocaleCore.resolveLang({
+    search: location.search,
+    saved: savedLang,
+    tgLanguageCode: tgUser.language_code,
+    navigatorLanguage: navigator.language
+  }, I18n.locales(), CFG.i18n['default']);
+
+  /* t(key, vars)：取词 + {占位符} 插值。缺 key 由 core 抛错（宁可炸也不显示空白）。 */
+  function t(key, vars) {
+    var s = I18n.t(LANG, key);
+    if (!vars) return s;
+    return s.replace(/\{(\w+)\}/g, function (m, name) {
+      return vars[name] !== undefined ? String(vars[name]) : m;
+    });
+  }
+
+  var Stock = StockCore.create(CFG.stock);
+  /* 金币：通关攒、可直接买道具（不用看广告）。彩雷这边【故意不写 coins 配置】，
+     走 core/coins.js 的默认值——通关 +1、200 金币换 1 个道具；
+     倒水那边显式配了自己的数值（通关 +2、撤销 150 换 2 个），证明每个游戏都能自定。 */
+  var Coins = CoinsCore.create(CFG.coins, Stock);
+  Object.assign(save, Stock.migrate(save));
   function load(){ try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
-  function persist(){ save.updatedMs = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} platformSync(); }
+  function persist(){
+    /* 多标签页保护：写盘前先跟磁盘上的现值把「只增账本」取大。
+       同一浏览器开两个标签页时，另一个标签页手里是过期快照，它的下一次写盘
+       （首页体力每秒结算就会触发）会把已花掉的金币/道具覆盖回去 —— 实测复现过。
+       granted/spent 单调只增，取大不会丢任何一侧的消耗。 */
+    try {
+      var onDisk = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (onDisk) Object.assign(save, Stock.reconcile(save, onDisk));
+    } catch (e) {}
+    save.updatedMs = Date.now(); Object.assign(save, Stock.legacyPatch(save));
+    try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} platformSync(); }
+  /* 用掉一个道具：spent+1（只增）；库存不足返回 false，交给「看广告补充」 */
+  function spendTool(key) {
+    var patch = Stock.spend(save, key);
+    if (!patch) return false;
+    Object.assign(save, patch); persist(); return true;
+  }
+  /* 发放道具（看广告补充等）：granted+n（只增） */
+  function grantTool(key, n) {
+    var patch = Stock.grant(save, key, n);
+    if (!patch) return false;
+    Object.assign(save, patch); persist(); return true;
+  }
+  function ensureTempName() {
+    if (typeof save.alias === 'string' && save.alias.trim()) return save.alias.trim();
+    save.alias = t('playerPrefix') + String(Math.floor(1000 + Math.random() * 9000));
+    persist();
+    return save.alias;
+  }
+  ensureTempName();
 
   /* ============ 音效（首页设置可开关） ============ */
   var AC = null;
   function blip(freq, dur) {
-    if (!save.sfx) return;
+    withAudio(function (ac) {                 // 同样走统一解锁：手机上挂起态要等 resume 兑现再排程
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'triangle'; o.frequency.value = freq;
+      g.gain.setValueAtTime(.16, ac.currentTime);      // 峰值由共享压缩器兜底，可以放心给足
+      g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + dur);
+      o.connect(g); g.connect(masterIn(ac));
+      o.start(); o.stop(ac.currentTime + dur);
+    });
+  }
+
+  /* 轻触觉反馈：优先 Telegram WebApp 的 haptic，否则用浏览器 Vibration API（安卓可用，
+     iOS Safari 不支持则静默跳过）。纯设备 API，无任何第三方素材。
+     不跟音效开关联动——静音场景下震动正是唯一的反馈通道。
+     时长取舍（2026-08-20 修）：原来给 12ms，低于多数安卓马达的可感阈值（普遍要 20~30ms
+     才有触感），手机上等于没震。
+     降级可观测：震动不可用/被拒是静默降级路径，把原因记进 BUZZ_STATE + console，
+     以后再有「手机上感受不到震动」时能直接查原因，而不是靠猜。 */
+  var BUZZ_STATE = 'never-called';
+  function buzz(ms) {
+    function mark(state) {
+      if (state !== BUZZ_STATE && state !== 'telegram-haptic' && state !== 'vibrate-ok') {
+        console.warn('[mine haptic] 震动降级：' + state);   // 只在异常态出声，别刷日志
+      }
+      BUZZ_STATE = state; return state;
+    }
+    try {
+      var tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.HapticFeedback) { tg.HapticFeedback.impactOccurred('light'); return mark('telegram-haptic'); }
+      if (navigator.vibrate) return mark(navigator.vibrate(ms || 30) ? 'vibrate-ok' : 'vibrate-refused');
+      return mark('vibrate-unsupported');      // iOS Safari 不实现 Vibration API
+    } catch (e) { return mark('vibrate-error:' + (e && e.name)); }
+  }
+
+  /* 移动端音频解锁的正确姿势：AudioContext 在 suspended 态时 currentTime 是冻结的，
+     而 resume() 是【异步】的——先前的写法在 resume() 后同步用旧时钟排程，
+     时钟一恢复就跳变，排程点已经过期，手机上首次点击往往整段无声。
+     所以必须等 resume 兑现后再按新的 currentTime 排程。 */
+  function withAudio(play) {
+    if (!save.sfx) return 'sfx-off';
     try {
       AC = AC || new (window.AudioContext || window.webkitAudioContext)();
-      var o = AC.createOscillator(), g = AC.createGain();
-      o.type = 'triangle'; o.frequency.value = freq;
-      g.gain.setValueAtTime(.08, AC.currentTime);
-      g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + dur);
-      o.connect(g); g.connect(AC.destination);
-      o.start(); o.stop(AC.currentTime + dur);
-    } catch (e) {}
+      if (AC.state === 'suspended' && AC.resume) {
+        var p = AC.resume();
+        if (p && p.then) { p.then(function () { play(AC); }, function () {}); return 'resuming'; }
+      }
+      play(AC);
+      return AC.state;
+    } catch (e) { return 'audio-error:' + (e && e.name); }
+  }
+
+  /* 找对雷的鼓励音：两个音符的轻柔上行（A5 → D6）+ 一下轻震动。
+     法律风险规避：完全由 Web Audio 振荡器现场合成，不含任何第三方采样/音频文件，
+     也不引用任何既有旋律（两个音符的上行音程本身不构成受保护作品），无需任何授权。
+     音量取舍（2026-08-20 修）：最初设 .035/.045（≈-27dBFS），线上实测确实发声，但手机小喇叭
+     加环境噪音下基本听不见——上调到 .07/.09（与原提示音 .08 同级），靠三角波 + 90ms 衰减
+     保持柔和，而不是靠压低音量。8ms 淡入防爆音，两声总长不到 0.2 秒。
+     AC.resume()：iOS/移动端 AudioContext 可能处于 suspended，不唤醒就静默不出声。 */
+  /* 频段与音色依据（2026-08-20 改，出处：ISO 226 等响曲线 / Fletcher-Munson，以及 Web Audio API 官方书
+     "Volume and Loudness" 一章对 DynamicsCompressorNode 的建议）：
+     ① 人耳在 2~5kHz 最敏感（耳道共振 + 中耳听骨传递），3~4kHz 需要的声压最低；低于 500Hz 敏感度大幅下降。
+        原来两音在 880/1174Hz，正好落在吃亏区间——手机小喇叭低频输出本来就弱，再叠上「媒体音量只开一半」
+        （低声压下等响曲线在低频抬得最高），于是第一个被淹掉的就是它。把两音搬到 2093Hz(C7) → 2794Hz(F7)，
+        靠听觉灵敏度换可闻性，而不是靠把振幅顶上去。
+     ② 音量开大也不刺耳：等响曲线在高声压下会变平，频段之间的差异变小，所以搬到敏感区不会额外扎耳；
+        再叠三重保险——正弦波（没有谐波，落在敏感区不需要靠谐波提亮）、lowpass 削掉残余毛刺、
+        DynamicsCompressorNode 压住峰值（官方书：游戏这种无法预知的混音适度压缩是好做法，还能降低削波风险）。
+     ③ 依旧保留 8ms 淡入 + 指数衰减，避免瞬态咔哒。 */
+  /* 上行大三和弦琶音 C6–E6–G6–C7（频率比 4:5:6:8，全是简单整数比）。
+     为什么从「两个裸正弦」换成琶音（2026-08-20 第二轮，依据见下）：
+     ① 音乐心理学：八度 2:1、纯五 3:2、大三 5:4 这类**简单频率比**被普遍判定为协和、悦耳，
+        复杂比（小二度等）才被判为刺耳；听众也偏好谐波关系明确、没有拍频的声音。
+     ② 行业实践：游戏/老虎机的「赢了」反馈普遍用**上行琶音与更丰满的和声**来抬升兴奋感，
+        短促单音只承担「操作已收到」的确认功能。
+     ③ 所以上一版（两个裸正弦、总长 <0.2 秒）能听见但不动人——它是提示音，不是奖励音。
+     每音再叠一个八度泛音（2:1）做出钟琴般的亮泽，末音留 0.4 秒余韵，总长约 0.6 秒。
+     法律风险：仍是振荡器现场合成、无任何采样，且刻意不复刻任何已有游戏的可识别动机，
+     只用通用的大三和弦琶音——基础音乐元素，不构成受保护作品。 */
+  var CHEER_NOTES = [           // [基频, 起始偏移秒, 包络峰值, 时长秒]
+    [1046.50, 0,    .105, .18],   // C6
+    [1318.51, .075, .105, .18],   // E6（大三度 5:4）
+    [1568.00, .150, .110, .24],   // G6（纯五度 3:2）
+    [2093.00, .225, .125, .40]    // C7（八度 2:1）+ 余韵
+  ];
+
+  /* 共享输出链：lowpass(4.5kHz) → compressor → destination。只建一次，所有音效都从这里出去，
+     这样峰值上限由压缩器统一兜住，单个音效怎么调都不会在大音量下扎耳。 */
+  var MASTER = null;
+  function masterIn(ac) {
+    if (MASTER && MASTER.ac === ac) return MASTER.node;
+    var lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 5600; lp.Q.value = .7;   // 放宽一点，留住八度泛音的亮泽
+    var comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -24; comp.knee.value = 12; comp.ratio.value = 8;
+    comp.attack.value = .003; comp.release.value = .15;
+    /* 输出归一：压缩器本身不做增益补偿，两个音符包络叠加后峰值实测能冲到 0.46（旧版 0.086），
+       满音量会偏吵。这里统一乘 0.5 把峰值锁回 ~0.23，RMS 相对旧版仍有 +8dB 级提升——
+       也就是「一半音量能听见」靠 RMS 与敏感频段拿，「满音量不刺耳」靠这一级限住峰值。 */
+    var outGain = ac.createGain(); outGain.gain.value = .5;
+    lp.connect(comp); comp.connect(outGain); outGain.connect(ac.destination);
+    /* 一条很轻的延时支路当「余韵」：让奖励音收尾时有一点空间感，听起来是庆祝而不是滴一声。
+       只有 18% 湿声 + 少量反馈，不会把短促的提示音糊掉。 */
+    var dly = ac.createDelay(.5); dly.delayTime.value = .11;
+    var fb = ac.createGain(); fb.gain.value = .22;
+    var wet = ac.createGain(); wet.gain.value = .18;
+    lp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(comp);
+    MASTER = { ac: ac, node: lp };
+    return lp;
+  }
+
+  /* 每个音 = 基频 + 一个八度泛音（2:1 是最简的比，加进来只提亮泽、不引入刺耳的高次成分）。 */
+  var CHEER_PARTIALS = [[1, 1], [2, .30]];            // [倍频, 相对音量]
+  function playNotes(ac, notes) {
+    var out = masterIn(ac);
+    notes.forEach(function (n) {
+      var t0 = ac.currentTime + n[1], peak = n[2], dur = n[3] || .1;
+      CHEER_PARTIALS.forEach(function (h) {
+        var o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(n[0] * h[0], t0);
+        g.gain.setValueAtTime(.0001, t0);
+        g.gain.linearRampToValueAtTime(peak * h[1], t0 + .008);   // 8ms 淡入，防爆音
+        g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+        o.connect(g); g.connect(out);
+        o.start(t0); o.stop(t0 + dur + .02);
+      });
+    });
+  }
+  function cheer() {
+    buzz();
+    withAudio(function (ac) { playNotes(ac, CHEER_NOTES); });
   }
 
   /* ============ 运行时状态 ============ */
@@ -205,7 +563,7 @@
   /* ============ 开关 ============ */
   function startLevel(lv) {
     var data = MineLevels.get(lv);
-    if (!data) { toast('关卡生成失败'); return; }
+    if (!data) { toast(t('levelGenFail')); return; }
     var mines = new Set();
     data.board.mines.forEach(function (c, r) { mines.add(r * data.size + c); });
     S = { lv: lv, size: data.size, board: data.board, mines: mines,
@@ -246,9 +604,8 @@
     var hs = '';
     for (var i = 0; i < 3; i++) hs += '<b class="' + (i < S.lives ? '' : 'off') + '">♥</b>';
     $('hearts').innerHTML = hs;
-    $('cntMine').textContent = save.toolMine;
-    $('cntSafe').textContent = save.toolSafe;
-    $('toolMine').disabled = save.toolMine <= 0 && false;
+    $('cntMine').textContent = Stock.stock(save, 'toolMine');
+    $('cntSafe').textContent = Stock.stock(save, 'toolSafe');
     renderTime();
   }
   function renderTime() {
@@ -335,74 +692,465 @@
       S.found.add(idx); S.marks.delete(idx);
       el.classList.remove('safe', 'hintsafe');
       el.classList.add('mine', 'pop');
-      blip(880, .12);
+      cheer();                              // 找对了：轻轻鼓励一下
       renderHud();
       if (S.found.size === S.size) return onWin();
     } else {                                // 挖错 → 扣血
       S.opened.add(idx); S.marks.delete(idx);
       el.classList.remove('safe', 'hintsafe');
       el.classList.add('opened', 'boom');
-      blip(140, .25);
+      blip(320, .25);   // 原来 140Hz：手机小喇叭物理上放不出这么低的频率，等于没有反馈
       S.lives -= 1; renderHud();
       if (S.lives <= 0) return onDead();
-      toast('不是雷！剩余 ' + S.lives + ' 条命');
+      toast(t('notMine', { n: S.lives }));
     }
   }
 
   /* ============ 道具 ============ */
   $('toolMine').addEventListener('click', function () {
     if (S.done) return;
-    if (save.toolMine <= 0) return offerAdTool('toolMine', '🎯 找一个雷');
-    var idx = MineEngine.pickUnfoundMine(S.board, S.found);
-    if (idx < 0) return toast('雷已经全部找到了');
-    save.toolMine -= 1; persist();
+    if (Stock.stock(save, 'toolMine') <= 0) return offerAdTool('toolMine', t('itemToolMineName'));
+    /* S.found 是 Set，引擎按数组消费（indexOf）：直接把 Set 传进去会抛 TypeError，
+       道具点了等于没点（库存不减、雷也不标） */
+    var idx = MineEngine.pickUnfoundMine(S.board, Array.from(S.found));
+    if (idx < 0) return toast(t('allMinesFound'));
+    if (!spendTool('toolMine')) return offerAdTool('toolMine', t('itemToolMineName'));
     S.found.add(idx); S.marks.delete(idx);
     var el = cellEl(idx);
     el.classList.remove('safe', 'hintsafe');
     el.classList.add('mine', 'pop');
+    cheer();                                // 道具找到的雷同样给鼓励音
     renderHud();
     if (S.found.size === S.size) onWin();
   });
 
   $('toolSafe').addEventListener('click', function () {
     if (S.done) return;
-    if (save.toolSafe <= 0) return offerAdTool('toolSafe', '🛡 排一个安全格');
+    if (Stock.stock(save, 'toolSafe') <= 0) return offerAdTool('toolSafe', t('itemToolSafeName'));
     var excluded = new Set(S.marks);
     S.opened.forEach(function (i) { excluded.add(i); });
-    var idx = MineEngine.pickSafeCell(S.board, excluded);
-    if (idx < 0) return toast('没有可提示的格子了');
-    save.toolSafe -= 1; persist();
+    var idx = MineEngine.pickSafeCell(S.board, Array.from(excluded));   // 同上：引擎要数组，不是 Set
+    if (idx < 0) return toast(t('noHintLeft'));
+    if (!spendTool('toolSafe')) return offerAdTool('toolSafe', t('itemToolSafeName'));
     S.marks.add(idx);
     cellEl(idx).classList.add('safe', 'hintsafe', 'pop');
     renderHud();
-    toast('这个格子不是雷');
+    toast(t('cellNotMine'));
   });
 
+  /* 用金币买道具：够钱就一步到位，不用看广告。金币与道具都记在只增账本里，
+     所以「买过就是买过、花掉就是花掉」，换设备重登也不会被云端旧值回退。 */
+  function buyTool(key, name) {
+    var patch = Coins.buy(save, key);
+    if (!patch) { toast(t('notEnoughCoins')); return false; }
+    Object.assign(save, patch); persist();
+    renderHud(); renderHome();
+    toast(t('boughtWithCoins', { n: Coins.priceOf(key), name: name }));
+    return true;
+  }
+
   function offerAdTool(key, name) {
-    dialog('道具用完了', '看一段广告，补 ' + AD_TOOL_GRANT + ' 个「' + name + '」道具。',
-      '看广告 +' + AD_TOOL_GRANT, function () {
-        save[key] += AD_TOOL_GRANT; persist(); renderHud(); toast('已补充道具');
-      }, '取消', null);
+    var sku = Coins.sku(key), bal = Coins.balance(save);
+    var adText = t('adGrant', { n: AD_TOOL_GRANT });
+    /* 广告位 tool-refill（config: format=rewarded, onFail=deny）：没看完不补道具 */
+    var doAd = function () {
+      watchAdFor('tool-refill', function () {
+        grantTool(key, AD_TOOL_GRANT); renderHud(); toast(t('toolRefilled'));
+      });
+    };
+    if (sku && bal >= sku.price) {
+      // 金币够：把「花金币」放在主按钮，看广告退居次选
+      dialog(t('toolEmptyTitle'),
+        t('toolEmptyBuy', { price: sku.price, amount: sku.amount, name: name, balance: bal }),
+        t('buyWithCoins', { n: sku.price }), function () { buyTool(key, name); },
+        adText, doAd);
+    } else {
+      dialog(t('toolEmptyTitle'),
+        t('toolEmptyAd', { n: AD_TOOL_GRANT, name: name })
+        + (sku ? t('toolEmptySave', { balance: bal, price: sku.price }) : ''),
+        adText, doAd, t('cancel'), null);
+    }
   }
 
   /* ============ 结算 ============ */
   function onWin() {
     S.done = true; stopTimer();
-    save.level = S.lv + 1; save.clears = (save.clears || 0) + 1; persist();
-    dialog('🎉 第 ' + S.lv + ' 关通过！', '全部 ' + S.size + ' 颗雷都找到了。',
-      '下一关', function () { startLevel(save.level); }, '返回首页', showHome);
+    save.level = S.lv + 1; save.clears = (save.clears || 0) + 1;
+    var wkMsgs = Weekly.enabled ? WeeklyCtl.addFrags(Weekly.frags.win) : [];   // 通关 → 周活动碎片
+    var coinPatch = Coins.rewardClear(save);          // 通关奖励金币（earnPerClear 配 0 则为 null）
+    if (coinPatch) Object.assign(save, coinPatch);
+    wsOnWin();   // 双连胜:A+1,B 周期推进/出票(2026-08-24)
+    persist();
+    dialog(t('winTitle', { n: S.lv }), t('winBody', { n: S.size })
+      + (coinPatch ? t('winCoins', { n: Coins.earnPerClear, total: Coins.balance(save) }) : ''),
+      t('nextLevel'), function () { startLevel(save.level); }, t('toHome'), showHome,
+      showHome);                      // 关掉这个窗（✕/点外部/Esc）= 回首页，不把人留在已结束的棋盘上
   }
   function onDead() {
     S.done = true; stopTimer();
-    dialog('💥 没有生命了', '看一段广告复活（恢复 1 条命，进度保留），或重开本关。',
-      '看广告复活', function () { S.done = false; S.lives = 1; renderHud(); if (S.remain != null) startTimer(); },
-      '重开本关', function () { startLevel(S.lv); });
+    dialog(t('deadTitle'), t('deadBody'),
+      /* 广告位 fail-revive（config: onFail=retry）：没看完不复活 */
+      t('adRevive'), function () {
+        watchAdFor('fail-revive', function () {
+          S.done = false; S.lives = 1; renderHud(); if (S.remain != null) startTimer();
+        });
+      },
+      t('restart'), function () { wsOnLose(); wsGate(function () { startLevel(S.lv); }); },
+      function () { wsOnLose(); showHome(); });   // 关掉 = 回首页（局已结束）；双连胜记一次失败
   }
   function onTimeUp() {
     S.done = true;
-    dialog('⏰ 时间到', '看一段广告 +' + AD_TIME_BONUS + ' 秒继续，或重开本关。',
-      '看广告 +' + AD_TIME_BONUS + 's', function () { S.done = false; S.remain = AD_TIME_BONUS; renderHud(); startTimer(); },
-      '重开本关', function () { startLevel(S.lv); });
+    dialog(t('timeUpTitle'), t('timeUpBody', { n: AD_TIME_BONUS }),
+      /* 广告位 time-bonus（config: onFail=deny, capping.maxPerSession=3）：没看完不加时 */
+      t('adGrant', { n: AD_TIME_BONUS + 's' }), function () {
+        watchAdFor('time-bonus', function () {
+          S.done = false; S.remain = AD_TIME_BONUS; renderHud(); startTimer();
+        });
+      },
+      t('restart'), function () { wsOnLose(); wsGate(function () { startLevel(S.lv); }); },
+      function () { wsOnLose(); showHome(); });   // 关掉 = 回首页；双连胜记一次失败
+  }
+
+  /* HTML 转义（背包窗口与周活动页共用）：core/home.js 的 esc 在它自己的 IIFE 里，页面取不到。
+     文案虽来自自家配置，但拼 HTML 一律先转义，避免以后配置里出现 & < > 引号把结构撑坏。
+     教训：这个函数原来是 openBag 的局部函数，周活动页复用时 ReferenceError 让整段渲染崩掉
+     （图卡 0 张、奖励发不出），真跑才暴露出来。 */
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /* ============ 广告（机制在 core/adplay.js + core/placements.js） ============
+     RCA（2026-08-21）：在此之前所有「看广告」按钮点了直接发奖 —— 页面从未引入广告 core，
+     Telegram 与浏览器里都不会出现任何广告（线上实测：广告 SDK 调用 0 次、外部请求 0 个）。
+     现在统一走 core：广告源顺序、各广告位格式/失败策略/频控全部由 config 声明（每游戏可不同），
+     core 只回报"看完了没有"，**发奖仍由本文件决定** —— 避免 core 代发导致没看完也拿奖。 */
+  var AdPlacements = (CFG.ads && CFG.ads.placements)
+    ? PlacementsCore.create(CFG.ads.placements, function () { return false; })   // 真实结果由 adplay 注入
+    : null;
+  var AD_STATE_KEY = 'mine_adstate_v1';
+  var adState = {};                       // 各广告位的频控状态（按 placement id 存）
+  try { adState = JSON.parse(localStorage.getItem(AD_STATE_KEY) || '{}') || {}; } catch (e) {}
+  function saveAdState() { try { localStorage.setItem(AD_STATE_KEY, JSON.stringify(adState)); } catch (e) {} }
+
+  /* 兜底广告卡：真的要看完倒计时才算成功，中途跳过 = 没看完（不发奖）。
+     这是 house 源，注入给 core；core 优先用 Telegram/AdsGram，都没有才用它。 */
+  function houseAd(seconds, done) {
+    var left = Math.ceil(seconds);
+    var mask = $('adMask'), skip = $('adSkip'), timer = null;
+    var finish = function (watched) {
+      if (timer) { clearInterval(timer); timer = null; }
+      mask.hidden = true;
+      skip.onclick = null;
+      done(watched);
+    };
+    $('adLab').textContent = t('adTitle');
+    $('adTip').textContent = t('adReward');
+    $('adCd').textContent = t('adWatching', { n: left });
+    skip.textContent = t('adSkip');
+    skip.disabled = false;
+    mask.hidden = false;
+    skip.onclick = function () { finish(false); };          // 用户主动放弃
+    timer = setInterval(function () {
+      left -= 1;
+      if (left <= 0) { $('adCd').textContent = ''; finish(true); return; }
+      $('adCd').textContent = t('adWatching', { n: left });
+    }, 1000);
+  }
+
+  /* 按需加载某个 Monetag zone 的 SDK。
+     为什么不写死在 head：TMA zone 与 Website zone 是两条独立通道，
+     一个页面可能同时配了两个 —— 只加载当前环境真要用的那个，
+     避免把 Telegram Mini App 的 zone 用在网页流量上（那是无效流量）。 */
+  function loadMonetagSdk(zone) {
+    var flag = 'show_' + zone;
+    if (typeof window[flag] === 'function') return Promise.resolve();
+    var existing = document.querySelector('script[data-zone="' + zone + '"]');
+    return new Promise(function (resolve, reject) {
+      var el = existing;
+      if (!el) {
+        el = document.createElement('script');
+        el.src = 'https://libtl.com/sdk.js';
+        el.setAttribute('data-zone', zone);
+        el.setAttribute('data-sdk', flag);
+        document.head.appendChild(el);
+      }
+      var tries = 0;
+      var tick = setInterval(function () {
+        if (typeof window[flag] === 'function') { clearInterval(tick); resolve(); return; }
+        if (++tries > 60) { clearInterval(tick); reject(new Error('sdk-timeout')); }   // 最多等 6 秒
+      }, 100);
+      el.addEventListener('error', function () { clearInterval(tick); reject(new Error('sdk-error')); });
+    });
+  }
+
+  var CFG_ADS = CFG.ads || null;
+  var AdPlay = AdPlayCore.create((CFG.ads && CFG.ads.play) || null,
+    { houseAd: houseAd, loadSdk: loadMonetagSdk, openUrl: openExternal });
+
+  /* 打开外部链接，返回是否真的开成了（被拦弹窗 → false，上层判失败不发奖）。
+     坑：window.open(url,'_blank','noopener') 按规范**返回 null**，会把成功误判成被拦；
+     所以不能在 features 里写 noopener，改为开完手动断 opener。 */
+  function openExternal(url) {
+    var w = null;
+    try { w = window.open(url, '_blank'); } catch (e) { return false; }
+    if (!w) return false;
+    try { w.opener = null; } catch (e) { /* 跨源时不可写，无妨 */ }
+    return true;
+  }
+
+  /* Multitag（被动收入）：只在浏览器、只在首页注入一次。
+     为什么不放 head：① Telegram 内不该加载（会和 TMA 激励广告抢焦点）；
+     ② 它含 Onclick popunder，而对局中每点一格都是一次 click，注入进对局界面会毁体验。
+     注意：脚本一旦注入就无法卸载，所以对局中的频次控制要在 Monetag 后台设 capping。 */
+  function loadMultitag() {
+    var m = (CFG_ADS && CFG_ADS.passive && CFG_ADS.passive.multitag) || null;
+    if (!m || !m.src) return false;                       // 没配 = 不启用
+    if (m.env === 'web' && AdPlay.inTelegram()) return false;
+    if (document.querySelector('script[data-multitag="1"]')) return false;  // 已注入
+    var el = document.createElement('script');
+    el.src = m.src;
+    el.async = true;
+    if (m.zone) el.setAttribute('data-zone', String(m.zone));
+    el.setAttribute('data-cfasync', 'false');
+    el.setAttribute('data-multitag', '1');
+    document.head.appendChild(el);
+    return true;
+  }
+
+  /* 统一入口：想靠广告拿奖励的地方都调它。
+     onReward 只在「真的看完 + 频控允许 + config 的 onFail 策略允许」时才被调用。 */
+  /* ============ 双连胜(core/winstreak.js · 2026-08-24)：与倒水共用同一份 core ============
+     A 首页大连胜:只增不封顶;断链挂 pend,下次点「开始/重开」时弹「看广告保持」
+     (拒绝/关窗即清零,连胜 <keepMinPrompt 静默清零——用户拍板)。
+     B 每 every 盘出一张奖励票:看广告(streak-claim)领 体力/金币/周碎片;不领则票与
+     every/every 冻结态一直保留(失败也不丢,票不叠加——用户拍板);A/B 独立。 */
+  var WinStreak = WinStreakCore.create(CFG.winstreak || null);
+  function wsGet() {
+    return WinStreak.from({ cur: save.wsCur, pend: save.wsPend, cyc: save.wsCyc, earned: save.wsEarned, claimed: save.wsClaimed });
+  }
+  function wsSet(st) {
+    save.wsCur = st.cur; save.wsPend = st.pend ? 1 : 0; save.wsCyc = st.cyc;
+    save.wsEarned = st.earned; save.wsClaimed = st.claimed;
+    persist();
+  }
+  function wsRewardText(rw) {
+    var parts = [];
+    if (rw.energy) parts.push('⚡+' + rw.energy);
+    if (rw.coins) parts.push('🪙+' + rw.coins);
+    if (rw.frags && Weekly.enabled) parts.push('🧩+' + rw.frags);
+    return parts.join(' · ');
+  }
+  function wsOnWin() {
+    if (!WinStreak.enabled) return;
+    var r = WinStreak.win(wsGet());
+    wsSet(r.state);
+    if (r.ticket) setTimeout(function () { toast(t('wsTicketToast', { n: WinStreak.every })); }, 600);
+  }
+  function wsOnLose() {
+    if (!WinStreak.enabled) return;
+    var st = wsGet();
+    if (st.pend) return;               // 已有未决断链(防御:同一断链不重复记)
+    wsSet(WinStreak.lose(st).state);   // B 周期立即清零;A 大连胜挂 pend/小连胜静默清零
+  }
+  /* 断链未决时先问「看广告保持」再放行;普通开局零打扰(用户定案) */
+  function wsGate(proceed) {
+    if (WinStreak.enabled) {
+      var ws = wsGet();
+      if (ws.pend) { wsKeepDialog(ws, proceed); return; }
+    }
+    proceed();
+  }
+  /* ✕/遮罩/Esc = 放弃连胜留在原页;两个按钮各自动线后都继续 proceed */
+  function wsKeepDialog(st, proceed) {
+    dialog(t('wsKeepTitle', { n: st.cur }), t('wsKeepBody', { n: st.cur }),
+      /* 广告位 streak-keep（config: onFail=grant）:广告源失败不怪玩家,连胜照保 */
+      t('wsKeepAd'), function () {
+        watchAdFor('streak-keep', function () {
+          wsSet(WinStreak.keep(wsGet())); toast(t('wsKept', { n: wsGet().cur })); proceed();
+        });
+      },
+      t('wsKeepDrop'), function () {
+        wsSet(WinStreak.drop(wsGet())); toast(t('wsDropped')); proceed();
+      },
+      function () { wsSet(WinStreak.drop(wsGet())); toast(t('wsDropped')); if (!$('home').hidden) renderHome(); });
+  }
+  /* 领取奖励票:广告位 streak-claim,播完才核销入账;体力可超上限(与 water 同规则 issue #7)。
+     金币走只增账本(Stock.grant→coinsEarned),周碎片走 WeeklyCtl——各自的云同步保护自动生效 */
+  var wsClaiming = false;
+  function wsClaimTicket() {
+    if (wsClaiming || !WinStreak.hasTicket(wsGet())) return;
+    wsClaiming = true;
+    watchAdFor('streak-claim', function () {
+      var r = WinStreak.claim(wsGet());
+      wsSet(r.state);
+      var rw = r.rewards;
+      if (rw.energy) { save.energy += rw.energy; if (save.energy >= Reward.E_MAX) save.lastTs = Date.now(); }
+      if (rw.coins) Object.assign(save, Stock.grant(save, Coins.coinsKey, rw.coins));
+      persist();
+      var wkMsgs = (rw.frags && Weekly.enabled) ? WeeklyCtl.addFrags(rw.frags) : [];
+      toast(t('wsClaimGot', { r: wsRewardText(rw) }));
+      wkMsgs.forEach(function (m, i) { setTimeout(function () { toast(m); }, 1400 * (i + 1)); });
+      if (!$('home').hidden) renderHome();
+    });
+    setTimeout(function () { wsClaiming = false; }, 800);   // 只防连点,不锁死失败路径
+  }
+
+  function watchAdFor(placementId, onReward) {
+    AdPlay.playPlacement(AdPlacements, placementId, adState[placementId] || {}).then(function (res) {
+      adState[placementId] = res.state || {};
+      saveAdState();
+      if (res.granted) { onReward(); return; }
+      if (res.shown === false) { toast(t('adCapped')); return; }          // 频控拦下
+      var why = res.ad && res.ad.reason;
+      if (why === 'no-source') { toast(t('adNone')); return; }
+      toast(t('adFailed'));                                               // 没看完
+      /* 降级可观测：广告源常态化失败时能从这行看出来（本机硬纪律） */
+      var st = AdPlay.stats();
+      console.warn('[mine ads] ad-not-completed placement=' + placementId +
+        ' source=' + (res.ad && res.ad.source) + ' reason=' + why +
+        ' totals ok/fail=' + st.ok + '/' + st.failed + ' bySource=' + JSON.stringify(st.bySource));
+    });
+  }
+
+  /* ============ 每周活动 ============
+     机制（周界/解锁/领取状态机/结转）全部在 core/weekly.js，与倒水共用同一份实现；
+     本游戏只在 game.config.json 的 weekly 段声明自己的奖励：金币 + 两种道具，
+     3 张图、阈值 60/150/300（倒水是 6 张图、发体力和提示）。
+     奖励入账走各自的经济体系：金币/道具都记在只增账本（core/stock.js），所以云端同步与
+     多标签页保护自动生效，不需要这里另写一套。 */
+  var Weekly = WeeklyCore.create(CFG.weekly);
+  var WK_KEY = 'mine_weekly_v1';
+  var WeeklyCtl = {
+    state: null,
+    load: function () {
+      var raw = null;
+      try { raw = JSON.parse(localStorage.getItem(WK_KEY) || 'null'); } catch (e) {}
+      this.state = Weekly.normalize(raw, Weekly.weekKey(Date.now()));
+      if (this.state !== raw) this.flush();
+    },
+    flush: function () { try { localStorage.setItem(WK_KEY, JSON.stringify(this.state)); } catch (e) {} },
+    settle: function () {                       // 跨周则重置 + 结转（渲染/加碎片前都先走这里）
+      var wk = Weekly.weekKey(Date.now());
+      var n = Weekly.normalize(this.state, wk);
+      if (n !== this.state) { this.state = n; this.flush(); }
+    },
+    addFrags: function (n) {                    // 解锁只进「可领取」，不自动发奖
+      this.settle();
+      var st = this.state, before = st.frags, msgs = [];
+      st.frags += n;
+      Weekly.newlyUnlocked(before, st.frags).forEach(function (i) {
+        if (!st.claimed[i]) msgs.push(t('wkUnlockToast', { pic: wkPicName(i) }));
+      });
+      if (before < Weekly.goal && st.frags >= Weekly.goal && !st.grand) msgs.push(t('wkGrandToast'));
+      this.flush();
+      return msgs;
+    },
+    claim: function (i) {                       // core 状态机把关（仅 claimable 可领），奖励入账后落盘
+      this.settle();
+      var res = Weekly.claim(this.state, i);
+      this.state = res.state; this.flush();
+      grantWeeklyReward(res.reward);
+      toast(t('wkGot', { text: rewardText(res.reward.type, res.reward.n) }));
+      renderWeekly(); renderHome();
+    },
+    claimGrand: function () {
+      this.settle();
+      var res = Weekly.claimGrand(this.state);
+      this.state = res.state; this.flush();
+      var parts = [];
+      Object.keys(res.reward).forEach(function (k) {
+        grantWeeklyReward({ type: k, n: res.reward[k] });
+        parts.push(rewardText(k, res.reward[k]));
+      });
+      toast(t('wkGot', { text: parts.join(' + ') }));
+      renderWeekly(); renderHome();
+    }
+  };
+
+  /* 奖励入账：金币与道具都走 core/stock.js 的只增账本（云端同步/多标签页保护自动生效）。
+     配置里出现未接线的奖励类型时明确抛错，而不是静默丢奖。 */
+  function grantWeeklyReward(r) {
+    if (r.type === 'coins') { Object.assign(save, Stock.grant(save, Coins.coinsKey, r.n)); persist(); return; }
+    if (Stock.keys.indexOf(r.type) !== -1) { grantTool(r.type, r.n); return; }
+    throw new Error('weekly: 奖励类型 "' + r.type + '" 没有接线（检查 config.weekly.rewardPool）');
+  }
+  function rewardText(type, n) {
+    var key = 'rw' + type.charAt(0).toUpperCase() + type.slice(1);   // coins → rwCoins
+    return t(key, { n: n });
+  }
+  function wkPicName(i) {
+    var th = Weekly.themeFor(Date.now());
+    var pack = (LANG === 'zh' ? th.zh : th.en) || th.zh;
+    return (pack.pics && pack.pics[i]) || ('#' + (i + 1));
+  }
+  function wkThemeName() {
+    var th = Weekly.themeFor(Date.now());
+    var pack = (LANG === 'zh' ? th.zh : th.en) || th.zh;
+    return pack.name || '';
+  }
+  function renderWeekly() {
+    if (!WeeklyCtl.state) WeeklyCtl.load();
+    WeeklyCtl.settle();
+    var st = WeeklyCtl.state;
+    $('btnWkBack').textContent = t('wkBack');
+    $('wkH').textContent = t('wkTitle');
+    $('wkTheme').textContent = wkThemeName();
+    $('wkGoalLab').textContent = t('wkGoal', { n: Weekly.goal });
+    $('wkFragLab').textContent = t('wkFragLab');
+    $('wkFragNum').textContent = st.frags + ' / ' + Weekly.goal;
+    $('wkBar').style.width = Math.min(100, (st.frags / Weekly.goal) * 100) + '%';
+    var carry = $('wkCarry');
+    carry.hidden = !(st.carried > 0);
+    if (st.carried > 0) carry.textContent = t('wkCarry', { n: st.carried });
+    var left = Math.max(0, Weekly.weekEnd(Date.now()) - Date.now());
+    $('wkCd').textContent = t('wkCd', { d: Math.floor(left / 86400000), h: Math.floor(left / 3600000) % 24 });
+    // 主题图列表
+    var rows = Weekly.thresholds.map(function (need, i) {
+      var stt = Weekly.picStatus(st, i);
+      var got = st['r' + i];
+      var sub = stt === 'claimed' ? (got ? rewardText(got.type, got.n) : t('wkClaimed'))
+        : stt === 'claimable' ? t('wkClaimable') : t('wkLocked', { n: need - st.frags });
+      return '<div class="wkpic ' + stt + '" data-i="' + i + '">' +
+        '<span class="ico">' + (stt === 'claimed' ? '✅' : stt === 'claimable' ? '🎁' : '🔒') + '</span>' +
+        '<span class="info"><b>' + escHtml(wkPicName(i)) + '</b><span>' + escHtml(sub) + '</span></span>' +
+        '<button type="button" data-claim="' + i + '"' + (stt === 'claimable' ? '' : ' disabled') + '>' +
+        escHtml(stt === 'claimed' ? t('wkClaimed') : t('wkClaim')) + '</button></div>';
+    }).join('');
+    $('wkGrid').innerHTML = rows;
+    Array.prototype.forEach.call($('wkGrid').querySelectorAll('button[data-claim]'), function (b) {
+      b.addEventListener('click', function () { WeeklyCtl.claim(parseInt(b.getAttribute('data-claim'), 10)); });
+    });
+    // 大奖行
+    var gs = Weekly.grandStatus(st);
+    var gparts = Object.keys(Weekly.grand).map(function (k) { return rewardText(k, Weekly.grand[k]); });
+    $('wkGrandName').textContent = t('wkGrand');
+    $('wkGrandDesc').textContent = gs === 'locked' ? t('wkGrandLocked', { n: Weekly.goal }) : gparts.join(' + ');
+    var gb = $('wkGrandBtn');
+    gb.textContent = gs === 'claimed' ? t('wkClaimed') : t('wkGrandClaim');
+    gb.disabled = gs !== 'claimable';
+    $('wkGrandRow').className = 'wkpic wkgrand ' + gs;
+    $('wkAdBtn').textContent = t('wkAd', { n: Weekly.frags.ad });
+    $('wkNote').textContent = t('wkNote', { n: Weekly.frags.win });
+  }
+  /* 首页入口回填：碎片进度 + 可领角标（角标数=待领图数含大奖，由 core 算） */
+  function renderWeeklyEntry() {
+    if (!$('btnWeekly')) return;
+    if (!Weekly.enabled) { $('btnWeekly').hidden = true; return; }
+    if (!WeeklyCtl.state) WeeklyCtl.load();
+    WeeklyCtl.settle();
+    $('wkEntryTitle').textContent = t('wkEntry');
+    $('wkEntrySub').textContent = t('wkEntrySub');
+    $('wkEntryFrag').textContent = WeeklyCtl.state.frags + '/' + Weekly.goal;
+    var cc = Weekly.claimableCount(WeeklyCtl.state);
+    var badge = $('wkBadge');
+    badge.hidden = cc === 0;
+    badge.textContent = String(cc);
+  }
+  function showWeekly() {
+    $('home').hidden = true; $('game').hidden = true; $('wkPage').hidden = false;
+    renderWeekly();
   }
 
   /* ============ 弹窗 / toast ============ */
@@ -412,21 +1160,92 @@
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.classList.remove('show'); }, 1600);
   }
-  function dialog(title, body, mainText, onMain, subText, onSub) {
+  /* 弹窗。硬规则：任何弹窗都必须留有退出路径——右上角 ✕、点窗口外的遮罩、Esc 三条路都通。
+     误点开一个只有「去改名 / 退出登录」的窗口却出不来，是绝对不允许的状态。
+     onDismiss 可选：给「关掉后要恢复现场」的弹窗用（如结束局面要回首页），默认只关窗。 */
+  var dlgDismiss = null;
+  function hideDialog() { $('overlay').classList.remove('show'); dlgDismiss = null; }
+  function dismissDialog() {                    // 用户主动放弃：✕ / 点外部 / Esc
+    var after = dlgDismiss;
+    hideDialog();
+    if (after) after();
+  }
+  function dialog(title, body, mainText, onMain, subText, onSub, onDismiss) {
     $('dlgTitle').textContent = title;
     $('dlgBody').textContent = body;
+    $('dlgList').hidden = true;                 // 默认纯文本弹窗；背包窗口自己打开列表区
     var mainBtn = $('dlgMain'), subBtn = $('dlgSub'), ov = $('overlay');
+    dlgDismiss = onDismiss || null;
     mainBtn.textContent = mainText;
-    mainBtn.onclick = function () { ov.classList.remove('show'); if (onMain) onMain(); };
+    mainBtn.onclick = function () { hideDialog(); if (onMain) onMain(); };
     if (subText) {
       subBtn.style.display = ''; subBtn.textContent = subText;
-      subBtn.onclick = function () { ov.classList.remove('show'); if (onSub) onSub(); };
+      subBtn.onclick = function () { hideDialog(); if (onSub) onSub(); };
     } else subBtn.style.display = 'none';
+    $('dlgX').onclick = dismissDialog;
+    ov.onclick = function (e) { if (e.target === ov) dismissDialog(); };   // 只有点在遮罩上才关，点窗口内不关
     ov.classList.add('show');
   }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && $('overlay').classList.contains('show')) dismissDialog();
+  });
+
+  /* 入口检测要同时挂 hashchange：用户往已经打开的页面地址栏后面加 #selftest 回车时，
+     浏览器只触发 hashchange、不会重载页面——只在启动时判一次的话面板永远不出现。 */
+  /* 充值 10000 金币（自检面板专用，普通玩家看不到入口）。
+     走生产同一条发放路径 Stock.grant → coinsEarned 累加；该字段在云端是 merge:"max"，
+     所以**登录状态下写入会抬升云端值，并跟着 run.ceo 账号跨设备生效**，且不会被其它设备旧值覆盖。
+     注意 max 是只增语义：加上去就降不回来（真要清零得反向加 coinsSpent）。
+     平台按 owner 做行级隔离，只能给「当前这台设备上已登录的这个账号」充值——
+     这也是为什么不能凭昵称给别人充值。 */
+  var GRANT_AMOUNT = 10000;
+  function grantCoins() {
+    var out = [];
+    function put(k, v) { out.push(k + '：' + v); $('stOut').textContent = out.join('\n'); }
+    var before = Coins.balance(save);
+    var patch = Stock.grant(save, Coins.coinsKey, GRANT_AMOUNT);
+    if (!patch) { put('结果', '发放失败（金币账目未配置）'); return; }
+    Object.assign(save, patch); persist(); renderHome();
+    put('账号', (Plat && Plat.user && (Plat.user.name || Plat.user.id)) || '未登录（仅本机生效）');
+    put('金币', before + ' → ' + Coins.balance(save) + '（+' + GRANT_AMOUNT + '）');
+    put('累计获得', String(save.coinsEarned || 0));
+    if (!Plat || !Plat.user) {
+      put('云端同步', '未登录 → 只写在这台设备；登录后会自动并入云端（取较大值）');
+      return;
+    }
+    put('云端同步', '正在写入并回读确认…');
+    /* saveCloud 直接写（不经防抖，避免"点完就关页面"丢失），再 loadCloud 回读实证真的落库。
+       两者都是 Promise；回读值必须 >= 本地才算成功，不做乐观宣称。 */
+    Plat.saveCloud(save, Date.now())
+      .then(function () { return Plat.loadCloud(); })
+      .then(function (row) {
+        if (!row) { put('云端回读', '读不到云端行（稍后再点一次确认）'); return; }
+        var cloudEarned = row.coins_earned || 0;
+        var cloudBal = Math.max(0, cloudEarned - (row.coins_spent || 0));
+        put('云端回读', 'coins_earned=' + cloudEarned + ' / coins_spent=' + (row.coins_spent || 0)
+          + ' → 云端余额 ' + cloudBal);
+        put('结论', cloudBal >= Coins.balance(save)
+          ? '✅ 已入云端，换台设备登录同一账号即可看到'
+          : '⚠ 云端还没跟上，等几秒再点一次本按钮');
+      })
+      .catch(function (err) {
+        put('云端回读', '失败：' + ((err && (err.code || err.message)) || err)
+          + '（登录可能已过期，回首页重新登录后再点）');
+      });
+  }
+
+  function syncSelfTestEntry() {
+    if (!/selftest/.test(location.hash) && !/selftest/.test(location.search)) return;
+    if (!$('selftest').hidden) return;
+    $('selftest').hidden = false;
+    $('stGrant').addEventListener('click', grantCoins);
+  }
+  syncSelfTestEntry();
+  window.addEventListener('hashchange', syncSelfTestEntry);
 
   /* ============ 调试口（截图/自动化用，与倒水页同风格） ============ */
   window.__mine = {
+    ads: AdPlay,                       // 自动化观测广告链用（availability/stats/sources）
     state: function () { return S && { lv: S.lv, size: S.size, found: Array.from(S.found), lives: S.lives, remain: S.remain, done: S.done }; },
     dig: dig, mark: toggleMark,
     solve: function () { S.mines.forEach(function (i) { if (!S.found.has(i)) dig(i); }); },
@@ -434,7 +1253,105 @@
   };
 
   /* ============ 首页：ShellCore + HomeCore 按 gameConfig screens.home 声明渲染 ============ */
-  $('home').innerHTML = ShellCore.create(HomeCore.registry(), CFG.screens).render('home', {}).join('');
+  /* 首页装配：按 config 声明渲染。切换语言时整块重建，所以抽成函数（bindHome 随后重绑事件）。 */
+  function buildHome() {
+    $('home').innerHTML = ShellCore.create(HomeCore.registry(), CFG.screens).render('home', {}).join('');
+  }
+
+  /* 语言下拉的选项：core/home.js 的 lang-select 模块只产出空 <select id="langSel">，
+     选项在这里按字典键填充——每种语言显示自己的自称（langName），
+     所以加语言只需在 config 的 i18n.locales 补一份字典，页面代码不用动。 */
+  function fillLangOptions() {
+    var sel = $('langSel');
+    if (!sel) return;
+    sel.innerHTML = I18n.locales().map(function (code) {
+      return '<option value="' + code + '"' + (code === LANG ? ' selected' : '') + '>'
+        + HomeCore.escapeHtml(I18n.t(code, 'langName')) + '</option>';
+    }).join('');
+    sel.value = LANG;
+  }
+
+  /* 静态文案回填：HTML 里写死的那些文字（标题/HUD 标签/道具按钮/首页 label/底部提示）
+     在这里按当前语言灌一遍。首页 label 走锚点回填，避免改 core/home.js 的 config 契约。 */
+  function applyStaticI18n() {
+    document.documentElement.lang = LocaleCore.htmlLang(LANG);
+    document.title = t('docTitle');
+    var setText = function (id, val) { var el = $(id); if (el) el.textContent = val; };
+    setText('btnBack', t('back'));
+    // 无障碍标签/提示也是文案：英文下不该念中文（此前 aria-label 全是写死的中文）
+    var setAttr = function (id, attr, val) { var el = $(id); if (el) el.setAttribute(attr, val); };
+    // 对局页顶部标题此前写死在静态 HTML 里，英文下仍显示「彩色扫雷」（用户实报的「顶部还显示中文」）
+    var gt = $('gameTitle');
+    if (gt) gt.innerHTML = t('logoMain') + ' <em>' + t('logoSub') + '</em>';
+    setAttr('board', 'aria-label', t('boardLabel'));
+    setAttr('langSel', 'aria-label', t('langLabel'));
+    setAttr('dlgX', 'aria-label', t('close'));
+    setAttr('dlgX', 'title', t('close'));
+    setText('hudLvK', t('hudLevel'));
+    setText('hudLeftK', t('hudMines'));
+    setText('hudTimeK', t('hudTime'));
+    setText('toolMineLbl', t('toolMineBtn'));
+    setText('toolSafeLbl', t('toolSafeBtn'));
+    setText('sfxLabel', t('sfxLabel'));       // core/home.js 的 sound-toggle 产出 id="sfxLabel"
+    setText('langLabel', t('langLabel'));     // core/home.js 的 lang-select 产出 id="langLabel"
+    fillLangOptions();
+    // 首页由 config 渲染，label 是 <b id=...> 后面的兄弟 <span>
+    var labels = { homeLv: 'statLevel', homeClears: 'statClears', btnBag: 'statTools', homeCoins: 'statCoins' };
+    Object.keys(labels).forEach(function (id) {
+      var el = $(id); if (!el) return;
+      var span = el.tagName === 'BUTTON' ? el.querySelector('span:not(.sticon)') : el.nextElementSibling;
+      if (span) span.textContent = t(labels[id]);
+    });
+    /* core/home.js 的 logo 模块产出 `<div class="logo">💣 彩色扫雷<em>COLOR MINES</em></div>`——
+       主标题是【裸文本节点】（不是 .logomain 那种子元素），副标题在 <em> 里。
+       所以按节点改：图标 + 主标题写文本节点，副标题写 em。 */
+    var logo = document.querySelector('#home .logo');
+    if (logo) {
+      var em = logo.querySelector('em');
+      for (var n = 0; n < logo.childNodes.length; n++) {
+        var node = logo.childNodes[n];
+        if (node.nodeType === 3 && node.nodeValue.trim()) { node.nodeValue = '💣 ' + t('logoMain'); break; }
+      }
+      if (em) em.textContent = t('logoSub');
+    }
+    /* 开始按钮由 core/home.js 渲染成 `<button id=btnStart>label <span id=startLv>N</span><small>…</small></button>`，
+       label 是裸文本节点、小字在 <small> 里——所以按节点改，不能整块 textContent（会抹掉关卡数字）。 */
+    var startBtn = $('btnStart');
+    if (startBtn) {
+      /* startBtn 文案里的关卡号由 core 渲染成独立的 <span id=startLv>，
+         所以字典给的是「开始 第 {n}」这类整句：把 {n} 之前的部分写进裸文本节点，
+         数字仍由 renderHome() 灌进 span，两边不互相覆盖。 */
+      if (startBtn.firstChild && startBtn.firstChild.nodeType === 3) {
+        var full = t('startBtn', { n: '\u0000' });          // 用哨兵占位，安全切分
+        startBtn.firstChild.nodeValue = full.split('\u0000')[0];
+      }
+      var small = startBtn.querySelector('small');
+      if (small) small.textContent = t('startSub', { n: Reward.E_COST });
+    }
+    /* 提示行：core 的 hintline 模块 class 是 .hintline（不是 .tips/.hint），两行用 <br> 分隔。
+       文案来自字典，用 escapeHtml 兜一层再拼 <br>，不直接把字典塞进 innerHTML。 */
+    setText('gameHint', t('gameHint'));      // 关内棋盘下方的玩法提示
+    var hint = document.querySelector('#home .hintline');
+    if (hint) {
+      hint.innerHTML = HomeCore.escapeHtml(t('tipLine1')) + '<br>' + HomeCore.escapeHtml(t('tipLine2'));
+    }
+  }
+
+  /* 切换语言：写持久化 → 换 LANG → 重建首页 DOM → 重绑事件 → 回填静态文案 → 重渲染数值。
+     不整页 reload，所以顺序里「重绑事件」不能漏（漏了按钮全死，本轮重点回归项）。 */
+  function setLang(lang) {
+    if (!I18n.locales().length || lang === LANG) return;
+    var hit = LocaleCore.matchLang(lang, I18n.locales());
+    if (!hit) return;
+    LANG = hit;
+    try { window.localStorage.setItem(LANG_KEY, LANG); } catch (e) {}
+    /* 顺序要紧：先重建 DOM（buildHome）→ 再重绑事件（bindHome，否则按钮全死）
+       → 再回填静态文案（applyStaticI18n 内含 fillLangOptions）→ 最后刷数值。 */
+    buildHome(); bindHome(); applyStaticI18n(); renderHome();
+    if (S && !S.done) renderHud();          // 关内 HUD 标签也要跟着换
+  }
+
+  buildHome();
 
   function renderHome() {
     var r = Reward.restore(save.energy, save.lastTs, Date.now());
@@ -442,33 +1359,49 @@
     $('homeLv').textContent = save.level;
     $('startLv').textContent = save.level;
     $('homeClears').textContent = save.clears || 0;
-    $('homeTools').textContent = save.toolMine + save.toolSafe;
+    // 道具格已改成图标按钮（数量不在首页显示，点开背包窗口看），所以这里不再回填数量
+    if ($('homeCoins')) $('homeCoins').textContent = Coins.balance(save);
+    renderWeeklyEntry();
     $('enVal').textContent = save.energy;
     document.querySelector('.energy .max').textContent = ' / ' + Reward.E_MAX;
     $('enBar').style.width = Math.min(100, Math.round(save.energy / Reward.E_MAX * 100)) + '%';
-    $('enSub').textContent = save.energy >= Reward.E_MAX ? '体力已满'
-      : '+1 体力 ' + Math.max(0, Math.ceil((Reward.E_TICK - (Date.now() - save.lastTs)) / 1000)) + ' 秒后';
-    $('profileName').textContent = save.alias || '玩家';
-    $('profileAvatar').textContent = (save.alias || '玩').slice(0, 1);
-    $('sfxToggle').textContent = save.sfx ? '开' : '关';
+    $('enSub').textContent = save.energy >= Reward.E_MAX ? t('energyFull')
+      : t('energyRegen', { n: Math.max(0, Math.ceil((Reward.E_TICK - (Date.now() - save.lastTs)) / 1000)) });
+    renderIdentity();
+    $('sfxToggle').textContent = save.sfx ? t('on') : t('off');
     $('sfxToggle').setAttribute('aria-pressed', String(!!save.sfx));
+    // 双连胜卡(2026-08-24):A 大连胜数字 + B 奖励票进度;有票时点亮领取按钮
+    if (WinStreak.enabled && $('wsCard')) {
+      var ws = wsGet();
+      var shown = WinStreak.cycleShown(ws);
+      $('wsCur').textContent = ws.cur;
+      $('wsCurLabel').textContent = t('wsLabel');
+      $('wsCycLabel').textContent = t('wsCycLabel', { n: WinStreak.every });
+      $('wsCycTxt').textContent = shown + '/' + WinStreak.every;
+      $('wsCycBar').style.width = Math.round(shown / WinStreak.every * 100) + '%';
+      $('wsClaim').textContent = t('wsClaimBtn');
+      $('wsClaim').hidden = !WinStreak.hasTicket(ws);
+    }
   }
   function showHome() {
+    if ($('wkPage')) $('wkPage').hidden = true;
     stopTimer();
     $('game').hidden = true; $('home').hidden = false;
+    loadMultitag();            // 被动广告只在首页注入
     renderHome();
-    renderAccount();
     maybePromptLogin();
   }
   function startGame() {
+    // 双连胜(2026-08-24):断链未决时先问「看广告保持」;普通开局零打扰
+    if (WinStreak.enabled && wsGet().pend) { wsKeepDialog(wsGet(), startGame); return; }
     renderHome();                        // 先按当前时间恢复体力再判定
     if (save.energy < Reward.E_COST) {
-      dialog('体力不足', '当前体力 ' + save.energy + '，进关需要 ' + Reward.E_COST + '。看一段广告补 ' + Reward.E_AD + ' 体力。',
-        '看广告 +' + Reward.E_AD, function () {
+      dialog(t('energyLowTitle'), t('energyLowBody', { have: save.energy, need: Reward.E_COST, grant: Reward.E_AD }),
+        t('adGrant', { n: Reward.E_AD }), function () { watchAdFor('tool-refill', function () {
           save.energy += Reward.E_AD;    // 广告补体力可超上限（与 water 同规则，issue #7）
           if (save.energy >= Reward.E_MAX) save.lastTs = Date.now();
-          persist(); renderHome(); toast('已补充体力');
-        }, '取消', null);
+          persist(); renderHome(); toast(t('energyRefilled'));
+        }); }, t('cancel'), null);
       return;
     }
     save.energy -= Reward.E_COST;
@@ -477,63 +1410,204 @@
     $('home').hidden = true; $('game').hidden = false;
     startLevel(save.level);
   }
-  $('btnStart').addEventListener('click', startGame);
-  $('btnProfile').addEventListener('click', function () {
-    var name = window.prompt('玩家名称（仅保存在本机）', save.alias || '');
-    if (name === null) return;
-    save.alias = name.trim().slice(0, 12); persist(); renderHome();
-  });
-  $('sfxToggle').addEventListener('click', function () { save.sfx = !save.sfx; persist(); renderHome(); });
+  /* 首页按钮绑定收进一个函数：切换语言时首页 DOM 会整块重建（innerHTML），
+     旧节点上的监听器随之失效，必须重新绑一遍——否则切完语言按钮全成死的。 */
+  function bindHome() {
+    $('btnStart').addEventListener('click', startGame);
+    $('sfxToggle').addEventListener('click', function () { save.sfx = !save.sfx; persist(); renderHome(); });
+    if ($('btnBag')) $('btnBag').addEventListener('click', openBag);
+    if ($('btnIdentity')) $('btnIdentity').addEventListener('click', onIdentityClick);
+    if ($('langSel')) $('langSel').addEventListener('change', function (e) { setLang(e.target.value); });
+    if ($('btnWeekly')) $('btnWeekly').addEventListener('click', showWeekly);
+    if ($('wsClaim')) $('wsClaim').addEventListener('click', wsClaimTicket);   // 双连胜:领取奖励票
+  }
+
+  /* 背包窗口：首页道具格是个图标按钮，点开这里看「有哪些道具、各剩几个、干什么用」。
+     数量从首页移到这里的好处——首页只剩一个入口图标，而窗口里能放下名称与说明。
+     道具清单来自 core/stock.js 的配置声明（含 icon/name/desc 元数据），
+     所以以后加新道具只改配置，这个窗口自动多一行，不用动代码。
+     金币不是道具，用 Coins.coinsKey 排除掉（它在首页有自己的显示位）。 */
+  function openBag() {
+    var rows = Stock.list(save, [Coins.coinsKey]);
+    var html = rows.length === 0
+      ? '<p class="bagempty">' + escHtml(t('bagEmpty')) + '</p>'
+      : rows.map(function (it) {
+          // 道具名/说明优先走 i18n（config 里的 nameKey/descKey），没配才用写死的字面量
+          var nm = it.nameKey ? t(it.nameKey) : it.name;
+          var ds = it.descKey ? t(it.descKey) : it.desc;
+          return '<div class="bagrow' + (it.stock > 0 ? '' : ' empty') + '">' +
+            '<span class="bagicon" aria-hidden="true">' + escHtml(it.icon) + '</span>' +
+            '<span class="baginfo"><b>' + escHtml(nm) + '</b><span>' + escHtml(ds) + '</span></span>' +
+            '<span class="bagqty">×' + it.stock + '</span>' +
+            '</div>';
+        }).join('');
+    dialog(t('bagTitle'), t('bagBody'), t('gotIt'), null, null, null, null);
+    var list = $('dlgList');
+    list.innerHTML = html;
+    list.hidden = false;
+  }
   setInterval(function () { if (!$('home').hidden) renderHome(); }, 1000);
   $('btnBack').addEventListener('click', function () {
     if (S && !S.done) {
-      dialog('退出本关？', '本关进度不保留，下次从第 ' + S.lv + ' 关重新开始。', '退出', showHome, '继续玩', null);
+      dialog(t('quitTitle'), t('quitBody', { n: S.lv }),
+        // 双连胜:局中弃战 = 没赢,算断链(与失败/超时同口径)
+        t('quit'), function () { wsOnLose(); showHome(); }, t('keepPlaying'), null);
     } else showHome();
   });
 
-  /* ============ run.ceo 平台（core/platform.js，SDK §0 两行接入）：云存档 + 登录，匿名可玩优先 ============ */
+  /* ============ run.ceo 平台：单栏身份 + 云存档，匿名可玩优先 ============ */
   var Plat = null, platPrompted = false;
+  var SYNC_FAILS = 0;   // 云端回写累计失败次数（降级可观测：常态化失败要能一眼看出来）
+  var PLAT_EXPIRED = false, PLAT_LAST_NAME = '';
+  var RENAME_STORE_KEY = 'mine:rename-before';
+  var renameReturn = { renamed: false, cleanUrl: location.href };
+  if (/^https?:/i.test(location.href)) {
+    renameReturn = IdentityCore.takeRenameFlag(location.href);
+    if (renameReturn.renamed) history.replaceState(null, '', renameReturn.cleanUrl);
+  }
+  /* IdentityCore 返回的是文案 key，这里映射到 i18n 字典键 —— 于是身份行文案自动跟随语言。
+     不要在这里写死文案：那会绕过 i18n，切语言时身份行会留在旧语言（本轮的坑）。 */
+  var ID_TEXT_KEY = {
+    me: 'defaultPlayer',
+    idSrcCloud: 'srcCloud',
+    idSrcTemp: 'srcLocal',
+    idSubPending: 'idConnecting',
+    idSubAnon: 'idAnon',
+    idSubCloud: 'idSynced',
+    idSubCloudTemp: 'idSyncedNoName',
+    idSubExpired: 'idExpired',
+    idSubUnsupported: 'idUnsupported',
+    idActLogin: 'login',
+    idActRelogin: 'reLogin',
+    idActRename: 'goRename'
+  };
+  function idText(key) { return key && ID_TEXT_KEY[key] ? t(ID_TEXT_KEY[key]) : (key || ''); }
+  function identityView() {
+    return IdentityCore.resolve({
+      mode: Plat ? Plat.mode : 'pending',
+      user: PLAT_EXPIRED ? null : (Plat && Plat.user),
+      expired: PLAT_EXPIRED,
+      // 存档里的系统默认名带着「生成时那门语言」的字面量，显示时按当前语言重拼（core/identity.js）
+      tempName: IdentityCore.localizeAlias(ensureTempName(), t('playerPrefix')),
+      lastName: PLAT_LAST_NAME,
+      defaultKey: 'me'
+    });
+  }
+  function renderIdentity() {
+    if (!$('btnIdentity')) return;
+    var v = identityView();
+    var name = v.name || idText(v.nameKey) || idText('me');
+    $('idName').textContent = name;
+    $('idAvatar').firstChild.nodeValue = IdentityCore.avatarChar(name) || t('defaultPlayer');
+    $('idSource').textContent = idText(v.sourceKey);
+    $('idSource').classList.toggle('show', !!v.sourceKey);
+    $('idSub').textContent = idText(v.subKey);
+    $('idBadge').className = 'idbadge ' + v.badge;
+    $('idAction').textContent = v.action.kind === 'panel' ? t('accountEntry') : idText(v.action.labelKey);
+    $('btnIdentity').dataset.state = v.state;
+    $('btnIdentity').dataset.action = v.action.kind;
+    if (!PLAT_EXPIRED && name) PLAT_LAST_NAME = name;
+  }
+  function markAuthExpired(reason) {
+    var shown = $('idName') && $('idName').textContent;
+    if (shown) PLAT_LAST_NAME = shown;
+    PLAT_EXPIRED = true;
+    console.warn('[mine identity] 登录已过期：' + reason, {
+      lastName: PLAT_LAST_NAME,
+      mode: Plat && Plat.mode
+    });
+    renderIdentity();
+  }
+  function nicknameApex() {
+    return /^play-[a-z0-9-]+\.run\.ceo$/i.test(location.hostname)
+      ? 'https://run.ceo'
+      : location.origin;
+  }
+  function goRename() {
+    var slug = Plat && Plat.play && Plat.play.slug;
+    if (!slug) { toast(t('noGameId')); return; }
+    var before = identityView().name || PLAT_LAST_NAME || '';
+    try {
+      sessionStorage.setItem(RENAME_STORE_KEY, before);
+      location.assign(IdentityCore.renameUrl({
+        apex: nicknameApex(),
+        slug: slug,
+        returnTo: IdentityCore.markReturn(location.href),
+        scope: 'perGame'
+      }));
+    } catch (err) {
+      console.warn('[mine identity] 无法打开 run.ceo 改名页：' + String(err && err.message || err), {
+        slug: slug,
+        origin: location.origin
+      });
+      toast(t('renamePageFail'));
+    }
+  }
+  function finishRenameReturn(session) {
+    if (!renameReturn.renamed) return;
+    var before = '';
+    try {
+      before = sessionStorage.getItem(RENAME_STORE_KEY) || '';
+      sessionStorage.removeItem(RENAME_STORE_KEY);
+    } catch (err) {
+      console.warn('[mine identity] 读取改名前名字失败：' + String(err && err.message || err));
+    }
+    var after = session && session.user ? session.user.name : null;
+    var outcome = IdentityCore.renameOutcome({ before: before, after: after });
+    if (outcome.status === 'applied') {
+      toast(t('nameUpdated'));
+      return;
+    }
+    console.warn('[mine identity] 改名回跳未确认生效：' +
+      (outcome.status === 'stale' ? t('nameUnchanged') : t('noUsableName')), {
+      status: outcome.status,
+      before: before,
+      after: after
+    });
+    toast(t('renameSubmitted'));
+  }
   function platformSync() {
     if (!Plat || Plat.mode !== 'online' || !Plat.user) return;
     Plat.queueSync(function () { return save; }, {
-      onAuthLost: function () { renderAccount(); toast('登录已过期，进度暂存本机'); }
+      onAuthLost: function () { markAuthExpired('queueSync.onAuthLost'); toast(t('loginExpiredToast')); },
+      /* 降级必须可观测：云端回写失败过去被静默吞掉，道具/进度对不上时日志里一条线索都没有。
+         这里把异常本体 + 累计失败次数都记下来，常态化失败一眼可见。 */
+      onError: function (err) {
+        SYNC_FAILS += 1;
+        console.warn('[mine cloud] 云存档回写失败（累计 ' + SYNC_FAILS + ' 次）：' +
+          ((err && (err.code || err.name)) || 'unknown') + ' / ' +
+          String((err && err.message) || err).slice(0, 200) + ' status=' + (err && err.status));
+      }
     });
-  }
-  function renderAccount() {
-    if (!$('btnAccount')) return;
-    if (!Plat || Plat.mode !== 'online') {
-      $('accountStatus').textContent = Plat ? '本地存档' : '连接中…';
-      $('accountAction').textContent = '';
-    } else if (Plat.user) {
-      $('accountStatus').textContent = '已登录 · 进度云同步';
-      $('accountAction').textContent = '退出';
-    } else {
-      $('accountStatus').textContent = '未登录 · 进度仅存本机';
-      $('accountAction').textContent = '登录';
-    }
   }
   /* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
   function maybePromptLogin() {
     if (!Plat || Plat.mode !== 'online' || Plat.user) return;
     if (!Plat.core.shouldPromptLogin({ clears: save.clears || 0, prompted: platPrompted })) return;
     platPrompted = true;
-    dialog('进度存到云端？', '你已通关 ' + (save.clears || 0) + ' 盘。登录 run.ceo 账号后，进度、道具、体力跨设备同步，换浏览器不丢档。',
-      '登录', function () { Plat.login(); }, '稍后', null);
+    dialog(t('cloudPromptTitle'), t('cloudPromptBody', { n: save.clears || 0 }),
+      t('login'), function () { Plat.login(); }, t('later'), null);
   }
-  $('btnAccount').addEventListener('click', function () {
-    if (!Plat) { toast('平台连接中…'); return; }
-    if (Plat.mode !== 'online') { toast('当前环境不支持云存档，进度保存在本机'); return; }
-    if (Plat.user) {
-      dialog('退出登录？', '本机继续保留当前进度，云端存档不受影响。', '退出', function () {
-        Plat.logout(); Plat.user = null; renderAccount(); toast('已退出，进度改存本机');
-      }, '取消', null);
-    } else Plat.login();
-  });
+  function onIdentityClick() {
+    var action = identityView().action.kind;
+    if (action === 'none') {
+      toast(Plat ? t('idUnsupported') : t('platformConnecting'));
+      return;
+    }
+    if (action === 'login' || action === 'relogin') { Plat.login(); return; }
+    if (action === 'rename') { goRename(); return; }
+    dialog(t('accountTitle'), t('accountBody'),
+      t('goRenameCloud'), goRename, t('logout'), function () {
+        Plat.logout(); Plat.user = null; PLAT_EXPIRED = false; renderIdentity(); toast(t('loggedOut'));
+      });
+  }
   PlatformCore.connect(CFG.platform).then(function (session) {
     Plat = session;
-    renderAccount();
+    if (session.user) PLAT_EXPIRED = false;
+    renderIdentity();
+    finishRenameReturn(session);
     if (session.mode !== 'online') return;
-    session.on('authexpired', function () { renderAccount(); });
+    session.on('authexpired', function () { markAuthExpired('session.authexpired'); });
     if (!session.user) return;
     // 登录态：拉云档 → 字段级合并（进度取大、道具/体力按时间戳取新）→ 落本地并回写云端
     session.loadCloud().then(function (row) {
@@ -541,13 +1615,32 @@
       var localFresh = (save.clears || 0) === 0 && save.level <= 1;
       var merged = session.core.mergeSave(save, row, { localFresh: localFresh }).save;
       Object.keys(merged).forEach(function (k) { save[k] = merged[k]; });
-      persist(); renderHome(); renderAccount();
-    }).catch(function () { renderAccount(); });
+      // 云端老行只有旧「库存数」列时按它推导 granted/spent；已有账本则原样保留（migrate 幂等）
+      Object.assign(save, Stock.migrate(save));
+      ensureTempName(); persist(); renderHome();
+      if (S && !S.done) renderHud();
+    }).catch(function (err) {
+      console.warn('[mine identity] 云存档载入失败：' + String(err && err.message || err));
+      renderIdentity();
+    });
   });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden' && Plat && Plat.mode === 'online') Plat.flush(function () { return save; });
   });
 
+  $('btnWkBack').addEventListener('click', showHome);
+  $('wkGrandBtn').addEventListener('click', function () { WeeklyCtl.claimGrand(); });
+  $('wkAdBtn').addEventListener('click', function () {
+    /* 看广告领碎片：走 core 广告链（tool-refill 广告位），没看完不给碎片 */
+    watchAdFor('tool-refill', function () {
+      var msgs = WeeklyCtl.addFrags(Weekly.frags.ad);
+      toast(t('wkFragGot', { n: Weekly.frags.ad }));
+      msgs.forEach(function (m, i) { setTimeout(function () { toast(m); }, 900 * (i + 1)); });
+      renderWeekly(); renderHome();
+    });
+  });
+  bindHome();            // 首页事件绑定（与 setLang 里重建后调用的是同一份，避免两处漂移）
+  applyStaticI18n();     // 静态文案按当前语言灌一遍（必须在 DOM 装配之后）
   showHome();
 })();
 </script>

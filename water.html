@@ -9,7 +9,6 @@
      onerror 动态注入官方 URL 作后备。 -->
 <script src="./tg-web-app.js" onerror="(function(){var s=document.createElement('script');s.src='https://telegram.org/js/telegram-web-app.js';document.head.appendChild(s);})()"></script>
 <!-- Monetag SDK(Rewarded Interstitial zone 11440777) -->
-<script src="https://libtl.com/sdk.js" data-zone="11440777" data-sdk="show_11440777"></script>
 <style>
 :root{
   --canvas:#141A16; --surface:#1B231D; --elevated:#232E26;
@@ -147,6 +146,19 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
   padding:12px 16px; font-size:14px; color:var(--ink-2); display:flex; justify-content:space-between; align-items:center;
 }
 .homebtn b{color:var(--podium)}
+/* ---------- 双连胜卡(2026-08-24 · core/winstreak.js) ---------- */
+.streakcard{
+  background:var(--surface); border:1px solid var(--edge); border-radius:10px;
+  padding:12px 16px; display:flex; align-items:center; gap:12px;
+}
+.streakcard .ic{font-size:20px}
+.streakcard .info{flex:1; min-width:0}
+.streakcard .val{font-weight:700; font-size:16px}
+.streakcard .val span{color:var(--ink-3); font-weight:400; font-size:12px}
+.streakcard .sub{font-size:11px; color:var(--ink-3); display:flex; justify-content:space-between; gap:8px; margin-top:2px}
+.streakcard .bar{height:5px; background:var(--elevated); border-radius:3px; margin-top:6px; overflow:hidden}
+.streakcard .bar i{display:block; height:100%; background:var(--podium); border-radius:3px; transition:width .3s}
+.streakcard .wsclaim{background:var(--accent); color:var(--canvas); border-radius:8px; padding:9px 12px; font-size:12px; font-weight:700; white-space:nowrap}
 /* ---------- 每周活动(issue #30) ---------- */
 .eventbtn{
   position:relative; width:100%; background:linear-gradient(135deg,var(--surface),var(--cell-same));
@@ -237,6 +249,20 @@ button{font:inherit; color:inherit; background:none; border:none; padding:0; cur
 .profilerow .profilelabel{display:block; font-size:11px; color:var(--ink-3)}
 .profilerow .profilename{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-size:14px; font-weight:600}
 .profilerow .profilesource{color:var(--ink-4); font-size:11px; white-space:nowrap}
+/* 单栏身份行（core/identity.js + home.js 的 identity-row）：一行内只有一个名字。
+   副标题刻意不用 nowrap+ellipsis——「进度存哪 / 去哪改名」是关键语义，截断了等于没说。 */
+.idrow .idnameline{display:flex; align-items:baseline; gap:6px; min-width:0}
+.idrow .idnameline .profilename{flex:0 1 auto}
+.idrow .idsource{flex:0 0 auto; font-style:normal; font-size:10px; color:var(--ink-4); border:1px solid var(--edge); border-radius:4px; padding:0 5px; line-height:1.5}
+.idrow .idsub{display:block; margin-top:2px; font-size:11px; line-height:1.35; color:var(--ink-3); overflow-wrap:break-word}
+.idrow[data-state="cloud"] .idsub, .idrow[data-state="cloudTemp"] .idsub{color:var(--ok)}
+.idrow[data-state="expired"] .idsub{color:var(--warn)}
+.idrow .avatar{position:relative}
+.idrow .idbadge{position:absolute; right:-2px; bottom:-2px; width:13px; height:13px; border-radius:50%; border:2px solid var(--surface); background:var(--ink-4); font-style:normal; font-size:8px; line-height:9px; text-align:center; color:var(--surface)}
+.idrow[data-badge="ok"] .idbadge{background:var(--ok)}
+.idrow[data-badge="warn"] .idbadge{background:var(--warn)}
+.idrow[data-action="login"] .profilesource, .idrow[data-action="rename"] .profilesource{color:var(--accent)}
+.idrow[data-action="relogin"] .profilesource{color:var(--warn)}
 /* ---------- 排行榜 ---------- */
 .lb{width:100%; display:flex; flex-direction:column; gap:10px; padding-top:8px}
 .lb h2{margin:0; font-size:18px; display:flex; justify-content:space-between; align-items:center}
@@ -472,9 +498,17 @@ body:has(#gamePage:not([hidden])){
   padding:24px; z-index:10;
 }
 .dialog{
+  position:relative;
   background:var(--surface); border:1px solid var(--edge-strong); border-radius:12px;
   padding:22px 20px; width:100%; max-width:320px; display:flex; flex-direction:column; gap:14px; text-align:center;
 }
+/* 关闭入口：任何弹窗都必须能退出（硬规则：禁止出现用户无法返回的窗口） */
+.dlgx{
+  position:absolute; top:6px; right:8px; width:32px; height:32px; padding:0; border:0;
+  border-radius:9px; background:transparent; color:var(--ink-3); font-size:16px; line-height:1;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.dlgx:hover{background:rgba(127,127,127,.14); color:var(--ink)}
 .dialog h2{margin:0; font-size:18px}
 .dialog p{margin:0; font-size:13px; color:var(--ink-2); line-height:1.6}
 .dialog .stats{display:flex; justify-content:center; gap:18px; font-size:12px; color:var(--ink-3)}
@@ -681,10 +715,18 @@ var SudokuEngine=(function(){
 <script src="./core/reward.js"></script>
 <script src="./reward.js"></script>
 <!-- 首页统一（issue #1）：config 声明 + core 模块渲染，与 mine.html 同款装配 -->
-<script id="gameConfig" type="application/json">{"id":"water","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"undo","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"addBottle","grantOn":[{"trigger":"dailyLogin","qty":1}],"unlock":[{"type":"level","n":3}]}],"weeklyEvent":{"enabled":true,"metric":"clears","period":"weekly","rewards":{"kind":"top10","tiers":[{"coins":100},{"coins":50},{"coins":25}]}},"ads":{"interstitial":{"enabled":true,"everyN":3},"geo":{"DE":{"rewarded":false}},"placements":{"pre-level-interstitial":{"format":"interstitial","capping":{"minIntervalSec":60,"maxPerDay":10}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}}},"lifetimeStats":[{"key":"bottles_poured","event":"pour","agg":"count","label":"倒了多少瓶"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_time_ms","event":"level_cleared","agg":"min","field":"timeMs","unit":"ms"},{"key":"current_streak","event":"streak_changed","agg":"last","field":"current"}],"leaderboards":[{"id":"fastest","metric":"best_time_ms","order":"asc","operator":"best","period":"none"},{"id":"streak_now","metric":"current_streak","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","settings":"Settings","undo":"Undo"},"zh":{"play":"开始","settings":"设置"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"text":"倒水排序","em":"WATER SORT"}},{"type":"energy","props":{}},{"type":"start-button","props":{"label":"开始","small":"消耗 15 体力 · 10 分钟限时"}},{"type":"weekly-event-entry","props":{}},{"type":"leaderboard-entry","props":{"boardId":"fastest"}},{"type":"homestats","props":{"items":[{"id":"stWins","label":"已通关","initial":0},{"id":"stBottles","label":"加瓶道具","initial":2}]}},{"type":"profile-row","props":{}},{"type":"account-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}}]},"result":{"modules":[{"type":"settle-summary"},{"type":"ad-double-button"}]}},"host":{"storagePrefix":"water:"},"save":{"version":1},"streak":{"enabled":true,"claimMode":"ad","policy":{"resetOnLoss":true},"tiers":[{"streak":10,"reward":{"type":"coins","amount":100}}]},"cosmetics":{"catalog":[{"id":"ocean-bg","kind":"background","unlock":[{"type":"level","n":20}]},{"id":"gold-bottle","kind":"skin","price":{"coins":50}}],"themes":{"default":{"bg":"#e8f4ff","piece":"bottle.png","sfx":"pour.mp3"},"sea":{"bg":"#8fd"},"deep":{"bg":"#046"}},"progressBackgrounds":[{"fromLevel":10,"themeId":"sea"},{"fromLevel":20,"themeId":"deep"}]},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"wins":{"col":"wins","merge":"max"},"bottles":{"col":"bottles","merge":"newest"},"undos":{"col":"undos","merge":"newest"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"}}}}</script>
+<script id="gameConfig" type="application/json">{"id":"water","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"undo","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"addBottle","grantOn":[{"trigger":"dailyLogin","qty":1}],"unlock":[{"type":"level","n":3}]}],"weeklyEvent":{"enabled":true,"metric":"clears","period":"weekly","rewards":{"kind":"top10","tiers":[{"coins":100},{"coins":50},{"coins":25}]}},"ads":{"interstitial":{"enabled":true,"everyN":3},"geo":{"DE":{"rewarded":false}},"placements":{"pre-level-interstitial":{"format":"interstitial","capping":{"minIntervalSec":60,"maxPerDay":10}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}},"undo-refill":{"format":"rewarded","onFail":"deny"},"bottle-unlock":{"format":"rewarded","onFail":"deny"},"energy-refill":{"format":"rewarded","onFail":"deny"},"weekly-frags":{"format":"rewarded","onFail":"deny","capping":{"maxPerDay":20}},"streak-keep":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":20}}},"play":{"sources":[{"type":"telegram","env":"telegram"},{"type":"monetag","zoneId":"11440777","env":"telegram"},{"type":"directlink","url":"https://omg10.com/4/11622862","env":"web"},{"type":"house"}],"houseSeconds":6,"timeoutMs":25000},"passive":{"multitag":{"src":"https://quge5.com/88/tag.min.js","zone":"271963","env":"web","screens":["home"]}}},"lifetimeStats":[{"key":"bottles_poured","event":"pour","agg":"count","label":"倒了多少瓶"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_time_ms","event":"level_cleared","agg":"min","field":"timeMs","unit":"ms"},{"key":"current_streak","event":"streak_changed","agg":"last","field":"current"}],"leaderboards":[{"id":"fastest","metric":"best_time_ms","order":"asc","operator":"best","period":"none"},{"id":"streak_now","metric":"current_streak","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"en","locales":{"en":{"play":"Play","settings":"Settings","undo":"Undo"},"zh":{"play":"开始","settings":"设置"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"logo","props":{"text":"倒水排序","em":"WATER SORT"}},{"type":"energy","props":{}},{"type":"start-button","props":{"label":"开始","small":"消耗 15 体力 · 10 分钟限时"}},{"type":"streak-card","props":{}},{"type":"weekly-event-entry","props":{}},{"type":"leaderboard-entry","props":{"boardId":"fastest"}},{"type":"homestats","props":{"items":[{"id":"stWins","label":"已通关","initial":0},{"id":"stBottles","label":"加瓶道具","initial":2},{"id":"stCoins","label":"金币","initial":0}]}},{"type":"identity-row","props":{}},{"type":"sound-toggle","props":{}},{"type":"lang-select","props":{}}]},"result":{"modules":[{"type":"settle-summary"},{"type":"ad-double-button"}]}},"host":{"storagePrefix":"water:"},"save":{"version":1},"streak":{"enabled":true,"claimMode":"ad","policy":{"resetOnLoss":true},"tiers":[{"streak":10,"reward":{"type":"coins","amount":100}}]},"cosmetics":{"catalog":[{"id":"ocean-bg","kind":"background","unlock":[{"type":"level","n":20}]},{"id":"gold-bottle","kind":"skin","price":{"coins":50}}],"themes":{"default":{"bg":"#e8f4ff","piece":"bottle.png","sfx":"pour.mp3"},"sea":{"bg":"#8fd"},"deep":{"bg":"#046"}},"progressBackgrounds":[{"fromLevel":10,"themeId":"sea"},{"fromLevel":20,"themeId":"deep"}]},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"wins":{"col":"wins","merge":"max"},"bottles":{"col":"bottles","merge":"newest"},"undos":{"col":"undos","merge":"newest"},"bottlesGranted":{"col":"bottles_granted","merge":"max"},"bottlesSpent":{"col":"bottles_spent","merge":"max"},"undosGranted":{"col":"undos_granted","merge":"max"},"undosSpent":{"col":"undos_spent","merge":"max"},"coinsEarned":{"col":"coins_earned","merge":"max"},"coinsSpent":{"col":"coins_spent","merge":"max"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"},"wsCur":{"col":"ws_cur","merge":"newest"},"wsPend":{"col":"ws_pend","merge":"newest"},"wsCyc":{"col":"ws_cyc","merge":"newest"},"wsEarned":{"col":"ws_earned","merge":"max"},"wsClaimed":{"col":"ws_claimed","merge":"max"}}},"coins":{"earnPerClear":2,"shop":{"bottles":{"price":200,"amount":1},"undos":{"price":150,"amount":2}}},"stock":{"items":{"coins":{"granted":"coinsEarned","spent":"coinsSpent","initial":0},"bottles":{"granted":"bottlesGranted","spent":"bottlesSpent","legacy":"bottles","initial":2},"undos":{"granted":"undosGranted","spent":"undosSpent","legacy":"undos","initial":3}}},"weekly":{"enabled":true,"thresholds":[100,200,300,400,500,600],"goal":600,"frags":{"win":10,"ad":10},"grand":{"energy":60,"hints":5},"rewardPool":[{"type":"energy","min":10,"max":60,"weight":1},{"type":"hints","min":1,"max":3,"weight":1}]},"winstreak":{"enabled":true,"keepMinPrompt":3,"every":10,"rewards":{"energy":60,"coins":10,"frags":10}}}</script>
 <script src="./core/shell.js"></script>
 <script src="./core/home.js"></script>
 <script src="./core/platform.js"></script>
+<script src="./core/identity.js"></script>
+<script src="./core/stock.js"></script>
+<script src="./core/coins.js"></script>
+<script src="./core/locale.js"></script>
+<script src="./core/weekly.js"></script>
+<script src="./core/placements.js"></script>
+<script src="./core/adplay.js"></script>
+<script src="./core/winstreak.js"></script>
 <script src="./water-home.js"></script>
 <script>
 /* ====================== 前 5 关固定盘面(与 levels.js 同源,内联;issue #14/#16) ======================
@@ -777,14 +819,37 @@ const I18N = {
     undosItem: '撤销道具', adUndo: '看一段广告，获得 <b style="color:var(--podium)">+{n}</b> 个撤销道具（永久保留）。', gotUndo: '+{n} 撤销道具', undoEmptyTitle: '撤销道具用完了', addBottleBtn: '解锁空瓶',
     diffBeginner: '新手', diffEasy: '简单', diffMedium: '中等', diffHard: '困难',
     adDemo: '演示模式:模拟广告播放中…', adFail: '广告未完成,未发放奖励',
-    alias: '玩家', me: '我', lbMe: '(我)', lbLoading: '加载中…',
-    profileLabel: '玩家名称', profileWeb: '网页本地 · 点击修改', profileTelegram: 'Telegram',
-    profileEditTitle: '修改玩家名称', profileEditBody: '此名称只保存在当前浏览器,用于排行榜和分享。', profilePlaceholder: '输入玩家名称',
-    profileSave: '保存', profileCancel: '取消', profileSaved: '玩家名称已保存', profileFromTelegram: '名称来自 Telegram 账号',
+    alias: '玩家', me: '我', lbMe: '(我)', lbLoading: '加载中…', close: '关闭', boardLabel: '瓶架',
+    /* 单栏身份行（两栏合一）：名字只有一个,改名一律跳 run.ceo 平台改本游戏云端名称 */
+    idSrcCloud: 'run.ceo', idSrcTemp: '临时名',
+    idSubPending: '正在确认云同步状态 · 进度已存这个浏览器',
+    idSubAnon: '进度只存这个浏览器 · 登录后跨设备同步',
+    idSubCloud: '云同步已开 · 名字与排行榜全设备一致',
+    idSubCloudTemp: '云同步已开 · 现在是临时名,去 run.ceo 设正式名（所有设备通用）',
+    idSubExpired: '登录已过期 · 新进度暂存这个浏览器',
+    idSubUnsupported: '不支持云同步 · 进度存这个浏览器',
+    idActLogin: '登录', idActRelogin: '重新登录', idActRename: '去改名',
+    idPanelTitle: '账号', idPanelName: '显示名称', idPanelSource: '名称来源', idPanelStore: '进度存储',
+    idPanelSourceCloud: 'run.ceo · 本游戏', idPanelSourceTemp: '本机临时名',
+    idPanelStoreCloud: '云端 · 已同步', idPanelStoreLocal: '这个浏览器',
+    idPanelCooldown: '改名限制', idPanelCooldownVal: '7 天一次（平台规定）',
+    idPanelRename: '去 run.ceo 改名（所有设备生效）', idPanelLogout: '退出登录（进度改存这个浏览器）',
+    idRenameTitle: '去 run.ceo 改名', idRenameBody: '改的是 run.ceo 上「本游戏」的名称,所有设备和排行榜都会变。改完自动回到这里,进度不受影响。',
+    idRenameGo: '继续', idRenameCancel: '取消', idRenameNoSlug: '暂时无法打开改名页,请稍后再试',
+    idRenameApplied: '名字已更新为 {n},所有设备一致', idRenameStale: '改名已提交 · 新名字重新进入游戏后生效',
+    idRenameUnknown: '改名结果未知 · 请重新进入游戏查看',
+    idUnsupportedToast: '当前环境不支持云同步,进度存在这个浏览器,名字也改不了',
+    idPendingToast: '平台连接中…',
     lbDate: '榜单日期 {d} · 每日刷新', lbOffline: '离线榜单:网络恢复后自动同步', lbMine: '我的成绩',
     bottleEmptyTitle: '加瓶道具用完了',
     bottleEmptyBody: '看一段广告,获得 <b style="color:var(--podium)">2 个</b>加瓶道具(永久保留)。',
     adBottle: '看广告 +2 加瓶', notNow: '先不用', gotBottles: '+2 加瓶道具',
+    adTitle: '广告', adWatching: '广告播放中… {n} 秒', adSkipBtn: '跳过（不领奖励）',
+    adRewardTip: '看完可得奖励',
+    coinsItem: '金币', buyCoins: '用 {n} 金币购买', boughtCoins: '已用 {n} 金币购买',
+    notEnoughCoins: '金币不够', undoEmptyTitle: '撤销道具用完了',
+    undoEmptyBody: '用金币直接补，或看一段广告补 {n} 次撤销。',
+    adUndo: '看广告 +{n} 撤销', clearCoins: '金币 +{n}',
     bottleAdded: '已用道具解锁 1 个空瓶', bottleUsed: '本关空瓶已全部解锁',
     bottleUnlockedAd: '广告完成,空瓶已解锁', bottleLocked: '这个空瓶还没解锁', noRoom: '目标瓶空位不足,这段同色倒不下',
     bottleUnlockAd: '广告解锁', bottleUnlocking: '播放中', bottleUnlockAria: '看广告解锁第 {n} 个空瓶',
@@ -833,6 +898,12 @@ const I18N = {
     wkAd: '看一段广告 +{n} 碎片', wkNote1: '每盘胜利 +{n} 碎片', wkNote2: '超过 {n} 的碎片自动结转下周,下周从结转值起算',
     wkGotFrags: '+{n} 碎片', wkUnlockToast: '🖼 点亮「{pic}」!奖励待领取,去活动页领', wkGrandToast: '🏆 大奖达成!去活动页领取',
     wkGrandGot: '🏆 已领取大奖:体力 +{e} · 加瓶 +{h}',
+    wsLabel: '连胜', wsCycLabel: '每 {n} 连胜奖励', wsClaimBtn: '🎁 看广告领取',
+    wsKeepTitle: '🔥 {n} 连胜断了!', wsKeepBody: '看一段广告保持 <b>{n} 连胜</b>;放弃则从 0 重新累积。',
+    wsKeepAd: '看广告保持连胜', wsKeepDrop: '放弃连胜并开始',
+    wsKept: '🔥 连胜已保持:{n}', wsDropped: '连胜已清零',
+    wsTicketToast: '🔥 {n} 连胜达成!看广告领奖励', wsWinClaim: '🎁 连胜奖励 · 看广告领取 {r}',
+    wsClaimGot: '🎁 已领取 {r}',
   },
   en: {
     title: 'Water Sort', logoMain: 'Water Sort', logoSub: 'COLOR PUZZLE',
@@ -845,14 +916,36 @@ const I18N = {
     undosItem: 'Undo items', adUndo: 'Watch a short ad to get <b style="color:var(--podium)">+{n}</b> undo items (yours to keep).', gotUndo: '+{n} undo items', undoEmptyTitle: 'Out of undo items', addBottleBtn: 'Unlock bottle',
     diffBeginner: 'Beginner', diffEasy: 'Easy', diffMedium: 'Medium', diffHard: 'Hard',
     adDemo: 'Demo mode: simulating an ad…', adFail: 'Ad not completed — no reward',
-    alias: 'Player ', me: 'Me', lbMe: ' (me)', lbLoading: 'Loading…',
-    profileLabel: 'Player name', profileWeb: 'This browser · tap to edit', profileTelegram: 'Telegram',
-    profileEditTitle: 'Edit player name', profileEditBody: 'This name stays in this browser and is used for leaderboards and sharing.', profilePlaceholder: 'Enter player name',
-    profileSave: 'Save', profileCancel: 'Cancel', profileSaved: 'Player name saved', profileFromTelegram: 'Name comes from your Telegram account',
+    alias: 'Player ', me: 'Me', lbMe: ' (me)', lbLoading: 'Loading…', close: 'Close', boardLabel: 'Bottle rack',
+    idSrcCloud: 'run.ceo', idSrcTemp: 'Temporary',
+    idSubPending: 'Checking cloud sync · progress is in this browser',
+    idSubAnon: 'Progress stays in this browser · sign in to sync across devices',
+    idSubCloud: 'Cloud sync on · same name everywhere, leaderboards included',
+    idSubCloudTemp: 'Cloud sync on · temporary name, set a real one on run.ceo (used on every device)',
+    idSubExpired: 'Session expired · new progress kept in this browser',
+    idSubUnsupported: 'Cloud sync unavailable · progress stays in this browser',
+    idActLogin: 'Sign in', idActRelogin: 'Sign in again', idActRename: 'Rename',
+    idPanelTitle: 'Account', idPanelName: 'Display name', idPanelSource: 'Name comes from', idPanelStore: 'Progress stored',
+    idPanelSourceCloud: 'run.ceo · this game', idPanelSourceTemp: 'Temporary local name',
+    idPanelStoreCloud: 'Cloud · synced', idPanelStoreLocal: 'This browser',
+    idPanelCooldown: 'Rename limit', idPanelCooldownVal: 'Once every 7 days (platform rule)',
+    idPanelRename: 'Rename on run.ceo (applies everywhere)', idPanelLogout: 'Sign out (progress stays in this browser)',
+    idRenameTitle: 'Rename on run.ceo', idRenameBody: 'You are changing the name for this game on run.ceo. It applies on every device and on leaderboards. You will come back here automatically and your progress is unaffected.',
+    idRenameGo: 'Continue', idRenameCancel: 'Cancel', idRenameNoSlug: 'Cannot open the rename page right now, please try again later',
+    idRenameApplied: 'Name updated to {n} — same on every device', idRenameStale: 'Rename submitted · the new name shows after you re-enter the game',
+    idRenameUnknown: 'Rename result unknown · re-enter the game to check',
+    idUnsupportedToast: 'Cloud sync is unavailable here; progress stays in this browser and the name cannot be changed',
+    idPendingToast: 'Connecting to the platform…',
     lbDate: 'Board of {d} · refreshes daily', lbOffline: 'Offline board: syncs once back online', lbMine: 'My score',
     bottleEmptyTitle: 'Out of extra bottles',
     bottleEmptyBody: 'Watch a short ad to get <b style="color:var(--podium)">2 extra bottles</b> (yours to keep).',
     adBottle: 'Watch ad · +2 bottles', notNow: 'Not now', gotBottles: '+2 extra bottles',
+    adTitle: 'Advertisement', adWatching: 'Ad playing… {n}s', adSkipBtn: 'Skip (no reward)',
+    adRewardTip: 'Watch to earn your reward',
+    coinsItem: 'Coins', buyCoins: 'Buy for {n} coins', boughtCoins: 'Bought for {n} coins',
+    notEnoughCoins: 'Not enough coins', undoEmptyTitle: 'Out of undos',
+    undoEmptyBody: 'Buy with coins, or watch an ad for {n} more undos.',
+    adUndo: 'Watch ad · +{n} undos', clearCoins: '+{n} coins',
     bottleAdded: 'Unlocked 1 bottle with an item', bottleUsed: 'All bottles are unlocked',
     bottleUnlockedAd: 'Ad complete — bottle unlocked', bottleLocked: 'This bottle is still locked', noRoom: 'Not enough room in the target bottle',
     bottleUnlockAd: 'Watch ad', bottleUnlocking: 'Playing', bottleUnlockAria: 'Watch an ad to unlock empty bottle {n}',
@@ -901,22 +994,23 @@ const I18N = {
     wkAd: 'Watch ad · +{n} shards', wkNote1: 'Each win: +{n} shards', wkNote2: 'Shards above {n} carry over to next week',
     wkGotFrags: '+{n} shards', wkUnlockToast: '🖼 "{pic}" lit! Reward ready — claim it on the event page', wkGrandToast: '🏆 Grand prize unlocked! Claim it on the event page',
     wkGrandGot: '🏆 Grand prize claimed: +{e} energy · +{h} extra bottles',
+    wsLabel: 'win streak', wsCycLabel: 'Reward every {n} wins', wsClaimBtn: '🎁 Watch ad · claim',
+    wsKeepTitle: '🔥 Your {n}-win streak broke!', wsKeepBody: 'Watch a short ad to keep your <b>{n}-win streak</b>, or give it up and restart from 0.',
+    wsKeepAd: 'Watch ad · keep streak', wsKeepDrop: 'Give up & start',
+    wsKept: '🔥 Streak kept: {n}', wsDropped: 'Streak reset',
+    wsTicketToast: '🔥 {n} wins in a row! Watch an ad to claim your reward', wsWinClaim: '🎁 Streak reward · watch ad {r}',
+    wsClaimGot: '🎁 Claimed {r}',
   },
 };
-/* 语言检测(与 i18n.js 同源):?lang= 调试参数(最高优先) → Telegram language_code → navigator.language → 默认 en;zh* 归 zh */
-function detectLang(search, tgCode, navLang) {
-  const m = /[?&]lang=([A-Za-z-]+)/.exec(search || '');
-  const cand = (m && m[1]) || tgCode || navLang || 'en';
-  return /^zh/i.test(cand) ? 'zh' : 'en';
-}
-/* issue #18:已保存语言优先层(与 i18n.js resolveLang 同源)。
-   优先级:?lang=(调试,仅本次会话生效,不写持久化) → saved(手动选择,持久化) → 自动检测。
-   saved 仅接受字典已有语言码,非法值忽略。 */
+/* 语言选择走 core/locale.js（与彩雷同一份实现，不再各写一套 detectLang/resolveLang）：
+   优先级 ?lang=(调试,不持久化) → saved(手动选择,持久化) → Telegram language_code
+   → navigator.language → 默认。匹配按 RFC 4647 lookup，所以 zh-CN/zh-TW 都落到 zh。 */
+const LANG_AVAILABLE = Object.keys(I18N);
+const LANG_DEFAULT = 'en';
 function resolveLang(search, saved, tgCode, navLang) {
-  const m = /[?&]lang=([A-Za-z-]+)/.exec(search || '');
-  if (m) return /^zh/i.test(m[1]) ? 'zh' : 'en';
-  if (saved && I18N[saved]) return saved;
-  return detectLang('', tgCode, navLang);
+  return LocaleCore.resolveLang({
+    search: search, saved: saved, tgLanguageCode: tgCode, navigatorLanguage: navLang
+  }, LANG_AVAILABLE, LANG_DEFAULT);
 }
 const LANG_KEY = 'sudoku_lang';
 /* 首屏同步读 localStorage 镜像,避免 CloudStorage 异步导致语言闪切;
@@ -938,8 +1032,16 @@ function applyStaticI18n() {
   q('#btnLb').innerHTML = '<span>' + t('leaderboard') + '</span><span>›</span>';
   q('#stWins').nextElementSibling.textContent = t('wins');
   q('#stBottles').nextElementSibling.textContent = t('bottlesItem');
-  q('#profileLabel').textContent = t('profileLabel');
+  const coinLabel = q('#stCoins');
+  if (coinLabel) coinLabel.nextElementSibling.textContent = t('coinsItem');
+  /* 身份行文案不在这里刷:本函数在顶层被同步调用一次(见文件下方 applyStaticI18n() 调用点),
+     那时 Profile / Plat 这些 let 还在 TDZ,renderIdentity() 会抛 ReferenceError 并中断整段脚本
+     (实测崩过:boot、平台连接、事件监听全不执行)。首屏由 renderHome() 渲染,切语言由 applyLang() 补刷。 */
   q('#lbPage h2').innerHTML = t('leaderboard') + '<button id="btnLbBack">' + t('back') + '</button>';
+  // 活动页返回按钮此前只写在静态 HTML 里(英文下仍显示「‹ 返回」);不重建节点,事件无需重绑
+  const wkBack = q('#btnWkBack'); if (wkBack) wkBack.textContent = t('back');
+  // 无障碍标签也是文案：英文下不该念中文（棋盘容器此前写死 aria-label="瓶架"）
+  const rack = q('#tubes'); if (rack) rack.setAttribute('aria-label', t('boardLabel'));
   q('.topbar .title').innerHTML = t('logoMain') + ' <em>' + t('logoSub') + '</em>';
   q('#btnHome').textContent = t('home');
   q('.hud .lvl').innerHTML = t('lvlPre') + '<b class="mono" id="hudLv">1</b>' + t('lvlPost');
@@ -980,6 +1082,7 @@ function applyLang(lang) {
   document.getElementById('btnLbBack').addEventListener('click', () => show('home'));
   populateLangSel();
   if (typeof pages !== 'undefined') {
+    renderIdentity();   // pages 存在 ⇒ 已 boot 完,此处刷身份行文案是安全的
     if (!pages.home.hidden) renderHome();
     if (!pages.lb.hidden) renderLb();
   }
@@ -987,6 +1090,27 @@ function applyLang(lang) {
 /* ====================== 首页装配：ShellCore + HomeCore 按 gameConfig screens.home 声明渲染（issue #1 首页统一）
    必须先于 applyStaticI18n()——静态文案回填的目标节点（#home .logo 等）由本装配产出 ====================== */
 const GAME_CFG = JSON.parse(document.getElementById('gameConfig').textContent);
+/* 道具库存走单调账本（core/stock.js）：只存 granted/spent 两个只增计数，库存 = granted - spent。
+   旧做法存「库存数」+ 按 updatedMs 取新合并，而 updatedMs 会被体力恢复/昵称/音效等无关写入刷新，
+   任一端拿着默认库存做一次无关保存就把已消耗的道具复活 —— 这正是「用了道具，重新登录又变回默认」的根因。
+   Profile.state.bottles / .undos 从此只是派生镜像（每次 mutate 由 legacyPatch 回填），读的地方无需改动。 */
+const Stock = StockCore.create(GAME_CFG.stock);
+/* 金币：通关攒、可直接买道具（不用看广告）。倒水这边显式配了自己的数值
+   （通关 +2、加瓶 200 换 1、撤销 150 换 2，见 game.config.json 的 coins 段）；
+   彩雷那边整段省略、走 core/coins.js 默认（通关 +1、200 换 1）——每个游戏都能自定。 */
+const Coins = CoinsCore.create(GAME_CFG.coins, Stock);
+function spendItem(key) {                       // 用掉一个：spent+1（只增），不足返回 false
+  const patch = Stock.spend(Profile.state, key);
+  if (!patch) return false;
+  Profile.mutate((s) => Object.assign(s, patch));
+  return true;
+}
+function grantItem(key, n) {                    // 发放（看广告/周活动奖励）：granted+n（只增）
+  const patch = Stock.grant(Profile.state, key, n);
+  if (!patch) return false;
+  Profile.mutate((s) => Object.assign(s, patch));
+  return true;
+}
 document.getElementById('home').innerHTML =
   ShellCore.create(HomeCore.registry(WaterHome.extensions()), { home: GAME_CFG.screens.home }).render('home', {}).join('');
 
@@ -1045,17 +1169,126 @@ const Store = (function () {
   };
 })();
 
-/* Monetag 激励广告桥(演示模式:未配置 zone id 时模拟播放后发奖励)。
-   上架:monetag.com 建 Rewarded Interstitial zone → 打开 head 里注释的 <script> 并替换
-   YOUR_ZONE_ID → 下面常量填同一 id。 */
-const MONETAG_ZONE_ID = '11440777';
-function showRewardedAd() {
-  const fn = MONETAG_ZONE_ID && window['show_' + MONETAG_ZONE_ID];
-  // #demoads 只供发布 gate/截图：仍走真实按钮与奖励回调，但不依赖广告网络是否在 headless 中完成。
-  if (!/[#&]demoads/.test(location.hash) && typeof fn === 'function') return fn();
-  return new Promise((resolve) => {
-    toast(t('adDemo'));
-    setTimeout(resolve, 1200);
+/* 激励广告：唯一实现在 core/adplay.js（与彩雷共用）。
+   原来这里是第四份独立实现（Monetag 桥 + 「演示模式」白送），2026-08-21 并入 core：
+   源顺序 / zoneId / 兜底秒数 / 各广告位频控与失败策略全部由 game.config.json 的 ads 段声明。
+   Monetag 的 zone 仍是线上那个（11440777），只是现在由 core 统一调度并在无填充时降级到兜底卡。
+   #demoads 保留：发布 gate/截图用，跳过真实广告网络但仍走完整奖励回调。 */
+const AdPlacements = (GAME_CFG.ads && GAME_CFG.ads.placements)
+  ? PlacementsCore.create(GAME_CFG.ads.placements, () => false) : null;
+const AD_STATE_KEY = 'sudoku_adstate_v1';
+let adState = {};
+try { adState = JSON.parse(window.localStorage.getItem(AD_STATE_KEY) || '{}') || {}; } catch (e) {}
+const saveAdState = () => { try { window.localStorage.setItem(AD_STATE_KEY, JSON.stringify(adState)); } catch (e) {} };
+/* 按需加载某个 Monetag zone 的 SDK。
+ 为什么不写死在 head：TMA zone 与 Website zone 是两条独立通道，
+ 一个页面可能同时配了两个 —— 只加载当前环境真要用的那个，
+ 避免把 Telegram Mini App 的 zone 用在网页流量上（那是无效流量）。 */
+function loadMonetagSdk(zone) {
+var flag = 'show_' + zone;
+if (typeof window[flag] === 'function') return Promise.resolve();
+var existing = document.querySelector('script[data-zone="' + zone + '"]');
+return new Promise(function (resolve, reject) {
+var el = existing;
+if (!el) {
+el = document.createElement('script');
+el.src = 'https://libtl.com/sdk.js';
+el.setAttribute('data-zone', zone);
+el.setAttribute('data-sdk', flag);
+document.head.appendChild(el);
+}
+var tries = 0;
+var tick = setInterval(function () {
+if (typeof window[flag] === 'function') { clearInterval(tick); resolve(); return; }
+if (++tries > 60) { clearInterval(tick); reject(new Error('sdk-timeout')); } // 最多等 6 秒
+}, 100);
+el.addEventListener('error', function () { clearInterval(tick); reject(new Error('sdk-error')); });
+});
+}
+
+const AdPlay = AdPlayCore.create((GAME_CFG.ads && GAME_CFG.ads.play) || null,
+  { houseAd: houseAd, loadSdk: loadMonetagSdk, openUrl: openExternal });
+
+/* 打开外部链接，返回是否真的开成了（被拦弹窗 → false，上层判失败不发奖）。
+   坑：window.open(url,'_blank','noopener') 按规范**返回 null**，会把成功误判成被拦；
+   所以不能在 features 里写 noopener，改为开完手动断 opener。 */
+function openExternal(url) {
+  var w = null;
+  try { w = window.open(url, '_blank'); } catch (e) { return false; }
+  if (!w) return false;
+  try { w.opener = null; } catch (e) { /* 跨源时不可写，无妨 */ }
+  return true;
+}
+
+/* Multitag（被动收入）：只在浏览器、只在首页注入一次。
+   为什么不放 head：① Telegram 内不该加载（会和 TMA 激励广告抢焦点）；
+   ② 它含 Onclick popunder，而对局中每点一格都是一次 click，注入进对局界面会毁体验。
+   注意：脚本一旦注入就无法卸载，所以对局中的频次控制要在 Monetag 后台设 capping。 */
+function loadMultitag() {
+  var m = (GAME_CFG.ads && GAME_CFG.ads.passive && GAME_CFG.ads.passive.multitag) || null;
+  if (!m || !m.src) return false;                       // 没配 = 不启用
+  if (m.env === 'web' && AdPlay.inTelegram()) return false;
+  if (document.querySelector('script[data-multitag="1"]')) return false;  // 已注入
+  var el = document.createElement('script');
+  el.src = m.src;
+  el.async = true;
+  if (m.zone) el.setAttribute('data-zone', String(m.zone));
+  el.setAttribute('data-cfasync', 'false');
+  el.setAttribute('data-multitag', '1');
+  document.head.appendChild(el);
+  return true;
+}
+
+/* 兼容旧调用点：仍叫 showRewardedAd()，返回 Promise（resolve=看完，reject=未看完）。
+   这样原有 .then(发奖).catch(提示) 的写法全部不用改，但语义变成了「真看完才 resolve」。 */
+/* ====================== 广告期间暂停游戏（Google H5 Games Ad Placement API 的 beforeAd/afterAd 契约）
+   官方 adBreak() 契约把这两件事写在函数签名的注释里：beforeAd = "Mute and pause the game flow"、
+   afterAd = "Resume the game and un-mute the sound"，奖励只在 adViewed（广告真的看完）之后发。
+   为什么必须在这一层做：看广告本身要花 15~30 秒（AdMob 激励广告倒计时 5~30s），若关卡倒计时
+   继续走，玩家看完 60 秒奖励回来只剩 30 秒——广告的代价被算进了关卡时长。
+   此前是三个调用点各自 stopTimer/startTimer（手写、易漏、新广告位默认不受保护），
+   现在收进 showRewardedAd()：任何广告位自动暂停倒计时 + 静音，广告关掉再恢复。
+   另加一道兜底：记下暂停瞬间的剩余秒数，恢复时若发现变少（某个源在同页 iframe 里播、
+   页面没 hidden、别处又把 tick 打开了），一律补回快照——广告花掉的时间绝不算进关卡。 */
+let adPauseDepth = 0, adPauseWasTicking = false, adPauseRemain = -1, adPauseSfx = null;
+function adPauseGame() {
+  if (adPauseDepth++ > 0) return;
+  adPauseWasTicking = !!S.timerId;
+  adPauseRemain = typeof S.remain === 'number' ? S.remain : -1;
+  stopTimer();
+  adPauseSfx = WaterAudio.isEnabled();
+  WaterAudio.setEnabled(false);   // 契约要求 mute：广告有自己的声音，别和游戏音效叠在一起
+}
+function adResumeGame() {
+  if (adPauseDepth <= 0) return;
+  if (--adPauseDepth > 0) return;
+  if (adPauseSfx !== null) { WaterAudio.setEnabled(adPauseSfx); adPauseSfx = null; }
+  // 兜底：广告期间不该流失一秒。少了就补回去（多了不动——奖励是在这之后才发的）
+  if (adPauseRemain >= 0 && typeof S.remain === 'number' && S.remain < adPauseRemain) {
+    console.warn('[water ads] 广告期间倒计时被扣掉了 ' + (adPauseRemain - S.remain) +
+      's，已按暂停快照补回（不该发生，说明有路径绕过了 adPauseGame）');
+    S.remain = adPauseRemain;
+    renderTimer();
+  }
+  adPauseRemain = -1;
+  if (adPauseWasTicking && !S.finished) startTimer();
+  adPauseWasTicking = false;
+}
+
+function showRewardedAd(placementId) {
+  const id = placementId || 'weekly-frags';
+  if (/[#&]demoads/.test(location.hash)) return Promise.resolve();   // 发布 gate/截图专用
+  adPauseGame();
+  const resume = (v) => { adResumeGame(); return v; };
+  const resumeThrow = (e) => { adResumeGame(); throw e; };
+  return AdPlay.playPlacement(AdPlacements, id, adState[id] || {}).then(resume, resumeThrow).then((res) => {
+    adState[id] = res.state || {}; saveAdState();
+    if (res.granted) return;
+    const st = AdPlay.stats();
+    console.warn('[water ads] ad-not-completed placement=' + id +
+      ' source=' + (res.ad && res.ad.source) + ' reason=' + (res.ad && res.ad.reason) +
+      ' totals ok/fail=' + st.ok + '/' + st.failed + ' bySource=' + JSON.stringify(st.bySource));
+    throw new Error(res.shown === false ? 'capped' : 'not-completed');
   });
 }
 
@@ -1102,131 +1335,54 @@ const InterAd = {
   reset() { this.cancel(); this.done = false; }
 };
 
-/* ====================== 每周活动纯函数(与 weekly.js 同源,内联;issue #30) ======================
-   周界取舍:UTC 周,周一 00:00 UTC 为界(周日 24:00 UTC 重置,与排行榜 todayUTC 同口径) */
-const Weekly = (function () {
-  'use strict';
-  const DAY = 86400000;
-  const WEEK = 7 * DAY;
-  const GOAL = 600;
-  const THRESHOLDS = [100, 200, 300, 400, 500, 600];
-  const FRAG_WIN = 10;
-  const FRAG_AD = 10;
-  const GRAND = { energy: 60, hints: 5 };
-  function weekIndex(now) { return Math.floor((Math.floor(now / DAY) + 3) / 7); }
-  function weekKey(now) { return 'w' + weekIndex(now); }
-  function weekEnd(now) { return (weekIndex(now) + 1) * WEEK - 3 * DAY; }
-  const THEMES = [
-    { zh: { name: '星空周', pics: ['晓星', '孤星', '行星环', '彗星', '星云涡', '星座图'] },
-      en: { name: 'Starry Week', pics: ['Dawn Star', 'Lone Star', 'Ringed Planet', 'Comet', 'Nebula', 'Constellation'] },
-      c1: '#D4B36A', c2: '#7FC29B', bg: '#101820' },
-    { zh: { name: '深海周', pics: ['珍珠', '水母', '游鱼', '海螺', '暗流', '灯塔'] },
-      en: { name: 'Deep Sea Week', pics: ['Pearl', 'Jellyfish', 'Fish', 'Conch', 'Undertow', 'Lighthouse'] },
-      c1: '#7FB8C2', c2: '#7FC29B', bg: '#0E1A20' },
-    { zh: { name: '森林周', pics: ['嫩芽', '孤木', '年轮', '飞鸟', '林间光', '山丘'] },
-      en: { name: 'Forest Week', pics: ['Sprout', 'Lone Tree', 'Rings', 'Bird', 'Sunbeam', 'Hills'] },
-      c1: '#8FC27F', c2: '#D4B36A', bg: '#121D14' },
-    { zh: { name: '灯火周', pics: ['烛光', '灯笼', '街灯', '篝火', '烟花', '灯河'] },
-      en: { name: 'Lantern Week', pics: ['Candle', 'Lantern', 'Streetlamp', 'Bonfire', 'Fireworks', 'River of Light'] },
-      c1: '#D2A05C', c2: '#DE9A70', bg: '#1C1410' },
-  ];
-  function themeFor(now) { return THEMES[weekIndex(now) % THEMES.length]; }
-  function unlockedCount(frags) {
-    let n = 0;
-    for (let i = 0; i < THRESHOLDS.length; i++) if (frags >= THRESHOLDS[i]) n++;
-    return n;
-  }
-  function newlyUnlocked(before, after) {
-    const out = [];
-    for (let i = 0; i < THRESHOLDS.length; i++) if (before < THRESHOLDS[i] && after >= THRESHOLDS[i]) out.push(i);
-    return out;
-  }
-  function rollReward(randType, randAmt) {
-    const ok = (r) => typeof r === 'number' && isFinite(r) && r >= 0 && r < 1;
-    const rt = ok(randType) ? randType : 0;
-    const ra = ok(randAmt) ? randAmt : 0;
-    if (rt < 0.5) return { type: 'energy', n: 10 + Math.floor(ra * 51) };
-    return { type: 'hints', n: 1 + Math.floor(ra * 3) };
-  }
-  function carry(frags) { return Math.max(0, (frags | 0) - GOAL); }
-  function blank(wk) { return { week: wk, frags: 0, carried: 0, claimed: [false, false, false, false, false, false], grand: false }; }
-  function normalize(state, wk) {
-    if (state && state.week === wk && Array.isArray(state.claimed) && state.claimed.length === 6) return state;
-    const b = blank(wk);
-    if (state && typeof state.frags === 'number' && state.week !== wk) {
-      b.carried = carry(state.frags);
-      b.frags = b.carried;
-    }
-    return b;
-  }
-  return { DAY, WEEK, GOAL, THRESHOLDS, FRAG_WIN, FRAG_AD, GRAND, THEMES,
-    weekIndex, weekKey, weekEnd, themeFor, unlockedCount, newlyUnlocked, rollReward, carry, blank, normalize };
+/* 兜底广告卡（house 源）：Monetag 无填充/未加载时也要真的"看"一段再发奖，
+   而不是像原来的「演示模式」那样直接白送。 */
+const AD_CARD_CSS = `.admask{position:fixed;inset:0;z-index:120;background:rgba(4,8,14,.92);
+display:flex;align-items:center;justify-content:center;padding:22px}
+.adbox{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--edge-strong);
+border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;text-align:center}
+.adbox .adlab{font-size:11px;color:var(--ink-3);letter-spacing:.12em;text-transform:uppercase}
+.adbox .adart{height:150px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+font-size:40px;background:linear-gradient(135deg,#1d2836,#0f1620);border:1px solid var(--edge)}
+.adbox .adtip{font-size:12px;color:var(--ink-2)}
+.adbox .adcd{font-size:15px;font-weight:800;color:var(--accent)}
+.adbox button{border:0;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;
+background:rgba(127,127,127,.18);color:var(--ink-2)}`;
+(function () {
+  const st = document.createElement('style'); st.textContent = AD_CARD_CSS; document.head.appendChild(st);
+  const el = document.createElement('div');
+  el.className = 'admask'; el.id = 'adMask'; el.hidden = true;
+  el.innerHTML = '<div class="adbox"><div class="adlab" id="adLab"></div>' +
+    '<div class="adart">🎬</div><div class="adtip" id="adTip"></div>' +
+    '<div class="adcd" id="adCd"></div><button id="adSkip" type="button"></button></div>';
+  document.body.appendChild(el);
 })();
+function houseAd(seconds, done) {
+  let left = Math.ceil(seconds);
+  const mask = document.getElementById('adMask'), skip = document.getElementById('adSkip');
+  let timer = null;
+  const finish = (watched) => {
+    if (timer) { clearInterval(timer); timer = null; }
+    mask.hidden = true; skip.onclick = null; done(watched);
+  };
+  document.getElementById('adLab').textContent = t('adTitle');
+  document.getElementById('adTip').textContent = t('adRewardTip');
+  document.getElementById('adCd').textContent = t('adWatching', { n: left });
+  skip.textContent = t('adSkipBtn');
+  mask.hidden = false;
+  skip.onclick = () => finish(false);
+  timer = setInterval(() => {
+    left -= 1;
+    if (left <= 0) { document.getElementById('adCd').textContent = ''; finish(true); return; }
+    document.getElementById('adCd').textContent = t('adWatching', { n: left });
+  }, 1000);
+}
 
-/* ====================== 每周活动领取核心(与 core/weekly.js 同源,内联;issue #1 手动领取) ======================
-   解锁 ≠ 领取:碎片达阈值只进 claimable,用户点击才 claimed;大奖同口径。claim 不可变,返回新 state。 */
-const WeeklyCore = (function () {
-  const DAY = 86400000;
-  const THRESHOLDS = [100, 200, 300, 400, 500, 600];
-  const GOAL = 600;
-  const GRAND = { energy: 60, hints: 5 };
-  const fail = (m) => { throw new Error('weekly-core: ' + m); };
-  function assertState(st) {
-    if (!st || typeof st !== 'object') fail('state 必须是对象');
-    if (typeof st.frags !== 'number' || !isFinite(st.frags) || st.frags < 0) fail('state.frags 必须是 >=0 的数');
-    if (!Array.isArray(st.claimed) || st.claimed.length !== THRESHOLDS.length) fail('state.claimed 必须是长度 6 的数组');
-  }
-  function picStatus(st, i) {
-    assertState(st);
-    if (!Number.isInteger(i) || i < 0 || i >= THRESHOLDS.length) fail('图索引必须是 0..5 的整数');
-    if (st.claimed[i]) return 'claimed';
-    return st.frags >= THRESHOLDS[i] ? 'claimable' : 'locked';
-  }
-  function claimable(st) {
-    const out = [];
-    for (let i = 0; i < THRESHOLDS.length; i++) if (picStatus(st, i) === 'claimable') out.push(i);
-    return out;
-  }
-  function claimableCount(st) { return claimable(st).length + (grandStatus(st) === 'claimable' ? 1 : 0); }
-  function claim(st, i, rollFn) {
-    const s = picStatus(st, i);
-    if (s === 'claimed') fail('图 ' + (i + 1) + ' 已领取，不能重复领');
-    if (s === 'locked') fail('图 ' + (i + 1) + ' 未解锁，不能领取');
-    const reward = rollFn();
-    if (!reward || (reward.type !== 'energy' && reward.type !== 'hints') || !Number.isInteger(reward.n) || reward.n <= 0) fail('rollFn 非法');
-    const next = Object.assign({}, st, { claimed: st.claimed.slice() });
-    next.claimed[i] = true;
-    next['r' + i] = reward;
-    return { state: next, reward };
-  }
-  function grandStatus(st) {
-    assertState(st);
-    if (st.grand) return 'claimed';
-    return st.frags >= GOAL ? 'claimable' : 'locked';
-  }
-  function claimGrand(st) {
-    const s = grandStatus(st);
-    if (s === 'claimed') fail('大奖已领取，不能重复领');
-    if (s === 'locked') fail('大奖未解锁，不能领取');
-    const next = Object.assign({}, st, { claimed: st.claimed.slice(), grand: true });
-    return { state: next, reward: { energy: GRAND.energy, hints: GRAND.hints } };
-  }
-  function isoWeekKey(now) {
-    const d = new Date(now);
-    const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
-    const y = t.getUTCFullYear();
-    const wk = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / DAY + 1) / 7);
-    return y + '-W' + (wk < 10 ? '0' + wk : wk);
-  }
-  function resolveWeek(config, now) {
-    if (!config || typeof config !== 'object') return null;
-    const e = config[isoWeekKey(now)];
-    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
-    return e;
-  }
-  return { THRESHOLDS, GOAL, GRAND, picStatus, claimable, claimableCount, claim, grandStatus, claimGrand, isoWeekKey, resolveWeek };
-})();
+/* ====================== 每周活动（唯一实现在 core/weekly.js） ======================
+   原来这里内联了两份副本（Weekly：周界/主题/结转；WeeklyCore：领取状态机），与 core 各自维护。
+   2026-08-21 合并：机制全部走 core，本游戏只在 game.config.json 的 weekly 段声明自己的
+   奖励内容（阈值 / 大奖 / 奖励池 / 碎片数量）。彩雷用同一份 core，配自己的奖励。 */
+const Weekly = WeeklyCore.create(GAME_CFG.weekly);
 
 /* 周图配置加载(assets/weekly/weekly-config.json,issue #2 每周专属 webp 横幅):
    按 ISO 周 key 命中当周条目;fetch 失败或未命中一律回退内置主题轮换(fail-open,不阻塞活动页)。 */
@@ -1241,7 +1397,7 @@ const WeeklyCfg = {
       .catch(() => { cb && cb(); });
   },
   weekName(now) {
-    const e = WeeklyCore.resolveWeek(this.data, now);
+    const e = Weekly.resolveWeek(this.data, now);
     if (!e) return null;
     return (LANG === 'zh' ? e.title : e.titleEn) || e.title || null;
   },
@@ -1284,7 +1440,7 @@ const WeeklyCtl = {
       if (st.claimed[i]) continue;
       msgs.push(t('wkUnlockToast', { pic: themePics()[i] }));
     }
-    if (before < Weekly.GOAL && st.frags >= Weekly.GOAL && !st.grand) msgs.push(t('wkGrandToast'));
+    if (before < Weekly.goal && st.frags >= Weekly.goal && !st.grand) msgs.push(t('wkGrandToast'));
     this.flush();
     return msgs;
   },
@@ -1292,20 +1448,21 @@ const WeeklyCtl = {
   claim(i, randFn) {
     this.settle();
     const rnd = randFn || Math.random;
-    const res = WeeklyCore.claim(this.state, i, () => Weekly.rollReward(rnd(), rnd()));
+    const res = Weekly.claim(this.state, i, () => Weekly.rollReward(rnd(), rnd()));
     this.state = res.state;
     const r = res.reward;
     if (r.type === 'energy') Profile.mutate((s) => { s.energy += r.n; });
-    else Profile.mutate((s) => { s.bottles += r.n; });
+    else grantItem('bottles', r.n);
     this.flush();
     return r;
   },
   // 领取大奖(固定内容),同样必须用户点击
   claimGrand() {
     this.settle();
-    const res = WeeklyCore.claimGrand(this.state);
+    const res = Weekly.claimGrand(this.state);
     this.state = res.state;
-    Profile.mutate((s) => { s.energy += res.reward.energy; s.bottles += res.reward.hints; });
+    Profile.mutate((s) => { s.energy += res.reward.energy; });
+    grantItem('bottles', res.reward.hints);
     this.flush();
     return res.reward;
   },
@@ -1337,7 +1494,10 @@ const Profile = {
     Store.get(this.key, (v) => {
       let s = null;
       if (v) { try { s = JSON.parse(v); } catch (e) {} }
-      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, bottles: 2, undos: 3, alias: '', localId: '', sfx: true }, s || {});
+      this.state = Object.assign({ energy: Reward.E_MAX, lastTs: Date.now(), wins: 0, alias: '', localId: '', sfx: true }, s || {});
+      // 道具账本初始化/旧档迁移（幂等）：新档发初始量，老档按剩余库存推导 granted，一个都不多发不少发
+      Object.assign(this.state, Stock.migrate(this.state));
+      Object.assign(this.state, Stock.legacyPatch(this.state));
       // 非 Telegram 环境:稳定化名 + 每浏览器唯一 ID,生成一次后持久保留。
       if (!this.state.alias || !this.state.localId) this.mutate((st) => {
         if (!st.alias) st.alias = t('alias') + Math.floor(1000 + Math.random() * 9000);
@@ -1350,6 +1510,15 @@ const Profile = {
   // 所有修改同步走内存副本,快照串行异步落盘 — 不存在读改写竞态窗口
   mutate(fn) {
     fn(this.state);
+    /* 多标签页保护：写盘前先跟磁盘现值把「只增账本」取大。
+       同一浏览器开两个标签页时，另一个标签页手里是过期快照，它下一次写盘会把
+       已花掉的金币/道具覆盖回去（彩雷侧线上实测复现过）。granted/spent 单调只增，
+       取大不会丢任何一侧的消耗，与云端 merge:"max" 同一语义。 */
+    try {
+      const onDisk = JSON.parse(window.localStorage.getItem(this.key) || 'null');
+      if (onDisk) Object.assign(this.state, Stock.reconcile(this.state, onDisk));
+    } catch (e) {}
+    Object.assign(this.state, Stock.legacyPatch(this.state));  // 派生库存回填旧字段，UI/旧客户端照常读
     this.state.updatedMs = Date.now();  // 云档合并判新用（core/platform.js mergeSave）
     const snapshot = JSON.stringify(this.state);
     this.flushChain = this.flushChain.then(() => { Store.set(this.key, snapshot); });
@@ -1377,20 +1546,20 @@ function myId() {
   return (u && u.id != null && String(u.id)) ||
     ('local:' + ((Profile.state && Profile.state.localId) || 'pending'));
 }
+/* 本机临时名:自动生成、不可编辑(定案:游戏内不提供本地改名)。
+   老用户此前设过的 alias 继续沿用,只是从此不再能改——它现在只是「临时名」。 */
+function tempName() {
+  // 存档里的系统默认名带着「生成时那门语言」的字面量,显示时按当前语言重拼(见 core/identity.js)
+  return IdentityCore.localizeAlias((Profile.state && Profile.state.alias) || '', t('alias'));
+}
+/* 名字的唯一优先级链(与 core/identity.js resolve 同一条):
+   run.ceo 本游戏云端名 › 浏览器临时名 › 默认「我」。
+   Telegram 那一路按定案不做——TG 身份只用于存档隔离(myId),不再作为显示名来源。 */
 function myName() {
-  // Telegram 真实昵称:first_name+last_name,退 username;非 TG 环境用本地持久化化名(issue #6)
-  // issue #20:身份来源经 tgUser() 三级兜底
-  const u = tgUser();
-  const tg = u && (((u.first_name || '') + ' ' + (u.last_name || '')).trim() || u.username);
-  return tg || (Profile.state && Profile.state.alias) || t('me');
+  const cloud = (Plat && Plat.user && typeof Plat.user.name === 'string') ? Plat.user.name.trim() : '';
+  return cloud || tempName() || t('me');
 }
-function normalizeAlias(value) {
-  return String(value == null ? '' : value)
-    .replace(/\s+/g, ' ')
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .trim()
-    .slice(0, 32);
-}
+
 /* 每日快照纯函数(与 lb.js 同源,内联;issue #11/#24/#25):UTC 日期;Top50 competition ranking;提交池随重算裁剪;
    country 字段与本国过滤(#24);分享文本组装(#25,模板走 I18N.shareTpl) */
 const Lb = (function () {
@@ -1623,6 +1792,87 @@ const S = {
 // 旧版本遗留的 sudoku_save 存档在启动时清除。
 /* ====================== 首页渲染 ====================== */
 let homeTimer = null;
+/* ====================== 双连胜(core/winstreak.js · 2026-08-24) ======================
+   A 首页大连胜:只增不封顶;断链不立刻清零,挂 pend,下次点「开始」时弹「看广告保持」
+   (拒绝/关窗即清零,连胜 <keepMinPrompt 静默清零不打扰——用户拍板)。
+   B 每 every 盘出一张奖励票:看广告(streak-claim)领 体力/金币/周碎片;不领则票与
+   every/every 冻结态一直保留(后续失败也不丢,票不叠加——用户拍板);A/B 独立。 */
+const WinStreak = WinStreakCore.create(GAME_CFG.winstreak || null);
+function wsGet() {
+  const p = Profile.state || {};
+  return WinStreak.from({ cur: p.wsCur, pend: p.wsPend, cyc: p.wsCyc, earned: p.wsEarned, claimed: p.wsClaimed });
+}
+function wsSet(st) {
+  Profile.mutate((s) => { s.wsCur = st.cur; s.wsPend = st.pend ? 1 : 0; s.wsCyc = st.cyc; s.wsEarned = st.earned; s.wsClaimed = st.claimed; });
+}
+function wsRewardText(rw) {
+  const parts = [];
+  if (rw.energy) parts.push('⚡+' + rw.energy);
+  if (rw.coins) parts.push('🪙+' + rw.coins);
+  if (rw.frags && Weekly.enabled) parts.push('🧩+' + rw.frags);
+  return parts.join(' · ');
+}
+function wsOnWin() {
+  if (!WinStreak.enabled) return;
+  const r = WinStreak.win(wsGet());
+  wsSet(r.state);
+  // 出票提示排在 wkGotFrags(700ms)之后,不与庆祝层/结算窗抢同一秒
+  if (r.ticket) setTimeout(() => toast(t('wsTicketToast', { n: WinStreak.every })), 1400);
+}
+function wsOnLose() {
+  if (!WinStreak.enabled) return;
+  const st = wsGet();
+  if (st.pend) return;               // 已有未决断链(防御:同一断链不重复记)
+  wsSet(WinStreak.lose(st).state);   // B 周期立即清零;A 大连胜挂 pend/小连胜静默清零
+}
+/* 领取奖励票:广告位 streak-claim,播完才核销入账;体力可超上限(同 issue #7 广告补体力口径) */
+function wsClaimTicket(btn) {
+  const st = wsGet();
+  if (!WinStreak.hasTicket(st)) return;
+  if (btn) btn.disabled = true;
+  showRewardedAd('streak-claim').then(() => {
+    const r = WinStreak.claim(wsGet());
+    wsSet(r.state);
+    const rw = r.rewards;
+    if (rw.energy) Profile.mutate((s) => { s.energy += rw.energy; if (s.energy >= Reward.E_MAX) s.lastTs = Date.now(); });
+    if (rw.coins) grantItem('coins', rw.coins);
+    const wkMsgs = (rw.frags && Weekly.enabled) ? WeeklyCtl.addFrags(rw.frags) : [];
+    haptic('success');
+    toast(t('wsClaimGot', { r: wsRewardText(rw) }));
+    wkMsgs.forEach((m, i) => setTimeout(() => toast(m), 1400 * (i + 1)));
+    if (btn && btn.isConnected) btn.hidden = true;
+    if (!pages.home.hidden) renderHome();
+  }).catch((err) => {
+    // 降级可观测:广告没看完/没拿到奖励时要能从日志看出原因,不做静默吞异常
+    console.warn('[water] streak-claim ad failed', err && (err.name || err.message || err));
+    toast(t('adFail'));
+  }).then(() => { if (btn && btn.isConnected) btn.disabled = false; });
+}
+/* 断链保持窗:只在「下次点击开始」时弹(普通开局零打扰——用户定案)。
+   ✕/遮罩/Esc = 放弃连胜留在首页;两个按钮各自动线后都继续开局。 */
+function wsKeepDialog(st, proceed) {
+  dialog(`<h2>${t('wsKeepTitle', { n: st.cur })}</h2>
+    <p>${t('wsKeepBody', { n: st.cur })}</p>
+    <button class="btn ad" id="dlgWsKeep">${t('wsKeepAd')}</button>
+    <button class="btn ghost" id="dlgWsDrop">${t('wsKeepDrop')}</button>`,
+    () => { wsSet(WinStreak.drop(wsGet())); toast(t('wsDropped')); if (!pages.home.hidden) renderHome(); });
+  overlay.querySelector('#dlgWsKeep').addEventListener('click', () => {
+    showRewardedAd('streak-keep').then(() => {
+      wsSet(WinStreak.keep(wsGet()));
+      closeDialog(); haptic('success'); toast(t('wsKept', { n: wsGet().cur }));
+      proceed();
+    }).catch((err) => {
+      console.warn('[water] streak-keep ad failed', err && (err.name || err.message || err));
+      toast(t('adFail'));
+    });
+  });
+  overlay.querySelector('#dlgWsDrop').addEventListener('click', () => {
+    wsSet(WinStreak.drop(wsGet()));
+    closeDialog(); toast(t('wsDropped'));
+    proceed();
+  });
+}
+
 function renderHome() {
   Profile.settle();
   const p = Profile.state;
@@ -1639,21 +1889,32 @@ function renderHome() {
   document.getElementById('startLv').textContent = p.wins + 1;
   document.getElementById('stWins').textContent = p.wins;
   document.getElementById('stBottles').textContent = p.bottles;
-  const u = tgUser();
-  const name = myName();
-  document.getElementById('profileName').textContent = name;
-  document.getElementById('profileAvatar').textContent = Array.from(name)[0] || (LANG === 'zh' ? '玩' : 'P');
-  document.getElementById('profileSource').textContent = u ? t('profileTelegram') : t('profileWeb');
+  const coinCell = document.getElementById('stCoins');
+  if (coinCell) coinCell.textContent = Coins.balance(p);
+  // 双连胜卡(2026-08-24):A 大连胜数字 + B 奖励票进度;有票时点亮领取按钮
+  if (WinStreak.enabled && document.getElementById('wsCard')) {
+    const ws = wsGet();
+    const shown = WinStreak.cycleShown(ws);
+    document.getElementById('wsCur').textContent = ws.cur;
+    document.getElementById('wsCurLabel').textContent = t('wsLabel');
+    document.getElementById('wsCycLabel').textContent = t('wsCycLabel', { n: WinStreak.every });
+    document.getElementById('wsCycTxt').textContent = shown + '/' + WinStreak.every;
+    document.getElementById('wsCycBar').style.width = Math.round(shown / WinStreak.every * 100) + '%';
+    const claimBtn = document.getElementById('wsClaim');
+    claimBtn.textContent = t('wsClaimBtn');
+    claimBtn.hidden = !WinStreak.hasTicket(ws);
+  }
+  renderIdentity();
   // issue #30:每周活动入口(角标 + 主题名 + 碎片数)
   WeeklyCtl.settle();
   const th = Weekly.themeFor(Date.now());
   if (!WeeklyCfg.tried) WeeklyCfg.load(() => { if (!pages.home.hidden) renderHome(); });
-  const wkCc = WeeklyCtl.state ? WeeklyCore.claimableCount(WeeklyCtl.state) : 0;
+  const wkCc = WeeklyCtl.state ? Weekly.claimableCount(WeeklyCtl.state) : 0;
   document.getElementById('wkBadge').textContent = wkCc > 0 ? t('wkClaimN', { n: wkCc }) : t('wkBadge');
   document.getElementById('wkEntryTitle').textContent = t('wkEntry', { theme: WeeklyCfg.weekName(Date.now()) || (th[LANG] || th.en).name });
-  document.getElementById('wkEntrySub').textContent = t('wkEntrySub', { n: Weekly.GRAND.energy });
+  document.getElementById('wkEntrySub').textContent = t('wkEntrySub', { n: Weekly.grand.energy });
   document.getElementById('wkEntryFrag').textContent = t('wkFragShort', { n: WeeklyCtl.state ? WeeklyCtl.state.frags : 0 });
-  renderAccount();
+  renderIdentity();
   maybePromptLogin();
   clearInterval(homeTimer);
   if (!pages.home.hidden) homeTimer = setInterval(() => { if (!pages.home.hidden) renderHome(); }, 1000);
@@ -1670,7 +1931,7 @@ function renderWeekly() {
   const L = th[LANG] || th.en;
   // 周专属配置(issue #2):命中则用当周标题+webp 横幅;未命中回退内置轮换主题
   if (!WeeklyCfg.tried) WeeklyCfg.load(() => { if (!pages.weekly.hidden) renderWeekly(); });
-  const wkCfgEntry = WeeklyCore.resolveWeek(WeeklyCfg.data, now);
+  const wkCfgEntry = Weekly.resolveWeek(WeeklyCfg.data, now);
   document.getElementById('wkTitle').innerHTML = t('wkTitle');
   // 展示用年内周数(第 N 周);内部 weekKey 仍用绝对周序号,跨年结转不受影响
   const yearWeek = Weekly.weekIndex(now) - Weekly.weekIndex(Date.UTC(new Date(now).getUTCFullYear(), 0, 1)) + 1;
@@ -1691,12 +1952,12 @@ function renderWeekly() {
   document.getElementById('wkCdSub').textContent = t('wkCdSub');
   // 碎片与进度条
   document.getElementById('wkFragLab').textContent = t('wkFragLab');
-  document.getElementById('wkFragNum').innerHTML = st.frags + ' <small>/ ' + Weekly.GOAL + '</small>';
+  document.getElementById('wkFragNum').innerHTML = st.frags + ' <small>/ ' + Weekly.goal + '</small>';
   const carryEl = document.getElementById('wkCarry');
   carryEl.hidden = !st.carried;
   if (st.carried) carryEl.textContent = t('wkCarry', { n: st.carried });
-  document.getElementById('wkBar').style.width = Math.min(100, st.frags / Weekly.GOAL * 100) + '%';
-  document.getElementById('wkTicks').innerHTML = ['0'].concat(Weekly.THRESHOLDS).map((v, i) =>
+  document.getElementById('wkBar').style.width = Math.min(100, st.frags / Weekly.goal * 100) + '%';
+  document.getElementById('wkTicks').innerHTML = ['0'].concat(Weekly.thresholds).map((v, i) =>
     (i > 0 && st.frags >= v) ? '<b>' + v + '</b>' : '<span>' + v + '</span>').join('');
   // 6 张主题图:已解锁(含已领奖励)/进行中(下一档)/锁定
   const grid = document.getElementById('wkGrid');
@@ -1705,7 +1966,7 @@ function renderWeekly() {
   const nums = ['①', '②', '③', '④', '⑤', '⑥'];
   for (let i = 0; i < 6; i++) {
     const d = document.createElement('div');
-    const ps = WeeklyCore.picStatus(st, i); // 'locked'|'claimable'|'claimed'(issue #1:解锁≠领取)
+    const ps = Weekly.picStatus(st, i); // 'locked'|'claimable'|'claimed'(issue #1:解锁≠领取)
     const cur = ps === 'locked' && i === nextIdx;
     d.className = 'pic ' + (ps === 'claimed' ? 'open' : ps === 'claimable' ? 'claimable' : cur ? 'cur' : 'lock');
     let tag, extra = '';
@@ -1717,12 +1978,12 @@ function renderWeekly() {
       tag = t('wkClaimable');
       extra = '<button class="claimbtn" data-claim="' + i + '">' + t('wkClaimBtn') + '</button>';
     } else if (cur) {
-      tag = t('wkCur', { a: st.frags, b: Weekly.THRESHOLDS[i] });
-      const prev = i === 0 ? 0 : Weekly.THRESHOLDS[i - 1];
-      const pct = Math.max(0, Math.min(100, (st.frags - prev) / (Weekly.THRESHOLDS[i] - prev) * 100));
+      tag = t('wkCur', { a: st.frags, b: Weekly.thresholds[i] });
+      const prev = i === 0 ? 0 : Weekly.thresholds[i - 1];
+      const pct = Math.max(0, Math.min(100, (st.frags - prev) / (Weekly.thresholds[i] - prev) * 100));
       extra = '<div class="prog"><i style="width:' + pct + '%"></i></div>';
     } else {
-      tag = t('wkLock', { n: Weekly.THRESHOLDS[i] });
+      tag = t('wkLock', { n: Weekly.thresholds[i] });
     }
     d.innerHTML = wkSvg(i, th) +
       (ps !== 'locked' || cur ? '' : '<div class="lockov">🔒</div>') +
@@ -1730,18 +1991,18 @@ function renderWeekly() {
     grid.appendChild(d);
   }
   // 大奖卡
-  const gs = WeeklyCore.grandStatus(st); // 'locked'|'claimable'|'claimed'(issue #1:达标≠发放)
+  const gs = Weekly.grandStatus(st); // 'locked'|'claimable'|'claimed'(issue #1:达标≠发放)
   document.getElementById('wkGrand').className = 'grand' + (gs === 'claimed' ? ' done' : '');
-  document.getElementById('wkGrandTitle').textContent = t('wkGrandTitle', { n: Weekly.GOAL });
-  document.getElementById('wkGrandBody').textContent = t('wkGrandBody', { e: Weekly.GRAND.energy, h: Weekly.GRAND.hints });
+  document.getElementById('wkGrandTitle').textContent = t('wkGrandTitle', { n: Weekly.goal });
+  document.getElementById('wkGrandBody').textContent = t('wkGrandBody', { e: Weekly.grand.energy, h: Weekly.grand.hints });
   const gstEl = document.getElementById('wkGrandSt');
   gstEl.classList.toggle('ready', gs === 'claimable');
   if (gs === 'claimable') gstEl.innerHTML = '<button class="claimbtn" id="btnWkGrandClaim">' + t('wkClaimBtn') + '</button>';
-  else gstEl.textContent = gs === 'claimed' ? t('wkGrandYes') : t('wkGrandNo', { a: st.frags, b: Weekly.GOAL });
+  else gstEl.textContent = gs === 'claimed' ? t('wkGrandYes') : t('wkGrandNo', { a: st.frags, b: Weekly.goal });
   // 操作区
-  document.getElementById('wkAdText').innerHTML = t('wkAd', { n: Weekly.FRAG_AD }).replace(/(\+\d+[^<]*)/, '<b>$1</b>');
-  document.getElementById('wkNote1').textContent = t('wkNote1', { n: Weekly.FRAG_WIN });
-  document.getElementById('wkNote2').textContent = t('wkNote2', { n: Weekly.GOAL });
+  document.getElementById('wkAdText').innerHTML = t('wkAd', { n: Weekly.frags.ad }).replace(/(\+\d+[^<]*)/, '<b>$1</b>');
+  document.getElementById('wkNote1').textContent = t('wkNote1', { n: Weekly.frags.win });
+  document.getElementById('wkNote2').textContent = t('wkNote2', { n: Weekly.goal });
   clearInterval(wkTimer);
   if (!pages.weekly.hidden) wkTimer = setInterval(() => { if (!pages.weekly.hidden) renderWeekly(); else clearInterval(wkTimer); }, 60000);
 }
@@ -1766,9 +2027,9 @@ document.getElementById('wkGrand').addEventListener('click', (e) => {
 // 挂点:看广告 +10 碎片(现有 Monetag 激励路径,演示模式兜底)
 document.getElementById('btnWkAd').addEventListener('click', () => {
   showRewardedAd().then(() => {
-    const msgs = WeeklyCtl.addFrags(Weekly.FRAG_AD);
+    const msgs = WeeklyCtl.addFrags(Weekly.frags.ad);
     haptic('success');
-    toast(t('wkGotFrags', { n: Weekly.FRAG_AD }));
+    toast(t('wkGotFrags', { n: Weekly.frags.ad }));
     msgs.forEach((m, i) => setTimeout(() => toast(m), 1400 * (i + 1)));
     renderWeekly();
   }).catch(() => toast(t('adFail')));
@@ -1950,7 +2211,9 @@ function startTimer() { stopTimer(); S.timerId = setInterval(tick, 1000); }
 function stopTimer() { if (S.timerId) { clearInterval(S.timerId); S.timerId = null; } }
 function grantTimeBonus(seconds) {
   S.timeBudget += seconds;
-  S.remain = seconds;
+  // 叠加而不是覆盖:奖励要加在「广告前还剩多少」之上。写成 = seconds 时,
+  // 任何还有剩余时间的场景(未来在别处补时、或倒计时未归零就领奖)都会把剩余时间吞掉。
+  S.remain = Math.max(0, S.remain) + seconds;
 }
 function elapsedTime() { return Math.max(0, S.timeBudget - Math.max(0, S.remain)); }
 
@@ -2071,27 +2334,54 @@ function animatePour(from, to, color, amount, done) {
 document.getElementById('btnUndo').addEventListener('click', () => {
   if (S.finished || S.locked) return;
   const stock = Profile.state ? (Number(Profile.state.undos) || 0) : 0;
-  if (stock <= 0) { adRefillUndo(); return; }   // 道具用完 → 看广告补充
+  if (stock <= 0) { offerUndoRefill(); return; }   // 道具用完 → 金币够就直接买，否则看广告
   if (!S.undo.length) return;
-  Profile.mutate((ps) => { ps.undos = Math.max(0, (Number(ps.undos) || 0) - 1); });
+  if (!spendItem('undos')) { offerUndoRefill(); return; }
   S.tubes = JSON.parse(S.undo.pop());
   S.moves = Math.max(0, S.moves - 1); S.sel = -1;
   haptic('light'); WaterAudio.play('undo'); render();
 });
 // 撤销道具用完 → 与解锁空瓶同一条广告通道补充库存(永久保留)
 let refillingUndo = false;
+/* 用金币买道具：金币与道具同记在只增账本里，买过就是买过、花掉就是花掉，换设备重登不会回退。 */
+function buyWithCoins(key) {
+  const patch = Coins.buy(Profile.state, key);
+  if (!patch) { toast(t('notEnoughCoins')); return false; }
+  Profile.mutate((s) => Object.assign(s, patch));
+  haptic('success');
+  toast(t('boughtCoins').replace('{n}', Coins.priceOf(key)));
+  const cell = document.getElementById('stCoins');      // 首页金币格即时刷新，别等下次回首页
+  if (cell) cell.textContent = Coins.balance(Profile.state);
+  return true;
+}
+
+/* 撤销用完：金币够就先给「花金币」这条路（不用看广告），不够才回到原来的看广告流程。 */
+function offerUndoRefill() {
+  const sku = Coins.sku('undos'), bal = Coins.balance(Profile.state);
+  if (!sku || bal < sku.price) { adRefillUndo(); return; }
+  dialog(`<h2>${t('undoEmptyTitle')}</h2>
+    <p>${t('undoEmptyBody').replace('{n}', UNDO_AD_GRANT)}</p>
+    <p style="font-size:12px;color:var(--ink-3)">${t('coinsItem')}: ${bal} / ${sku.price}</p>
+    <button class="btn primary" id="dlgBuyUndo">${t('buyCoins').replace('{n}', sku.price)}</button>
+    <button class="btn ad" id="dlgAdUndo">${t('adUndo').replace('{n}', UNDO_AD_GRANT)}</button>
+    <button class="btn ghost" id="dlgClose">${t('notNow')}</button>`);
+  overlay.querySelector('#dlgBuyUndo').addEventListener('click', () => {
+    if (buyWithCoins('undos')) { closeDialog(); render(); }
+  });
+  overlay.querySelector('#dlgAdUndo').addEventListener('click', () => { closeDialog(); adRefillUndo(); });
+  overlay.querySelector('#dlgClose').addEventListener('click', closeDialog);
+}
+
 function adRefillUndo() {
   if (refillingUndo) return;
   refillingUndo = true;
-  const resumeTimer = !!S.timerId;
-  stopTimer();
+  // 倒计时的暂停/恢复统一由 showRewardedAd() 负责（Ad Placement API 的 beforeAd/afterAd 契约）
   showRewardedAd().then(() => {
-    Profile.mutate((ps) => { ps.undos = (Number(ps.undos) || 0) + UNDO_AD_GRANT; });
+    grantItem('undos', UNDO_AD_GRANT);
     toast(t('gotUndo').replace('{n}', UNDO_AD_GRANT));
     WaterAudio.play('tubeDone');
   }).catch(() => { toast(t('adFail')); }).then(() => {
     refillingUndo = false;
-    if (resumeTimer && !S.finished) startTimer();
     render();
   });
 }
@@ -2108,9 +2398,8 @@ function applyBottleUnlock(result, toastKey) {
   S.tubes = result.state;
   S.unlockedBottles = result.unlocked;
   S.sel = -1;
-  if (Profile.state.bottles !== result.stock) {
-    Profile.mutate((s) => { s.bottles = result.stock; });
-  }
+  // 道具解锁（mode:'item'）才扣库存：spent+1（只增）；看广告解锁不扣
+  if (result.stock < Stock.stock(Profile.state, 'bottles')) spendItem('bottles');
   haptic('success');
   WaterAudio.play('tubeDone');
   toast(t(toastKey));
@@ -2120,8 +2409,7 @@ function applyBottleUnlock(result, toastKey) {
 
 function unlockBottleWithAd(i) {
   if (S.finished || S.locked || S.unlockingBottle >= 0 || !isBottleLocked(i)) return;
-  const resumeTimer = !!S.timerId;
-  stopTimer();
+  // 倒计时的暂停/恢复统一由 showRewardedAd() 负责（Ad Placement API 的 beforeAd/afterAd 契约）
   S.sel = -1;
   S.unlockingBottle = i;
   render();
@@ -2135,7 +2423,6 @@ function unlockBottleWithAd(i) {
     }), 'bottleUnlockedAd');
   }, () => toast(t('adFail'))).then(() => {
     S.unlockingBottle = -1;
-    if (resumeTimer && !S.finished) startTimer();
     render();
   });
 }
@@ -2145,13 +2432,20 @@ document.getElementById('btnBottle').addEventListener('click', () => {
   if (S.finished) return;
   if (!lockedBottleIndexes().length) { toast(t('bottleUsed')); return; }
   if (Profile.state.bottles <= 0) {
+    const sku = Coins.sku('bottles'), bal = Coins.balance(Profile.state);
+    const canBuy = !!sku && bal >= sku.price;
     dialog(`<h2>${t('bottleEmptyTitle')}</h2>
       <p>${t('bottleEmptyBody')}</p>
+      ${sku ? `<p style="font-size:12px;color:var(--ink-3)">${t('coinsItem')}: ${bal} / ${sku.price}</p>` : ''}
+      ${canBuy ? `<button class="btn primary" id="dlgBuyBottle">${t('buyCoins').replace('{n}', sku.price)}</button>` : ''}
       <button class="btn ad" id="dlgAdBottle">${t('adBottle')}</button>
       <button class="btn ghost" id="dlgClose">${t('notNow')}</button>`);
+    if (canBuy) overlay.querySelector('#dlgBuyBottle').addEventListener('click', () => {
+      if (buyWithCoins('bottles')) { closeDialog(); render(); }
+    });
     overlay.querySelector('#dlgAdBottle').addEventListener('click', () => {
       showRewardedAd().then(() => {
-        Profile.mutate((s) => { s.bottles += 2; });
+        grantItem('bottles', 2);
         closeDialog(); haptic('success'); toast(t('gotBottles')); render();
       }).catch(() => toast(t('adFail')));
     });
@@ -2166,29 +2460,19 @@ document.getElementById('btnBottle').addEventListener('click', () => {
   }), 'bottleAdded');
 });
 
-document.getElementById('btnHome').addEventListener('click', () => { stopTimer(); show('home'); });
+document.getElementById('btnHome').addEventListener('click', () => {
+  stopTimer();
+  // 双连胜:局中弃战 = 没赢,算断链(与超时放弃同口径);已结束的局不重复记
+  if (S.tubes && !S.finished) { S.finished = true; wsOnLose(); }
+  show('home');
+});
+// 双连胜:首页连胜卡的领取按钮(骨架由 core/home.js 渲染,config 未开则元素不存在)
+const wsClaimEl = document.getElementById('wsClaim');
+if (wsClaimEl) wsClaimEl.addEventListener('click', () => wsClaimTicket(wsClaimEl));
 document.getElementById('btnLb').addEventListener('click', () => { show('lb'); renderLb(); });
 document.getElementById('btnLbBack').addEventListener('click', () => show('home'));
-document.getElementById('btnProfile').addEventListener('click', () => {
-  if (tgUser()) { toast(t('profileFromTelegram')); return; }
-  dialog(`<h2>${t('profileEditTitle')}</h2>
-    <p>${t('profileEditBody')}</p>
-    <input id="profileInput" maxlength="32" autocomplete="nickname" aria-label="${t('profilePlaceholder')}" placeholder="${t('profilePlaceholder')}">
-    <button class="btn" id="profileSave">${t('profileSave')}</button>
-    <button class="btn ghost" id="profileCancel">${t('profileCancel')}</button>`);
-  const input = overlay.querySelector('#profileInput');
-  input.value = Profile.state.alias || '';
-  input.focus();
-  const save = () => {
-    const alias = normalizeAlias(input.value);
-    if (!alias) { input.focus(); return; }
-    Profile.mutate((s) => { s.alias = alias; });
-    closeDialog(); renderHome(); toast(t('profileSaved'));
-  };
-  overlay.querySelector('#profileSave').addEventListener('click', save);
-  overlay.querySelector('#profileCancel').addEventListener('click', closeDialog);
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
-});
+/* 本地改名入口已按定案删除:名字只能在 run.ceo 改「本游戏的云端名称」,
+   入口是单栏身份行(btnIdentity → 账号面板 → 去 run.ceo 改名),游戏内不再有输入框。 */
 // issue #24:Tab 切换(会话内记住选择)
 document.getElementById('lbTabLocal').addEventListener('click', () => { LB_TAB = 'local'; renderLb(); });
 document.getElementById('lbTabGlobal').addEventListener('click', () => { LB_TAB = 'global'; renderLb(); });
@@ -2202,6 +2486,11 @@ document.getElementById('btnLbShare').addEventListener('click', () => {
 
 // 开始按钮:先扣体力,扣成功才进游戏(挂点:体力不足看广告)
 document.getElementById('btnStart').addEventListener('click', () => {
+  // 双连胜(2026-08-24):断链未决时先问「看广告保持」;普通开局零打扰
+  if (WinStreak.enabled) {
+    const ws = wsGet();
+    if (ws.pend) { wsKeepDialog(ws, () => document.getElementById('btnStart').click()); return; }
+  }
   Profile.settle();
   if (Profile.state.energy < Reward.E_COST) {
     dialog(`<h2>${t('energyLowTitle')}</h2>
@@ -2236,8 +2525,31 @@ document.addEventListener('keydown', (e) => {
 
 /* ====================== 对话框 ====================== */
 const overlay = document.getElementById('overlay');
-function dialog(html) { overlay.innerHTML = '<div class="dialog">' + html + '</div>'; overlay.hidden = false; }
-function closeDialog() { overlay.hidden = true; overlay.innerHTML = ''; }
+/* 硬规则：任何弹窗都必须留有退出路径——右上角 ✕、点窗口外的遮罩、Esc 三条路都通。
+   误点开一个窗口却出不来，是绝对不允许的状态。
+   onDismiss 可选：给「关掉后要恢复现场」的弹窗用（例如死局弹窗要把计时接着走）。 */
+let dlgDismiss = null;
+/* 防误触静默期(2026-08-21 手机实报):弹窗生成的那一刻,玩家的手指可能正落在刚出现的按钮上
+   (倒水是「点源 + 点目标」的成对点击,通关那一下与弹窗弹出重合),于是一通关就被误点。
+   guardMs 内弹窗不接受任何点击/Esc:按钮 pointer-events 关掉,遮罩点击与 Esc 也一律忽略。 */
+let dlgGuardUntil = 0;
+function dlgGuarded() { return Date.now() < dlgGuardUntil; }
+function dialog(html, onDismiss, guardMs) {
+  dlgDismiss = onDismiss || null;
+  overlay.innerHTML = '<div class="dialog">'
+    + '<button class="dlgx" id="dlgX" type="button" aria-label="' + t('close') + '" title="' + t('close') + '">✕</button>'
+    + html + '</div>';
+  overlay.hidden = false;
+  overlay.querySelector('#dlgX').addEventListener('click', dismissDialog);
+  const g = Math.max(0, guardMs || 0);
+  dlgGuardUntil = g ? Date.now() + g : 0;
+  overlay.classList.toggle('guard', g > 0);
+  if (g) setTimeout(() => overlay.classList.remove('guard'), g);
+}
+function closeDialog() { dlgDismiss = null; dlgGuardUntil = 0; overlay.classList.remove('guard'); overlay.hidden = true; overlay.innerHTML = ''; }
+function dismissDialog() { if (dlgGuarded()) return; const after = dlgDismiss; closeDialog(); if (after) after(); }
+overlay.addEventListener('click', (e) => { if (e.target === overlay) dismissDialog(); });  // 点窗口内不关
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !overlay.hidden) dismissDialog(); });
 
 // 挂点:倒计时归零 → 看广告 +60s
 function timeUp() {
@@ -2245,7 +2557,8 @@ function timeUp() {
   dialog(`<h2>${t('timeUpTitle')}</h2>
     <p>${t('timeUpBody', { n: AD_TIME_BONUS })}</p>
     <button class="btn ad" id="dlgAdTime">${t('adTime', { n: AD_TIME_BONUS })}</button>
-    <button class="btn ghost" id="dlgGiveup">${t('giveUp')}</button>`);
+    <button class="btn ghost" id="dlgGiveup">${t('giveUp')}</button>`,
+    () => { S.finished = true; wsOnLose(); show('home'); });   // 关掉 = 回首页（时间已到，留在原地无事可做）；双连胜记一次失败
   overlay.querySelector('#dlgAdTime').addEventListener('click', () => {
     showRewardedAd().then(() => {
       grantTimeBonus(AD_TIME_BONUS);
@@ -2253,7 +2566,7 @@ function timeUp() {
     }).catch(() => toast(t('adFail')));
   });
   overlay.querySelector('#dlgGiveup').addEventListener('click', () => {
-    S.finished = true; closeDialog(); show('home');
+    S.finished = true; wsOnLose(); closeDialog(); show('home');
   });
 }
 
@@ -2278,7 +2591,8 @@ function stuck() {
     ${bottleBtn}
     <button class="btn${lockedLeft ? ' ghost' : ''}" id="dlgUndo">${t('stuckUndo')}</button>
     <button class="btn ghost" id="dlgRestart">${t('stuckRestart')}</button>
-    <button class="btn ghost" id="dlgGiveup">${t('toHome')}</button>`);
+    <button class="btn ghost" id="dlgGiveup">${t('toHome')}</button>`,
+    startTimer);                                   // 关掉 = 继续这局，计时接着走
   const bottleEl = overlay.querySelector('#dlgStuckBottle');
   if (bottleEl) bottleEl.addEventListener('click', () => unlockBottleFromStuck(bottleEl, stock));
   overlay.querySelector('#dlgUndo').addEventListener('click', () => {
@@ -2290,7 +2604,7 @@ function stuck() {
     document.getElementById('btnRestart').click();
   });
   overlay.querySelector('#dlgGiveup').addEventListener('click', () => {
-    S.finished = true; closeDialog(); show('home');
+    S.finished = true; wsOnLose(); closeDialog(); show('home');
   });
   InterAd.arm(); // issue #22:结算态空闲插屏
 }
@@ -2349,17 +2663,76 @@ function unlockBottleFromStuck(btn, stock) {
   });
 }
 
+/* 通关庆祝动画(2026-08-21 手机实报):通关那一下点击与结算窗弹出重合,手指的第二下会被
+   刚生成的按钮接住(多半点到「回首页」),玩家看到的就是「通关后没有下一关,直接回首页」。
+   修法:通关先播一段 🎉——这一层吃掉点击但没有任何按钮,误点不会有任何后果;
+   动画播完才生成选择窗(再叠一道 DLG_GUARD_MS 静默期兜底)。
+   #celems=N 覆盖时长(0=不播,自动化截图/门禁用);reduced-motion 用户自动缩短。 */
+const WIN_CELE_MS = 1400;
+const DLG_GUARD_MS = 450;
+const CELE_CSS = `.cele{position:fixed;inset:0;z-index:118;overflow:hidden;display:flex;
+align-items:center;justify-content:center;background:radial-gradient(circle at 50% 45%,
+rgba(255,255,255,.10),rgba(4,8,14,.42))}
+.cele .cebig{font-size:76px;line-height:1;animation:cepop .75s cubic-bezier(.2,1.35,.4,1) both;
+filter:drop-shadow(0 8px 20px rgba(0,0,0,.55))}
+.cele .celab{position:absolute;top:calc(50% + 62px);font-size:15px;font-weight:800;letter-spacing:.06em;
+color:#fff;padding:7px 16px;border-radius:999px;background:rgba(8,14,10,.72);
+border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 18px rgba(0,0,0,.35);
+animation:cepop .75s .12s cubic-bezier(.2,1.35,.4,1) both}
+.cele i.cf{position:absolute;top:-26px;width:9px;height:15px;border-radius:2px;
+animation-name:cefall;animation-timing-function:ease-in;animation-fill-mode:both}
+@keyframes cepop{0%{transform:scale(.2);opacity:0}55%{transform:scale(1.16);opacity:1}
+100%{transform:scale(1);opacity:1}}
+@keyframes cefall{0%{top:-26px;opacity:0}12%{opacity:1}100%{top:106%;opacity:.85}}
+@media (prefers-reduced-motion:reduce){.cele i.cf{display:none}}
+/* 防误触静默期:弹窗刚出现时按钮不可点(手指正落在那里也点不动),遮罩/Esc 由 dlgGuarded() 拦 */
+#overlay.guard .dialog{pointer-events:none}`;
+(function () {
+  const st = document.createElement('style'); st.textContent = CELE_CSS; document.head.appendChild(st);
+})();
+function celebrate(done) {
+  const m = location.hash.match(/celems=(\d+)/);
+  let ms = m ? +m[1] : WIN_CELE_MS;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ms = Math.min(ms, 400);
+  if (!ms) { done(); return; }
+  const el = document.createElement('div');
+  el.className = 'cele'; el.id = 'celeLayer';
+  const cols = ['#ffd166', '#06d6a0', '#4cc9f0', '#ef476f', '#b388ff', '#f8961e'];
+  let bits = '<div class="cebig">🎉</div><div class="celab">' + t('winTitle', { n: S.level }).replace(/^🎉\s*/, '') + '</div>';
+  for (let i = 0; i < 26; i++) {
+    const l = Math.round(Math.random() * 96), d = (Math.random() * 0.45).toFixed(2);
+    const du = (0.85 + Math.random() * 0.55).toFixed(2), c = cols[i % cols.length];
+    const r = Math.round(Math.random() * 360);
+    bits += `<i class="cf" style="left:${l}%;background:${c};animation-delay:${d}s;`
+      + `animation-duration:${du}s;transform:rotate(${r}deg)"></i>`;
+  }
+  el.innerHTML = bits;
+  document.body.appendChild(el);
+  // 动画层自己吞掉这段时间里的所有点击(它没有按钮),这才是防误点的关键
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); done(); }, ms);
+}
+
 function win() {
   stopTimer(); S.finished = true; haptic('success'); WaterAudio.play('win');
-  Profile.mutate((s) => { s.wins = Math.max(s.wins, S.level); });
- 
+  Profile.mutate((s) => {
+    s.wins = Math.max(s.wins, S.level);
+    const coinPatch = Coins.rewardClear(s);     // 通关奖励金币（本游戏配置在 game.config.json 的 coins 段）
+    if (coinPatch) Object.assign(s, coinPatch);
+  });
+  wsOnWin();   // 双连胜:A+1,B 周期推进/出票(2026-08-24)
   lbSubmit(Profile.state.wins);
   // issue #30:每盘胜利 +10 碎片(解锁/大奖 toast 延迟播,不遮结算对话框)
-  const wkMsgs = WeeklyCtl.addFrags(Weekly.FRAG_WIN);
-  setTimeout(() => toast(t('wkGotFrags', { n: Weekly.FRAG_WIN })), 700);
+  const wkMsgs = WeeklyCtl.addFrags(Weekly.frags.win);
+  setTimeout(() => toast(t('wkGotFrags', { n: Weekly.frags.win })), 700);
   wkMsgs.forEach((m, i) => setTimeout(() => toast(m), 700 + 1400 * (i + 1)));
   const used = elapsedTime();
   const parTxt = S.par ? (S.moves === S.par ? t('statBest') : t('statPar', { n: S.par })) : t('statNoPar');
+  // 先庆祝、后弹窗:结算窗绝不能生成在玩家手指还没离开屏幕的那一刻(见 celebrate 注释)
+  celebrate(() => showWinDialog(used, parTxt));
+}
+
+/* 结算选择窗:只在庆祝动画播完后生成,并带 DLG_GUARD_MS 防误触静默期。 */
+function showWinDialog(used, parTxt) {
   dialog(`<h2>${t('winTitle', { n: S.level })}</h2>
     <div class="stats">
       <span><b class="mono">${fmtTime(used)}</b>${t('statTime')}</span>
@@ -2367,18 +2740,25 @@ function win() {
       <span><b class="mono">${Profile.state.wins}</b>${t('statWins')}</span>
     </div>
     <p class="parline">${parTxt}</p>
+    ${WinStreak.enabled && WinStreak.hasTicket(wsGet()) ? '<button class="btn ad" id="dlgWsClaim">' + t('wsWinClaim', { r: wsRewardText(WinStreak.rewards()) }) + '</button>' : ''}
     ${IN_TG ? '<button class="btn ghost" id="dlgShare">' + t('share') + '</button>' : ''}
     <button class="btn" id="dlgNext">${t('next')}</button>
-    <button class="btn ghost" id="dlgHome">${t('toHome')}</button>`);
+    <button class="btn ghost" id="dlgHome">${t('toHome')}</button>`,
+    // 结算弹窗是「结束局面」：关掉(✕/Esc/点遮罩)必须回首页,不能把人留在一盘已完成、
+    // 点什么都没反应的棋盘上——那时唯一出路只剩左上角返回,玩家看到的就是「通关后没有下一关」。
+    () => { show('home'); }, DLG_GUARD_MS);
   overlay.querySelector('#dlgNext').addEventListener('click', () => {
     closeDialog();
     document.getElementById('btnStart').click();
   });
   overlay.querySelector('#dlgHome').addEventListener('click', () => { closeDialog(); show('home'); });
+  // 双连胜:第 every 胜的结算窗带领取按钮(领完按钮消失,窗留着走 下一关/回首页)
+  const wsBtn = overlay.querySelector('#dlgWsClaim');
+  if (wsBtn) wsBtn.addEventListener('click', () => wsClaimTicket(wsBtn));
   const sh = overlay.querySelector('#dlgShare');
   // issue #25:完局分享改走公共 shareText()(TG 深链/剪贴板降级同一路径)
   if (sh) sh.addEventListener('click', () => shareText(t('shareText', { n: Profile.state.wins }) + ' ' + GAME_URL));
-  InterAd.arm(); // issue #22:结算态(胜利)空闲插屏
+  InterAd.arm(); // issue #22:结算态(胜利)空闲插屏——抽签从「弹窗真的出现」起算,不与庆祝动画重叠
 }
 
 /* ====================== 开局与恢复 ====================== */
@@ -2390,13 +2770,9 @@ function autoSolve() {
   const r = WaterEngine.solve(S.tubes, { capacity: S.capacity });
   if (!r.solvable) return;
   const seq = [];
-  let sim = S.tubes.map((tt) => tt.slice());   // 一次一格玩法:每个整段最优移动要点 amount 次
-      for (const mv of r.moves) {
-        const st = WaterEngine.pour(sim, mv[0], mv[1], S.capacity);
-        const amt = st ? st.amount : 1;
-        for (let k = 0; k < amt; k += 1) seq.push(mv[0], mv[1]);
-        if (st) sim = st.state;
-      }
+  // 整段倒入玩法:一个最优移动=一次点击对(选源+点目标),与 tapTube/S.moves 同口径;
+  // 旧的按 amount 重复点击会在整段倒完后多点出计划外移动,偏离最优路径。
+  for (const mv of r.moves) seq.push(mv[0], mv[1]);
   // 必须等上一步倒水动画放完再点下一下:动画期间 tapTube 会被 S.locked 挡掉,
   // 固定间隔点击会被吞掉一次,后面整条序列错位(源/目标互换,于是出现非法移动)。
   (function step(n) {
@@ -2422,21 +2798,14 @@ function newGame(level) {
   S.unlockedBottles = [];
   S.unlockingBottle = -1;
   S.capacity = lv.capacity;
-  S.par = (() => {   // 一次一格玩法:把求解器整段最优路径换算成格数;生成关(minMoves=null)仍不显示
+  S.par = (() => {   // 步数口径=点击次数:整段倒入算 1 步,与 S.moves++ 完全同口径;生成关(minMoves=null)仍不显示
     if (lv.minMoves == null) return null;
     try {
       // 公平口径:按「不解锁空瓶」的可玩盘面求最优——锁瓶只是可选辅助,
       // 显示的「最少 N 步」必须是零广告玩家真实可达的(L9/L10 全开盘面会少 1 步,误导人)。
       const base = S.start.filter((_, ti) => !S.lockedBottleSlots.includes(ti));
       const r = WaterEngine.solve(base, { capacity: S.capacity });
-      if (!r.solvable) return lv.minMoves;
-      let sim = base.map((tt) => tt.slice()), units = 0;
-      for (const mv of r.moves) {
-        const pr = WaterEngine.pour(sim, mv[0], mv[1], S.capacity);
-        if (!pr) return lv.minMoves;
-        units += pr.amount; sim = pr.state;
-      }
-      return units;
+      return r.solvable ? r.moves.length : lv.minMoves; // BFS 最短解的移动数就是最少点击数
     } catch (e) { return lv.minMoves; }
   })();
   S.level = level; S.sel = -1;
@@ -2497,11 +2866,11 @@ function boot() {
       if (wf) {
         WeeklyCtl.state.frags = +wf[1];
         const wclaim = /wkclaimed/.test(location.hash);
-        for (let i = 0; i < 6; i++) if (wclaim && WeeklyCtl.state.frags >= Weekly.THRESHOLDS[i]) {
+        for (let i = 0; i < 6; i++) if (wclaim && WeeklyCtl.state.frags >= Weekly.thresholds[i]) {
           WeeklyCtl.state.claimed[i] = true;
           WeeklyCtl.state['r' + i] = i % 2 === 0 ? { type: 'energy', n: 35 } : { type: 'hints', n: 2 };
         }
-        if (wclaim && WeeklyCtl.state.frags >= Weekly.GOAL) WeeklyCtl.state.grand = true;
+        if (wclaim && WeeklyCtl.state.frags >= Weekly.goal) WeeklyCtl.state.grand = true;
         const wc = location.hash.match(/wkcarry=(\d+)/);
         if (wc) WeeklyCtl.state.carried = +wc[1];
       }
@@ -2563,27 +2932,138 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 /* ====================== run.ceo 平台（core/platform.js，SDK §0 两行接入）：云存档 + 登录，匿名可玩优先 ====================== */
-let Plat = null, platPrompted = false;
+/* 刻意用 var:这些状态在文件末尾声明,但 applyStaticI18n() 等顶层早期代码会调 renderIdentity()。
+   若用 let,早期调用会踩 TDZ 抛 ReferenceError,整段脚本中断(实测崩过:boot/平台连接/事件监听全不执行)。
+   var 有 hoisting,早期读到 undefined → 身份行落到「平台连接中」态,安全降级。 */
+var Plat = null, platPrompted = false;
+var SYNC_FAILS = 0;   // 云端回写累计失败次数（降级可观测：常态化失败要能一眼看出来）
 function platformSync() {
   if (!Plat || Plat.mode !== 'online' || !Plat.user) return;
   Plat.queueSync(() => Object.assign({}, Profile.state), {
-    onAuthLost: () => { renderAccount(); toast(LANG === 'zh' ? '登录已过期，进度暂存本机' : 'Login expired, progress saved locally'); }
+    onAuthLost: () => {
+      PLAT_EXPIRED = true; renderIdentity();
+      toast(LANG === 'zh' ? '登录已过期，进度暂存这个浏览器' : 'Session expired; progress kept in this browser');
+    },
+    /* 降级必须可观测：云端回写失败过去被静默吞掉，道具/进度对不上时日志里一条线索都没有。
+       这里记异常本体 + 累计失败次数，常态化失败一眼可见。 */
+    onError: (err) => {
+      SYNC_FAILS += 1;
+      console.warn('[water cloud] 云存档回写失败（累计 ' + SYNC_FAILS + ' 次）：' +
+        ((err && (err.code || err.name)) || 'unknown') + ' / ' +
+        String((err && err.message) || err).slice(0, 200) + ' status=' + (err && err.status));
+    }
   });
 }
-function renderAccount() {
-  if (!document.getElementById('btnAccount')) return;
-  const status = document.getElementById('accountStatus');
-  const action = document.getElementById('accountAction');
-  if (!Plat || Plat.mode !== 'online') {
-    status.textContent = Plat ? (LANG === 'zh' ? '本地存档' : 'Local save') : (LANG === 'zh' ? '连接中…' : 'Connecting…');
-    action.textContent = '';
-  } else if (Plat.user) {
-    status.textContent = LANG === 'zh' ? '已登录 · 进度云同步' : 'Signed in · cloud sync';
-    action.textContent = LANG === 'zh' ? '退出' : 'Sign out';
-  } else {
-    status.textContent = LANG === 'zh' ? '未登录 · 进度仅存本机' : 'Signed out · local only';
-    action.textContent = LANG === 'zh' ? '登录' : 'Sign in';
+/* ---- 单栏身份行:两栏合一后「我是谁 / 进度存哪 / 能做什么」只由 IdentityCore 判定一次 ---- */
+var PLAT_EXPIRED = false;      // authexpired / 401 后置起,重新登录成功清掉（var:同上,防 TDZ）
+var PLAT_LAST_NAME = '';       // 过期时保住上一次显示的名字,避免跳回陌生名
+var IDENTITY_VIEW = null;      // 最近一次 resolve 结果,btnIdentity 按它分派动作
+
+function identityState() {
+  return {
+    mode: !Plat ? 'pending' : (Plat.mode === 'online' ? 'online' : 'local'),
+    user: Plat && Plat.mode === 'online' ? Plat.user : null,
+    expired: PLAT_EXPIRED,
+    lastName: PLAT_LAST_NAME,
+    tempName: tempName(),
+    defaultKey: 'me'
+  };
+}
+
+function renderIdentity() {
+  const row = document.getElementById('btnIdentity');
+  if (!row) return;
+  const v = IdentityCore.resolve(identityState());
+  IDENTITY_VIEW = v;
+  const name = v.name || t(v.nameKey || 'me');
+  row.dataset.state = v.state;
+  row.dataset.badge = v.badge;
+  row.dataset.action = v.action.kind;
+  document.getElementById('idName').textContent = name;
+  document.getElementById('idAvatar').firstChild.nodeValue = IdentityCore.avatarChar(name) || (LANG === 'zh' ? '玩' : 'P');
+  document.getElementById('idBadge').textContent = v.badge === 'ok' ? '✓' : (v.badge === 'warn' ? '!' : '');
+  document.getElementById('idSource').textContent = v.sourceKey ? t(v.sourceKey) : '';
+  document.getElementById('idSub').textContent = t(v.subKey);
+  document.getElementById('idAction').textContent = v.action.labelKey ? t(v.action.labelKey) :
+    (v.action.kind === 'panel' ? '›' : '');
+  if (v.state === 'cloud' || v.state === 'cloudTemp') PLAT_LAST_NAME = name;
+}
+
+/* 平台顶域:play-<slug>.run.ceo → https://run.ceo(SDK 同一推断规则,见 v1.md §0) */
+function platformApex() {
+  const m = /^play-([a-z0-9-]+)\.(.+)$/i.exec(location.hostname);
+  return m ? location.protocol + '//' + m[2] + (location.port ? ':' + location.port : '') : location.origin;
+}
+
+/* 跳转去 run.ceo 改名:游戏内不做改名界面(平台契约禁止游戏源自渲染改名选择器)。
+   slug 取自 play.slug(SDK 单一来源);拿不到就不跳,免得拼出一个走不通的地址。 */
+function gotoRename() {
+  const slug = Plat && Plat.play && Plat.play.slug;
+  if (!slug) { toast(t('idRenameNoSlug')); return; }
+  let url;
+  try {
+    url = IdentityCore.renameUrl({
+      apex: platformApex(),
+      slug: slug,
+      returnTo: IdentityCore.markReturn(location.href)
+    });
+  } catch (err) {
+    console.warn('[identity] renameUrl 拼装失败:', err && err.message, { slug: slug, apex: platformApex() });
+    toast(t('idRenameNoSlug'));
+    return;
   }
+  try { sessionStorage.setItem('water:renameFrom', myName()); } catch (e) {}
+  location.href = url;
+}
+
+function openIdentityPanel() {
+  const v = IDENTITY_VIEW || IdentityCore.resolve(identityState());
+  const cloud = v.state === 'cloud' || v.state === 'cloudTemp';
+  dialog(`<h2>${t('idPanelTitle')}</h2>
+    <p><b>${t('idPanelName')}</b>: ${HomeCore.escapeHtml(v.name || t(v.nameKey || 'me'))}<br>
+    <b>${t('idPanelSource')}</b>: ${cloud && v.nameKind === 'cloud' ? t('idPanelSourceCloud') : t('idPanelSourceTemp')}<br>
+    <b>${t('idPanelStore')}</b>: ${cloud ? t('idPanelStoreCloud') : t('idPanelStoreLocal')}<br>
+    <b>${t('idPanelCooldown')}</b>: ${t('idPanelCooldownVal')}</p>
+    <button class="btn" id="dlgIdRename">${t('idPanelRename')}</button>
+    <button class="btn ghost" id="dlgIdLogout">${t('idPanelLogout')}</button>
+    <button class="btn ghost" id="dlgIdClose">${t('idRenameCancel')}</button>`);
+  overlay.querySelector('#dlgIdRename').addEventListener('click', () => { closeDialog(); confirmRename(); });
+  overlay.querySelector('#dlgIdLogout').addEventListener('click', () => {
+    Plat.logout(); Plat.user = null; PLAT_EXPIRED = false; PLAT_LAST_NAME = '';
+    closeDialog(); renderIdentity();
+    toast(LANG === 'zh' ? '已退出,进度改存这个浏览器' : 'Signed out; progress stays in this browser');
+  });
+  overlay.querySelector('#dlgIdClose').addEventListener('click', closeDialog);
+}
+
+/* 跳走之前先说清会离开游戏、改完自动回来(S9) */
+function confirmRename() {
+  dialog(`<h2>${t('idRenameTitle')}</h2>
+    <p>${t('idRenameBody')}</p>
+    <button class="btn" id="dlgRenameGo">${t('idRenameGo')}</button>
+    <button class="btn ghost" id="dlgRenameCancel">${t('idRenameCancel')}</button>`);
+  overlay.querySelector('#dlgRenameGo').addEventListener('click', () => { closeDialog(); gotoRename(); });
+  overlay.querySelector('#dlgRenameCancel').addEventListener('click', closeDialog);
+}
+
+/* 改完名字回到游戏:名字到底变了没必须判定清楚,不许静默当成功。
+   stale/unknown 都打带原因的 warn 日志 + 计数,并给用户一句能分辨的提示。 */
+var RENAME_STALE_COUNT = 0;
+function settleRenameReturn() {
+  let before = '';
+  try { before = sessionStorage.getItem('water:renameFrom') || ''; sessionStorage.removeItem('water:renameFrom'); } catch (e) {}
+  const after = (Plat && Plat.user && typeof Plat.user.name === 'string') ? Plat.user.name : null;
+  const r = IdentityCore.renameOutcome({ before: before, after: after });
+  if (r.warn) {
+    RENAME_STALE_COUNT += 1;
+    console.warn('[identity] 改名回跳后名字未更新:', {
+      status: r.status, before: before, after: after,
+      platMode: Plat ? Plat.mode : 'pending', signedIn: !!(Plat && Plat.user),
+      staleCount: RENAME_STALE_COUNT
+    });
+  }
+  toast(r.status === 'applied' ? t('idRenameApplied').replace('{n}', r.name) : t(r.msgKey));
+  renderIdentity();
 }
 /* 登录引导：匿名通关满 N 盘（config platform.loginPromptAfterClears）在首页非阻断提示一次 */
 function maybePromptLogin() {
@@ -2597,26 +3077,42 @@ function maybePromptLogin() {
   overlay.querySelector('#dlgPlatLogin').addEventListener('click', () => { closeDialog(); Plat.login(); });
   overlay.querySelector('#dlgPlatLater').addEventListener('click', closeDialog);
 }
-document.getElementById('btnAccount').addEventListener('click', () => {
-  if (!Plat) { toast(LANG === 'zh' ? '平台连接中…' : 'Connecting…'); return; }
-  if (Plat.mode !== 'online') { toast(LANG === 'zh' ? '当前环境不支持云存档，进度保存在本机' : 'Cloud save unavailable here; progress stays local'); return; }
-  if (Plat.user) {
-    dialog(`<h2>${LANG === 'zh' ? '退出登录？' : 'Sign out?'}</h2>
-      <p>${LANG === 'zh' ? '本机继续保留当前进度，云端存档不受影响。' : 'Local progress stays on this device; your cloud save is unaffected.'}</p>
-      <button class="btn" id="dlgPlatOut">${LANG === 'zh' ? '退出' : 'Sign out'}</button>
-      <button class="btn ghost" id="dlgPlatKeep">${LANG === 'zh' ? '取消' : 'Cancel'}</button>`);
-    overlay.querySelector('#dlgPlatOut').addEventListener('click', () => {
-      Plat.logout(); Plat.user = null; closeDialog(); renderAccount();
-      toast(LANG === 'zh' ? '已退出，进度改存本机' : 'Signed out; progress stays local');
-    });
-    overlay.querySelector('#dlgPlatKeep').addEventListener('click', closeDialog);
-  } else Plat.login();
+/* 整行一个可点区域,按 IdentityCore 给出的 action 分派——用户不必猜"点哪半边会发生什么" */
+document.getElementById('btnIdentity').addEventListener('click', () => {
+  const v = IDENTITY_VIEW || IdentityCore.resolve(identityState());
+  switch (v.action.kind) {
+    case 'login':
+    case 'relogin':
+      Plat.login();
+      break;
+    case 'rename':
+      confirmRename();
+      break;
+    case 'panel':
+      openIdentityPanel();
+      break;
+    default:
+      /* pending / unsupported:不给假按钮,但要说清当前是什么情况 */
+      toast(v.state === 'pending' ? t('idPendingToast') : t('idUnsupportedToast'));
+  }
 });
+/* 改名回跳:进页面先认标记并抹掉(避免刷新重复提示),平台连上后再判定名字到底变了没 */
+var RENAME_RETURNED = false;
+try {
+  const flag = IdentityCore.takeRenameFlag(location.href);
+  if (flag.renamed) {
+    RENAME_RETURNED = true;
+    history.replaceState(null, '', flag.cleanUrl);
+  }
+} catch (e) { /* 非 http(s) 面（file://）无回跳场景,忽略 */ }
+
 PlatformCore.connect(GAME_CFG.platform).then((session) => {
   Plat = session;
-  renderAccount();
+  if (PLAT_EXPIRED && session.user) PLAT_EXPIRED = false;   // 重新登录成功,警示态收掉
+  renderIdentity();
+  if (RENAME_RETURNED) settleRenameReturn();
   if (session.mode !== 'online') return;
-  session.on('authexpired', renderAccount);
+  session.on('authexpired', () => { PLAT_EXPIRED = true; renderIdentity(); });
   if (!session.user) return;
   // Profile 异步加载（TG CloudStorage 场景）就绪后再合并云档
   const whenProfile = (fn) => { if (Profile.state) fn(); else setTimeout(() => whenProfile(fn), 100); };
@@ -2625,10 +3121,14 @@ PlatformCore.connect(GAME_CFG.platform).then((session) => {
       // localFresh：本地无实际游玩痕迹（换设备刚打开就登录），云端优先，防默认档覆盖云档
       const localFresh = (Profile.state.wins || 0) === 0;
       const merged = session.core.mergeSave(Profile.state, row, { localFresh }).save;
-      Profile.mutate((s) => { Object.keys(merged).forEach((k) => { if (k !== 'localId') s[k] = merged[k]; }); });
+      Profile.mutate((s) => {
+        Object.keys(merged).forEach((k) => { if (k !== 'localId') s[k] = merged[k]; });
+        // 云端老行只有旧「库存数」列时按它推导 granted/spent；已有账本则原样保留（migrate 幂等）
+        Object.assign(s, Stock.migrate(s));
+      });
       if (!pages.home.hidden) renderHome();
-      renderAccount();
-    }).catch(() => renderAccount());
+      renderIdentity();
+    }).catch(() => renderIdentity());
   });
 });
 

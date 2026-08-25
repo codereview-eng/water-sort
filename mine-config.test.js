@@ -518,6 +518,12 @@ test('页面真的接了 i18n：走 core/locale.js，不自造第二套实现', 
   assert.ok(html.includes('LocaleCore.createI18n(CFG.i18n)'), '没用 core 建 i18n 实例');
   assert.ok(html.includes('LocaleCore.resolveLang('), '语言选择没走 core 的 resolveLang（禁止各写一套）');
   assert.ok(html.includes('function applyStaticI18n'), '缺静态文案回填');
+  assert.strictEqual((html.match(/function applyStaticI18n\(\)/g) || []).length, 1,
+    'applyStaticI18n 必须只有一个定义；后定义的旧实现会覆盖新版翻译链');
+  assert.ok(/homeCoins:\s*'statCoins'/.test(html),
+    '配置生成的金币标签必须由 applyStaticI18n 走 homeCoins → statCoins 翻译');
+  assert.ok(!html.includes('function populateLangSel()') && !html.includes('function applyLang(lang)'),
+    '页面仍残留会覆盖新版语言链的旧 populateLangSel/applyLang 实现');
   assert.ok(html.includes('function setLang'), '缺语言切换');
   // 切换语言会重建首页 DOM，必须重绑事件——漏了按钮全成死的（本轮真跑抓到过）
   assert.ok(/function setLang[\s\S]{0,600}buildHome\(\); bindHome\(\);/.test(html),

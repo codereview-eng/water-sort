@@ -227,9 +227,24 @@
     };
   }
 
+  /* 系统临时名 = 语言前缀 + 随机序号。切语言时只替换已知系统前缀；
+     用户自己设置的名称和云端名称一律原样保留。 */
+  var DEFAULT_ALIAS_RE = /^(?:玩家|Player)\s*(\d{3,6})$/;
+  function aliasSeed(alias) {
+    var m = DEFAULT_ALIAS_RE.exec(String(alias == null ? '' : alias).trim());
+    return m ? m[1] : null;
+  }
+  function localizeAlias(alias, label) {
+    var seed = aliasSeed(alias);
+    if (seed === null) return String(alias == null ? '' : alias);
+    return String(label == null ? '' : label) + seed;
+  }
+
   return {
     resolve: resolve,
     avatarChar: avatarChar,
+    aliasSeed: aliasSeed,
+    localizeAlias: localizeAlias,
     trackRenameDegrade: trackRenameDegrade,
     renameUrl: renameUrl,
     markReturn: markReturn,

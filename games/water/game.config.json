@@ -214,7 +214,7 @@
         {
           "type": "logo",
           "props": {
-            "text": "倒水排序",
+            "text": "Water Sort",
             "em": "WATER SORT"
           }
         },
@@ -225,8 +225,8 @@
         {
           "type": "start-button",
           "props": {
-            "label": "开始",
-            "small": "消耗 15 体力 · 10 分钟限时"
+            "label": "Start",
+            "small": "15 energy · 10-minute limit"
           }
         },
         {
@@ -249,17 +249,17 @@
             "items": [
               {
                 "id": "stWins",
-                "label": "已通关",
+                "label": "Cleared",
                 "initial": 0
               },
               {
                 "id": "stBottles",
-                "label": "加瓶道具",
+                "label": "Extra bottles",
                 "initial": 2
               },
               {
                 "id": "stCoins",
-                "label": "金币",
+                "label": "Coins",
                 "initial": 0
               }
             ]

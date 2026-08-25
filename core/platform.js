@@ -103,6 +103,12 @@
     return allowed;
   }
 
+  /* 防抖同步的最长等待：高频 persist() 不能不断重置计时器，导致云端永远不落盘。 */
+  function nextSyncDelay(firstQueuedAt, nowMs, debounceMs, maxWaitMs) {
+    if (!firstQueuedAt) return debounceMs;
+    return Math.max(0, Math.min(debounceMs, firstQueuedAt + maxWaitMs - nowMs));
+  }
+
   function normalizeAccountName(value) {
     if (typeof value !== 'string') return '';
     var name = value;
@@ -280,6 +286,7 @@
         if (!table) return local('ENTITY_UNDECLARED', play.user);
         var rowId = null;
         var timer = null;
+        var firstQueuedAt = 0;
         var currentUser = play.user || null;
         var authExpiredListeners = [];
         function setUser(user) {
@@ -336,9 +343,14 @@
           queueSync: function (getSave, hooks) {
             hooks = hooks || {};
             if (!session.user) return;
+            var now = Date.now();
+            if (!timer) firstQueuedAt = now;
+            var delay = nextSyncDelay(firstQueuedAt, now,
+              opts.syncDebounceMs || 1500, opts.syncMaxWaitMs || 5000);
             if (timer) clearTimeout(timer);
             timer = setTimeout(function () {
               timer = null;
+              firstQueuedAt = 0;
               Promise.resolve().then(function () { return session.saveCloud(getSave()); })
                 .catch(function (err) {
                   if (err && err.status === 401) {
@@ -348,12 +360,12 @@
                     setTimeout(function () { session.queueSync(getSave, { onAuthLost: hooks.onAuthLost, onError: hooks.onError, __retried: true }); }, 5000);
                   } else if (hooks.onError) hooks.onError(err);
                 });
-            }, opts.syncDebounceMs || 1500);
+            }, delay);
           },
           /* 页面隐藏前尽力冲刷未落的同步 */
           flush: function (getSave) {
             if (!session.user || !timer) return;
-            clearTimeout(timer); timer = null;
+            clearTimeout(timer); timer = null; firstQueuedAt = 0;
             Promise.resolve().then(function () { return session.saveCloud(getSave()); }).catch(function () {});
           }
         };
@@ -369,5 +381,5 @@
     });
   }
 
-  return { create: create, loadSdk: loadSdk, connect: connect };
+  return { create: create, loadSdk: loadSdk, connect: connect, nextSyncDelay: nextSyncDelay };
 });

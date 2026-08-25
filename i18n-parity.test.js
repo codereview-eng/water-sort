@@ -38,6 +38,21 @@ function mineDicts() {
   assert.ok(m, 'mine.html 里找不到内嵌 gameConfig');
   return { cfg: cfg.i18n.locales, inline: JSON.parse(m[1]).i18n.locales };
 }
+function gameConfig(game) {
+  return JSON.parse(readFileSync(join(ROOT, `games/${game}/game.config.json`), 'utf8'));
+}
+function cjkStrings(value, path, out) {
+  out = out || [];
+  path = path || 'screens';
+  if (typeof value === 'string') {
+    if (CJK.test(value)) out.push(`${path}="${value.slice(0, 60)}"`);
+  } else if (Array.isArray(value)) {
+    value.forEach((item, i) => cjkStrings(item, `${path}[${i}]`, out));
+  } else if (value && typeof value === 'object') {
+    Object.entries(value).forEach(([key, item]) => cjkStrings(item, `${path}.${key}`, out));
+  }
+  return out;
+}
 
 /* 字典里存在嵌套结构（例如 water 的 shareTpl 是个对象），所以一律先扁平成
    「点路径 → 字符串」再比对：嵌套里漏一条翻译同样要被拦住。 */
@@ -104,6 +119,14 @@ for (const g of GAMES) {
       if (a !== b) bad.push(`${k}: zh[${a}] vs en[${b}]`);
     }
     assert.deepStrictEqual(bad, [], `占位符不一致：\n  ${bad.join('\n  ')}`);
+  });
+}
+
+for (const game of ['water', 'mine']) {
+  test(`${game}：screens 可见 fallback 不许含 CJK（英文安全骨架）`, () => {
+    const leaks = cjkStrings(gameConfig(game).screens);
+    assert.deepStrictEqual(leaks, [],
+      `screens 配置会在语言回填前直接渲染，必须使用英文安全 fallback：\n  ${leaks.join('\n  ')}`);
   });
 }
 

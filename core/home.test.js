@@ -118,7 +118,7 @@ test('coins：默认 id/图标/文案，数值位可回填', () => {
   const html = Home.registry().get('coins')({});
   assert.ok(html.includes('class="coinbox"'));
   assert.ok(html.includes('id="homeCoins"'), '默认 id');
-  assert.ok(html.includes('🪙') && html.includes('金币'));
+  assert.ok(html.includes('🪙') && html.includes('Coins'));
   const custom = Home.registry().get('coins')({ id: 'stCoins', icon: '💰', label: 'Coins', initial: 7 });
   assert.ok(custom.includes('id="stCoins"') && custom.includes('💰') && custom.includes('Coins'));
   assert.ok(custom.includes('>7<'), 'initial 要渲染进去');

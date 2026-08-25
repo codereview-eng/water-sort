@@ -18,7 +18,8 @@ jobs:
         with:
           node-version: '22'
 
-      # 单元/契约测试 + 多语言静态 gate（字典对等 / en 无中文 / 占位符一致 / 内嵌副本同步）
+      # 单元/契约测试 + 多语言静态 gate（字典对等 / en 无中文 /
+      # screens 英文安全 fallback / 占位符一致 / 内嵌副本同步）
       - name: 单元与契约测试
         run: node --test ./*.test.js ./core/*.test.js
 

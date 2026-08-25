@@ -52,7 +52,7 @@
     var id = props.id !== undefined ? String(props.id) : 'homeCoins';
     if (!id) fail('coins.props.id 不能是空字符串');
     var icon = props.icon !== undefined ? esc(String(props.icon)) : '🪙';
-    var label = props.label !== undefined ? esc(String(props.label)) : '金币';
+    var label = props.label !== undefined ? esc(String(props.label)) : 'Coins';
     var initial = props.initial !== undefined ? esc(String(props.initial)) : '0';
     return '<div class="coinbox">' +
       '<span class="icon">' + icon + '</span>' +
@@ -119,12 +119,12 @@
      文案与状态运行时由游戏侧按 id 回填（idName/idSource/idSub/idAction），本层只出骨架。 */
   function identityRow() {
     return '<button class="profilerow idrow" id="btnIdentity">' +
-      '<span class="avatar" id="idAvatar">玩' +
+      '<span class="avatar" id="idAvatar">P' +
       '<i class="idbadge" id="idBadge" aria-hidden="true"></i>' +
       '</span>' +
       '<span class="profileinfo">' +
       '<span class="idnameline">' +
-      '<span class="profilename" id="idName">玩家</span>' +
+      '<span class="profilename" id="idName">Player</span>' +
       '<i class="idsource" id="idSource"></i>' +
       '</span>' +
       '<span class="idsub" id="idSub"></span>' +
@@ -134,15 +134,15 @@
   }
 
   function soundToggle(props) {
-    var label = props.label !== undefined ? esc(String(props.label)) : '音效';
+    var label = props.label !== undefined ? esc(String(props.label)) : 'Sound';
     return '<div class="langrow">' +
       '<label for="sfxToggle" id="sfxLabel">' + label + '</label>' +
-      '<button id="sfxToggle" class="sfxbtn" aria-pressed="true">开</button>' +
+      '<button id="sfxToggle" class="sfxbtn" aria-pressed="true">On</button>' +
       '</div>';
   }
 
   function langSelect(props) {
-    var label = props.label !== undefined ? esc(String(props.label)) : '语言';
+    var label = props.label !== undefined ? esc(String(props.label)) : 'Language';
     return '<div class="langrow">' +
       '<label for="langSel" id="langLabel">' + label + '</label>' +
       '<select id="langSel" aria-label="' + label + '"></select>' +

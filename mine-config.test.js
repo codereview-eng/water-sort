@@ -462,17 +462,44 @@ test('screens.home 声明可被 ShellCore+HomeCore 完整渲染且含全部回�
   assert.strictEqual(parts.length, cfg.screens.home.modules.length);
   for (const p of parts) assert.ok(typeof p === 'string' && p.length > 0, '模块渲染产出空 markup');
   const joined = parts.join('');
-  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'homeLv', 'homeClears', 'btnBag',
-    'btnIdentity', 'idAvatar', 'idBadge', 'idName', 'idSource', 'idSub', 'idAction', 'sfxToggle']) {
+  /* 游戏化首页（2026-08-26）：统计格换成 Hero 主视觉，音效/语言收进设置弹窗，
+     所以首页锚点清单跟着换——但「每个动态数值都有稳定锚点」这条纪律没松。 */
+  for (const id of ['btnStart', 'startLv', 'enVal', 'enBar', 'enSub', 'enMax', 'homeCoins',
+    'heroLv', 'heroKicker', 'heroDesc', 'heroChapter', 'heroProgress',
+    'btnBag', 'dkRules', 'dkSet', 'btnStreak', 'btnWeekly', 'wsRailBadge', 'wkBadge',
+    'btnIdentity', 'idAvatar', 'idBadge', 'idName', 'idSource', 'idSub', 'idAction']) {
     assert.ok(joined.includes('id="' + id + '"'), '缺回填锚点 ' + id);
   }
+  /* 侧边图标（2026-08-26 owner 定案）：功能入口收成左右两条竖列，点击一律弹窗，
+     所以详情锚点搬进各自的弹窗 screen——但每个入口都必须有 action，不许出现点了没反应的图标。 */
+  const rails = cfg.screens.home.modules.filter((m) => m.type === 'side-rail');
+  assert.strictEqual(rails.length, 2, '首页应有左右两条图标列');
+  assert.deepStrictEqual(rails.map((r) => r.props.side).sort(), ['left', 'right']);
+  for (const r of rails) {
+    for (const it of r.props.items) {
+      assert.ok(it.action && it.icon && it.id, '侧边图标缺 id/icon/action');
+    }
+  }
+  assert.ok(!cfg.screens.home.modules.some((m) => m.type === 'dock'), '底部导航条已下线（owner 定案）');
+  const streak = Shell.create(Home.registry(), cfg.screens).render('streak', {}).join('');
+  for (const id of ['wsCard', 'wsCur', 'wsCycTxt', 'wsCycBar', 'wsClaim']) {
+    assert.ok(streak.includes('id="' + id + '"'), '连胜弹窗缺 ' + id);
+  }
+  assert.ok(!joined.includes('id="wsClaim"'), '领取按钮只能有一个实例（在连胜弹窗里）');
+  // 设置项不再摊在首页，但必须仍由 config 声明（收进 screens.settings 弹窗，不是被删掉）
+  const settings = Shell.create(Home.registry(), cfg.screens).render('settings', {}).join('');
+  for (const id of ['sfxToggle', 'sfxLabel', 'langSel', 'langLabel']) {
+    assert.ok(settings.includes('id="' + id + '"'), '设置窗口缺 ' + id);
+  }
+  assert.ok(!joined.includes('id="sfxToggle"'), '音效开关不该再摊在首页上（首页不是设置页）');
   for (const oldId of ['btnProfile', 'accountStatus', 'accountAction']) {
     assert.ok(!joined.includes('id="' + oldId + '"'), '首页仍残留旧身份锚点 ' + oldId);
   }
   // 道具格改成图标按钮：首页不再显示道具数量（数量在背包窗口里看）
   assert.ok(!joined.includes('id="homeTools"'), '首页仍残留旧的道具数量格 homeTools');
   assert.ok(/<button[^>]*id="btnBag"/.test(joined), '道具格必须是可点按钮（不是静态数值格）');
-  assert.ok(/id="btnBag"[\s\S]*?class="sticon"/.test(joined), '道具按钮必须带图标');
+  // 图标在老布局是 .sticon，在 Dock 里是 .ic；两种都算，但必须有图标
+  assert.ok(/id="btnBag"[\s\S]{0,120}class="(sticon|ic)"/.test(joined), '道具按钮必须带图标');
 });
 
 test('道具元数据齐全：背包窗口能显示每个道具的图标/名称/说明', () => {
@@ -520,16 +547,26 @@ test('页面真的接了 i18n：走 core/locale.js，不自造第二套实现', 
   assert.ok(html.includes('function applyStaticI18n'), '缺静态文案回填');
   assert.strictEqual((html.match(/function applyStaticI18n\(\)/g) || []).length, 1,
     'applyStaticI18n 必须只有一个定义；后定义的旧实现会覆盖新版翻译链');
-  assert.ok(/homeCoins:\s*'statCoins'/.test(html),
-    '配置生成的金币标签必须由 applyStaticI18n 走 homeCoins → statCoins 翻译');
+  /* 金币在游戏化首页上是一枚只有数字的 chip，没有文字标签了——
+     翻译职责改落到无障碍标签（没有可读文案 ≠ 不用翻译：读屏在英文模式下念中文同样是漏翻）。 */
+  assert.ok(/t\('statCoins'\)/.test(html),
+    '金币的文案（含无障碍标签）必须由 applyStaticI18n 走 statCoins 翻译');
+  for (const [id, key] of [['heroKicker', 'nextLevel'], ['heroChapter', 'statClears'], ['dkRules', 'tabRules'],
+    ['dkSet', 'tabSet'], ['btnStreak', 'tabStreak'], ['btnWeekly', 'tabEvent']]) {
+    assert.ok(html.includes(key), `Hero/Dock 文案 ${id} 缺翻译键 ${key}`);
+  }
   assert.ok(!html.includes('function populateLangSel()') && !html.includes('function applyLang(lang)'),
     '页面仍残留会覆盖新版语言链的旧 populateLangSel/applyLang 实现');
   assert.ok(html.includes('function setLang'), '缺语言切换');
   // 切换语言会重建首页 DOM，必须重绑事件——漏了按钮全成死的（本轮真跑抓到过）
   assert.ok(/function setLang[\s\S]{0,600}buildHome\(\); bindHome\(\);/.test(html),
     'setLang 必须在重建 DOM 后重绑事件');
-  // 语言下拉走 core 内置模块，不自己拼 HTML
-  assert.ok(cfg.screens.home.modules.some((m) => m.type === 'lang-select'), '首页缺 lang-select 模块');
+  // 语言下拉走 core 内置模块，不自己拼 HTML；位置从首页移到了设置弹窗（screens.settings）
+  const declared = []
+    .concat(cfg.screens.home.modules, cfg.screens.settings ? cfg.screens.settings.modules : [])
+    .map((m) => m.type);
+  assert.ok(declared.includes('lang-select'), '语言下拉必须仍由 config 声明（首页或设置窗口）');
+  assert.ok(html.includes("render('settings'"), '设置窗口内容必须也走 config 声明渲染，不许手写 markup');
 });
 
 test('反回归：主脚本里不得再出现面向用户的中文字面量', () => {
@@ -636,7 +673,12 @@ test('周活动机制走 core，页面不得自带第二份实现', () => {
     '页面重新实现了 core 已有的周活动机制（应直接调 core）');
   assert.ok(!/const\s+THRESHOLDS\s*=|var\s+THRESHOLDS\s*=/.test(html), '页面写死了阈值（应由 config 声明）');
   // 首页入口用 core 内置模块
-  assert.ok(cfg.screens.home.modules.some((m) => m.type === 'weekly-event-entry'), '首页缺周活动入口模块');
+  /* 入口可以是整行卡（weekly-event-entry），也可以是侧边图标列里 action:'weekly' 的一格
+     （2026-08-26 owner 定案的手游式布局）——但首页必须能进得去周活动。 */
+  const weeklyEntry = cfg.screens.home.modules.some((m) => m.type === 'weekly-event-entry')
+    || cfg.screens.home.modules.some((m) => m.type === 'side-rail'
+      && m.props.items.some((it) => it.action === 'weekly'));
+  assert.ok(weeklyEntry, '首页缺周活动入口');
   // 奖励入账必须走只增账本（云端同步与多标签页保护才会自动生效）
   assert.ok(/function grantWeeklyReward[\s\S]{0,400}Stock\.grant\(save, Coins\.coinsKey/.test(html),
     '金币奖励未走 Stock.grant（会绕过云端同步与多标签页保护）');

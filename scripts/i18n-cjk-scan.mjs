@@ -124,11 +124,17 @@ async function scanGame(bws, game) {
        所以一律用真实 DOM 点击驱动——找不到入口就抛错判红，不许静默跳过。
        覆盖：首页 / 周活动 / 对局 / 道具弹窗。结算窗需要真通关，这里不覆盖，
        由彩雷自己的通关用例负责，不在这里假装扫过。 */
+    /* 2026-08-26 首页游戏化后入口换了位置：道具从统计格挪进底部 Dock，
+       音效/语言收进设置弹窗，玩法提示收进玩法弹窗——新增的两个窗口一并纳入扫描，
+       否则「首页看着全英文、弹窗里还是中文」这种漏翻正好从门禁的盲区溜过去。 */
     mine: [
       ['home', '1'],
-      ['weekly', click('.eventbtn')],
+      ['weekly', click('#btnWeekly')],
       ['game', click('#btnWkBack') + '; ' + click('.bigbtn')],
-      ['item-dialog', `document.getElementById('btnBack').click(); ` + click('.homestats button')],
+      ['item-dialog', `document.getElementById('btnBack').click(); ` + click('#btnBag')],
+      ['settings-dialog', `document.getElementById('dlgMain').click(); ` + click('#dkSet')],
+      ['rules-dialog', `document.getElementById('dlgMain').click(); ` + click('#dkRules')],
+      ['streak-dialog', `document.getElementById('dlgMain').click(); ` + click('#btnStreak')],
     ],
   };
   const FINGERPRINT = `(() => {

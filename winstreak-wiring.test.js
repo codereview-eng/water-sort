@@ -55,16 +55,24 @@ test('mine：胜利记 wsOnWin，四个失败出口都记 wsOnLose', () => {
   assert.ok(windowAfter(mine, "$('btnBack').addEventListener", 400, 'mine btnBack').includes('wsOnLose()'), '局中弃战要记断链');
 });
 
-test('mine：开局门先解决未决断链；首页卡回填与领取按钮已接', () => {
+test('mine：开局门先解决未决断链；连胜角标/弹窗回填与领取按钮已接', () => {
   const start = windowAfter(mine, 'function startGame() {', 400, 'mine startGame');
   assert.ok(start.includes('wsKeepDialog('), '开局门必须先弹保持窗');
   assert.ok(start.includes('.pend'), '开局门必须判 pend');
+  /* 2026-08-26 owner 定案：首页只留侧边🔥图标 + 角标，两块详情与领取按钮搬进连胜弹窗。
+     所以回填拆成两半：角标 renderStreakRail，卡片 fillStreakCard；renderHome 必须两个都调，
+     否则「连胜涨了首页看不出来」或「弹窗数字不刷新」。 */
   const home = windowAfter(mine, 'function renderHome() {', 2600, 'mine renderHome');
+  assert.ok(home.includes('renderStreakRail()'), 'renderHome 必须刷新侧边连胜角标');
+  assert.ok(home.includes('fillStreakCard()'), 'renderHome 必须刷新连胜卡（弹窗开着时）');
+  const fill = windowAfter(mine, 'function fillStreakCard() {', 900, 'mine fillStreakCard');
   for (const id of ['wsCur', 'wsCycTxt', 'wsCycBar', 'wsClaim']) {
-    assert.ok(home.includes(`'${id}'`), `renderHome 缺 ${id} 回填`);
+    assert.ok(fill.includes(`'${id}'`), `fillStreakCard 缺 ${id} 回填`);
   }
-  assert.ok(windowAfter(mine, 'function bindHome() {', 900, 'mine bindHome').includes('wsClaimTicket'),
-    '首页领取按钮必须在 bindHome 里绑（切语言重建 DOM 后要重绑，见 repo memory）');
+  const rail = windowAfter(mine, 'function renderStreakRail() {', 700, 'mine renderStreakRail');
+  assert.ok(rail.includes('hasTicket('), '有未领取的票时角标必须点亮（否则玩家不知道该去领）');
+  assert.ok(windowAfter(mine, 'function openStreak() {', 900, 'mine openStreak').includes('wsClaimTicket'),
+    '领取按钮必须在打开连胜弹窗时绑（弹窗内容每次重建，见 repo memory 的重绑教训）');
 });
 
 test('两游戏：streak-keep / streak-claim 广告位已配置，winstreak 段已声明', () => {
@@ -77,7 +85,14 @@ test('两游戏：streak-keep / streak-claim 广告位已配置，winstreak 段�
       assert.ok(cfg.ads.placements[p], `${name} 缺广告位 ${p}`);
       assert.equal(cfg.ads.placements[p].format, 'rewarded');
     }
-    assert.ok(cfg.screens.home.modules.some((mm) => mm.type === 'streak-card'), name + ' 首页缺 streak-card 模块');
+    /* 双连胜必须在首页有位置：老布局用 streak-card（一张卡里两块），
+       游戏化首页用 streak-duo（A 大连胜与 B 奖励票周期左右分开，用户实测「只看到一个连胜」后拆的）。
+       两者回填 id 相同，宿主逻辑共用；这里只要求「至少有一个」，不锁死长相。 */
+    /* 双连胜必须有位置：老布局在首页整行卡，游戏化布局是首页侧边图标 + 点开的连胜弹窗
+       （screens.streak）。这里只要求「某个 screen 声明了它」，不锁死放在哪一屏。 */
+    const anyScreen = Object.values(cfg.screens).flatMap((sc) => sc.modules.map((mm) => mm.type));
+    assert.ok(anyScreen.includes('streak-card') || anyScreen.includes('streak-duo'),
+      name + ' 缺双连胜模块（streak-card 或 streak-duo）');
     for (const f of ['wsCur', 'wsPend', 'wsCyc', 'wsEarned', 'wsClaimed']) {
       assert.ok(cfg.platform.fields[f], `${name} 云同步缺字段 ${f}`);
     }

@@ -294,9 +294,168 @@
     return cand[Math.floor((rand || Math.random)() * cand.length)];
   }
 
+  /* ============ 线索推理（道具「找线索」的内核，2026-08-26） ============
+     彩雷没有「周围雷数」这种数字线索，线索全部来自四条硬约束：
+       每行一颗 / 每列一颗 / 每个色块一颗 / 任意两雷不相邻(8 邻域)。
+     只吃玩家**真正已知的事实**：已挖开的格(确认非雷) + 已确认的雷。
+     玩家自己打的 ✕ 标记不算事实——他标错了会让提示跟着错，那比没提示更糟。
+
+     纪律 · 限流写在内核里：一次只返回一条结论。约束传播跑到不动点会一口气
+     吐出几十个结论（实测 11×11 中后期平均 48.5 格 / 全盘 121 格），
+     一次全给等于一键破关，所以闸门不能交给 UI 层自觉。 */
+  var UNKNOWN = 0, KNOWN_SAFE = 1, KNOWN_MINE = 2;
+
+  /* 恰好一颗雷的约束组：每行、每列、每个色块 */
+  function hintGroups(size, region) {
+    var gs = [], r, c, g, i;
+    for (r = 0; r < size; r++) {
+      g = [];
+      for (c = 0; c < size; c++) g.push(r * size + c);
+      gs.push({ kind: 'row', at: r, cells: g });
+    }
+    for (c = 0; c < size; c++) {
+      g = [];
+      for (r = 0; r < size; r++) g.push(r * size + c);
+      gs.push({ kind: 'col', at: c, cells: g });
+    }
+    var byReg = {};
+    for (i = 0; i < size * size; i++) {
+      if (!byReg[region[i]]) byReg[region[i]] = [];
+      byReg[region[i]].push(i);
+    }
+    Object.keys(byReg).forEach(function (id) {
+      gs.push({ kind: 'region', at: Number(id), cells: byReg[id] });
+    });
+    return gs;
+  }
+
+  function factState(size, openedIdx, foundIdx) {
+    var st = new Uint8Array(size * size), i;
+    for (i = 0; i < (openedIdx || []).length; i++) st[openedIdx[i]] = KNOWN_SAFE;
+    for (i = 0; i < (foundIdx || []).length; i++) st[foundIdx[i]] = KNOWN_MINE;
+    return st;
+  }
+
+  function neighbors(size, idx) {
+    var r = Math.floor(idx / size), c = idx % size, out = [], dr, dc, rr, cc;
+    for (dr = -1; dr <= 1; dr++) {
+      for (dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        rr = r + dr; cc = c + dc;
+        if (rr < 0 || cc < 0 || rr >= size || cc >= size) continue;
+        out.push(rr * size + cc);
+      }
+    }
+    return out;
+  }
+
+  /* 一步局部推理：返回当前一步就能得出的**一条**结论，按可讲解程度排序——
+     「这一组只剩一格 → 必是雷」最好讲，其次「这一组已有雷 → 其余非雷」，
+     最后「紧邻已确认的雷 → 非雷」。推不出返回 null（= 玩家真卡住了）。 */
+  function deduceStep(size, region, openedIdx, foundIdx) {
+    var st = factState(size, openedIdx, foundIdx);
+    var gs = hintGroups(size, region), gi, g, i, mine, unk;
+    for (gi = 0; gi < gs.length; gi++) {
+      g = gs[gi]; mine = -1; unk = [];
+      for (i = 0; i < g.cells.length; i++) {
+        if (st[g.cells[i]] === KNOWN_MINE) mine = g.cells[i];
+        else if (st[g.cells[i]] === UNKNOWN) unk.push(g.cells[i]);
+      }
+      if (mine < 0 && unk.length === 1) {
+        /* 色块可能天生只有一格（生长算法允许），此时理由不是「其它格都排除了」
+           而是「这个色块只有这一格」——文案得说实话，否则玩家找不到那些「其它格」。 */
+        var only = g.cells.length === 1;
+        return { kind: 'mine', idx: unk[0], why: g.kind + (only ? '-only' : '-last'), group: g, depth: 'local' };
+      }
+    }
+    for (gi = 0; gi < gs.length; gi++) {
+      g = gs[gi]; mine = -1; unk = [];
+      for (i = 0; i < g.cells.length; i++) {
+        if (st[g.cells[i]] === KNOWN_MINE) mine = g.cells[i];
+        else if (st[g.cells[i]] === UNKNOWN) unk.push(g.cells[i]);
+      }
+      if (mine >= 0 && unk.length) {
+        return { kind: 'safe', idx: unk[0], why: g.kind + '-taken', group: g, src: mine, depth: 'local' };
+      }
+    }
+    for (i = 0; i < size * size; i++) {
+      if (st[i] !== KNOWN_MINE) continue;
+      var nb = neighbors(size, i);
+      for (var k = 0; k < nb.length; k++) {
+        if (st[nb[k]] === UNKNOWN) {
+          return { kind: 'safe', idx: nb[k], why: 'adjacent', src: i, depth: 'local' };
+        }
+      }
+    }
+    return null;
+  }
+
+  /* 带已知事实的全解枚举（一行一颗雷 → 逐行选列 + 约束剪枝）。
+     卡住时用它定格：某格在所有一致解里都是雷/都不是雷 → 可确定。
+     cap 兜住极端盘面的爆炸风险（实测本仓关卡最坏 80ms、解数为 1）。 */
+  function decideByEnum(size, region, openedIdx, foundIdx, cap) {
+    var st = factState(size, openedIdx, foundIdx);
+    cap = cap === undefined ? 200000 : cap;
+    var freq = new Int32Array(size * size), count = 0;
+    var usedCol = new Array(size), usedReg = {}, pick = new Array(size), r;
+    for (r = 0; r < size; r++) { usedCol[r] = false; pick[r] = -1; }
+    var forcedOf = new Array(size);
+    for (r = 0; r < size; r++) {
+      forcedOf[r] = -1;
+      for (var c = 0; c < size; c++) if (st[r * size + c] === KNOWN_MINE) forcedOf[r] = c;
+    }
+    (function bt(row) {
+      if (count >= cap) return;
+      if (row === size) {
+        count++;
+        for (var rr = 0; rr < size; rr++) freq[rr * size + pick[rr]]++;
+        return;
+      }
+      for (var c = 0; c < size; c++) {
+        var idx = row * size + c;
+        if (st[idx] === KNOWN_SAFE) continue;
+        if (forcedOf[row] >= 0 && c !== forcedOf[row]) continue;
+        if (usedCol[c]) continue;
+        if (row > 0 && Math.abs(c - pick[row - 1]) < 2) continue;
+        var g = region[idx];
+        if (usedReg[g]) continue;
+        usedCol[c] = true; usedReg[g] = 1; pick[row] = c;
+        bt(row + 1);
+        pick[row] = -1; usedReg[g] = 0; usedCol[c] = false;
+        if (count >= cap) return;
+      }
+    }(0));
+    if (!count) return null;
+    for (var i = 0; i < size * size; i++) {
+      if (st[i] !== UNKNOWN) continue;
+      if (freq[i] === count) return { kind: 'mine', idx: i, why: 'enum', depth: 'deep', solutions: count };
+      if (freq[i] === 0) return { kind: 'safe', idx: i, why: 'enum', depth: 'deep', solutions: count };
+    }
+    return null;
+  }
+
+  /* 道具「找线索」统一入口：三层降级，保证「点了永远有用」——
+     ① 一步能推出来的（讲得清理由）→ ② 卡住了用枚举定一格（诚实标注需联立推理）
+     → ③ 兜底给一个真安全格（= 老道具的行为，永不返回空手）。 */
+  function hintNext(board, openedIdx, foundIdx, rand) {
+    var size = board.size, region = board.region;
+    var step = deduceStep(size, region, openedIdx, foundIdx);
+    if (step) return step;
+    var deep = decideByEnum(size, region, openedIdx, foundIdx);
+    if (deep) return deep;
+    var excluded = (openedIdx || []).concat(foundIdx || []);
+    var idx = pickSafeCell(board, excluded, rand);
+    if (idx < 0) return null;
+    return { kind: 'safe', idx: idx, why: 'fallback', depth: 'fallback' };
+  }
+
   return {
     SIZES: SIZES,
     rng: rng,
+    hintGroups: hintGroups,
+    deduceStep: deduceStep,
+    decideByEnum: decideByEnum,
+    hintNext: hintNext,
     placeMines: placeMines,
     growRegions: growRegions,
     countSolutions: countSolutions,

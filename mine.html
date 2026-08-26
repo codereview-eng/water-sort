@@ -606,6 +606,7 @@
     });
   }
   function cheer() {
+    if (clockPause.muted) return;      // 广告期间静音（adBreak 契约：mute 进、un-mute 出）
     buzz();
     withAudio(function (ac) { playNotes(ac, CHEER_NOTES); });
   }
@@ -633,8 +634,49 @@
     if (S.remain != null) startTimer();
   }
 
+  /* ============ 关卡时钟：广告与切后台期间必须停表 ============
+     用户实报（2026-08-26）：「看广告回来本该 +60s，结果只剩 20-30s」。
+     根因不在加时那一行，而在广告源的 resolve 时机：core/adplay.js 的 directlink 源
+     在 openUrl() 打开新标签的那一刻就 resolve({ok:true})——玩家还在广告页看，
+     父页面已经判「看完」并重启计时，于是 60 秒在玩家回来之前就被吃掉了。
+     所以暂停不能只包住「广告 promise 期间」，还要包住「页面不可见期间」。
+
+     PV ref（强，官方文档）：Google H5 Games Ad Placement API 的 adBreak() 契约——
+     beforeAd「Mute and pause the game flow」/ afterAd「Resume the game and un-mute」，
+     奖励在真看完之后发放。倒水已按此落地（adPauseGame/adResumeGame），这里补上彩雷。 */
+  var clockPause = { depth: 0, wasTicking: false, remain: -1, muted: false };
+
+  function pauseClock() {
+    if (clockPause.depth++ > 0) return;
+    clockPause.wasTicking = !!(S && S.timerId);
+    clockPause.remain = (S && typeof S.remain === 'number') ? S.remain : -1;
+    stopTimer();
+    clockPause.muted = true;          // 契约要求 mute：广告有自己的声音，别叠在一起
+  }
+
+  function resumeClock() {
+    if (clockPause.depth <= 0) return;
+    if (--clockPause.depth > 0) return;
+    clockPause.muted = false;
+    /* 兜底：暂停期间一秒都不该流失。少了就按快照补回并大声打日志——
+        说明有路径绕过了 pauseClock（同页 iframe 广告、别处又开了一个 tick 等）。 */
+    if (clockPause.remain >= 0 && S && typeof S.remain === 'number' && S.remain < clockPause.remain) {
+      console.warn('[mine ads] clock lost ' + (clockPause.remain - S.remain) +
+        's while paused; restored from snapshot (should not happen: some path bypassed pauseClock)');
+      S.remain = clockPause.remain;
+      renderTime();
+    }
+    clockPause.remain = -1;
+    var resume = clockPause.wasTicking;
+    clockPause.wasTicking = false;
+    if (resume && S && !S.done) startTimer();
+  }
+
   function startTimer() {
     stopTimer();
+    /* 暂停期间不许真的开表：directlink 那条路会在玩家还没回来时就发奖并调用本函数，
+       此时页面仍不可见，开表等于继续吃玩家的时间。记下「本该在跑」，恢复时再开。 */
+    if (clockPause.depth > 0) { clockPause.wasTicking = true; return; }
     S.timerId = setInterval(function () {
       if (S.done) return stopTimer();
       S.remain -= 1; renderTime();
@@ -642,6 +684,14 @@
     }, 1000);
   }
   function stopTimer(){ if (S && S.timerId) { clearInterval(S.timerId); S.timerId = null; } }
+
+  /* 页面不可见就停表：既护住「广告开在新标签」（directlink 按访问计费，玩家真的会离开页面），
+     也顺手修掉「切后台接个电话回来时间没了」——限时关卡里这同样是差体验。 */
+  document.addEventListener('visibilitychange', function () {
+    if (!S || S.done) return;
+    if (document.hidden) pauseClock();
+    else resumeClock();
+  });
 
   /* ============ 渲染 ============ */
   function renderBoard() {
@@ -971,7 +1021,11 @@
       /* 广告位 time-bonus（config: onFail=deny, capping.maxPerSession=3）：没看完不加时 */
       t('adGrant', { n: AD_TIME_BONUS + 's' }), function () {
         watchAdFor('time-bonus', function () {
-          S.done = false; S.remain = AD_TIME_BONUS; renderHud(); startTimer();
+          /* 累加而不是覆盖：超时路径上 remain 是 0，但别的加时入口（以后可能有）
+             remain 可能还有剩，覆盖式赋值会把玩家剩下的时间吞掉。 */
+          S.done = false;
+          S.remain = Math.max(0, S.remain || 0) + AD_TIME_BONUS;
+          renderHud(); startTimer();
         });
       },
       t('restart'), function () { wsOnLose(); wsGate(function () { startLevel(S.lv); }); },
@@ -1165,9 +1219,23 @@
   }
 
   function watchAdFor(placementId, onReward) {
-    AdPlay.playPlacement(AdPlacements, placementId, adState[placementId] || {}).then(function (res) {
+    /* 暂停/恢复收在这一层，而不是各调用点各写一遍——否则以后新增广告位默认不受保护
+       （倒水踩过这个坑，见 ad-pause-timer.test.js 的注释）。 */
+    pauseClock();
+    var settled = false;
+    var done = function () { if (settled) return; settled = true; resumeClock(); };
+    AdPlay.playPlacement(AdPlacements, placementId, adState[placementId] || {}).catch(function (err) {
+      console.warn('[mine ads] playPlacement threw placement=' + placementId +
+        ' err_name=' + (err && err.name) + ' err_msg=' + String((err && err.message) || err).slice(0, 200));
+      return { granted: false, shown: false, ad: { reason: 'error' } };
+    }).then(function (res) {
       adState[placementId] = res.state || {};
       saveAdState();
+      /* 顺序要紧：先恢复时钟再发奖。发奖会调 startTimer，若此时还在暂停态，
+         startTimer 只会记下「本该在跑」而不真的开表，玩家的加时就白加了。
+         页面若仍不可见（directlink 场景玩家还在广告页），visibilitychange 那一层
+         仍然按住停表，等他真的回来才走表。 */
+      done();
       if (res.granted) { onReward(); return; }
       if (res.shown === false) { toast(t('adCapped')); return; }          // 频控拦下
       var why = res.ad && res.ad.reason;
@@ -1178,6 +1246,10 @@
       console.warn('[mine ads] ad-not-completed placement=' + placementId +
         ' source=' + (res.ad && res.ad.source) + ' reason=' + why +
         ' totals ok/fail=' + st.ok + '/' + st.failed + ' bySource=' + JSON.stringify(st.bySource));
+    }, function (err) {                       // 兜底：任何未预期失败也必须把时钟还给玩家
+      done();
+      console.warn('[mine ads] ad chain error placement=' + placementId +
+        ' err_name=' + (err && err.name) + ' err_msg=' + String((err && err.message) || err).slice(0, 200));
     });
   }
 

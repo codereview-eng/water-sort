@@ -214,3 +214,100 @@ test('deduceStep：理由带的组必须货真价实（行=整行、单格色块
   assert.ok(sawRow, '这批局面里应当出现过行相关的理由');
   void sawOnly;   // 单格色块不保证出现，出现时上面已断言
 });
+
+/* ============ 「找线索」v2（clueNext，2026-08-27） ============
+   v1 的实测教训（test/manual/mine-clue-spike.mjs，40 关 2400 次调用）：
+   解卡率 0.0% / 冗余率 99.3% —— 它反复讲「这格安全」，而玩法里只有挖雷才算进度，
+   理性玩家的 opened 恒为空，进度全在他自己打的 ✕ 里。v2 因此改成：吃 marks、恒指雷。
+   下面这几条守住这次改造的判据，别再退回去。 */
+
+/* 玩家画像：只会三条局部规则的理性玩家，推到不动点（跟 spike 里同源） */
+function playerFixpoint(spec) {
+  const size = spec.size, gs = E.hintGroups(size, spec.board.region);
+  const safe = new Set(), mine = new Set();
+  const nb = (idx) => {
+    const r = (idx / size) | 0, c = idx % size, out = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && cc >= 0 && rr < size && cc < size) out.push(rr * size + cc);
+    }
+    return out;
+  };
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const g of gs) {
+      let has = false; const unk = [];
+      for (const i of g.cells) {
+        if (mine.has(i)) has = true;
+        else if (!safe.has(i)) unk.push(i);
+      }
+      if (has) { for (const i of unk) if (!safe.has(i)) { safe.add(i); changed = true; } }
+      else if (unk.length === 1) { mine.add(unk[0]); changed = true; }
+    }
+    for (const m of Array.from(mine)) for (const x of nb(m)) {
+      if (!mine.has(x) && !safe.has(x)) { safe.add(x); changed = true; }
+    }
+  }
+  return { marks: Array.from(safe), found: Array.from(mine) };
+}
+
+test('clueNext：每一条线索都指向一个还没找到的真雷（安全格对玩家没用，v1 就废在这）', () => {
+  for (const lv of [1, 3, 6, 10, 12, 18, 25, 33]) {
+    const spec = Levels.get(lv);
+    const real = new Set(E.mineIndexes(spec.board));
+    const st = playerFixpoint(spec);
+    for (let k = 0; k < 12 && st.found.length < spec.size; k++) {
+      const hint = E.clueNext(spec.board, { opened: [], found: st.found, marks: st.marks });
+      assert.ok(hint, `lv${lv} 还有雷没找到就不该空手`);
+      assert.strictEqual(hint.kind, 'mine', 'v2 恒指雷');
+      assert.ok(real.has(hint.idx), `lv${lv} 指的必须是真雷，推错比不推更糟`);
+      assert.ok(!st.found.includes(hint.idx), '不许重复指已经找到的雷');
+      st.found.push(hint.idx);
+    }
+  }
+});
+
+test('clueNext：打错的 ✕ 是最高优先级线索（错误信念会毒化玩家后面全部推理）', () => {
+  const spec = Levels.get(9);
+  const mines = E.mineIndexes(spec.board);
+  const st = playerFixpoint(spec);
+  const hint = E.clueNext(spec.board, { opened: [], found: [], marks: st.marks.concat([mines[2]]) });
+  assert.strictEqual(hint.why, 'markwrong');
+  assert.strictEqual(hint.idx, mines[2]);
+  assert.strictEqual(hint.kind, 'mine');
+});
+
+test('clueNext：全部雷都找到了就返回 null，不硬造线索', () => {
+  const spec = Levels.get(4);
+  assert.strictEqual(E.clueNext(spec.board, { opened: [], found: E.mineIndexes(spec.board), marks: [] }), null);
+});
+
+test('propagateSafe / 限区 / 夹逼：任何一步都不许把真雷判成安全（不可逆的错）', () => {
+  for (const lv of [2, 5, 8, 11, 14, 20, 28]) {
+    const spec = Levels.get(lv), size = spec.size;
+    const real = new Set(E.mineIndexes(spec.board));
+    const rand = E.rng(lv * 7919);
+    for (let t = 0; t < 8; t++) {
+      const f = factsOf(spec, rand, 0.15 * (t % 4), 0.15 * (t % 5));
+      const st = new Uint8Array(size * size);
+      for (const i of f.opened) st[i] = 1;
+      for (const i of f.found) st[i] = 2;
+      E.propagateSafe(size, spec.board.region, st);
+      for (let hop = 0; hop < 12; hop++) {
+        if (!E.confineOnce(size, spec.board.region, st) && !E.squeezeOnce(size, spec.board.region, st)) break;
+        E.propagateSafe(size, spec.board.region, st);
+      }
+      for (const m of real) assert.notStrictEqual(st[m], 1, `lv${lv} 把真雷 ${m} 判成了安全`);
+    }
+  }
+});
+
+test('clueNext：仍然一次只吐一条（限流写在内核，不靠 UI 自觉）', () => {
+  const spec = Levels.get(11);
+  const st = playerFixpoint(spec);
+  const hint = E.clueNext(spec.board, { opened: [], found: st.found, marks: st.marks });
+  assert.ok(hint && typeof hint.idx === 'number');
+  assert.ok(!Array.isArray(hint.idx), '返回的是一格，不是一批');
+});

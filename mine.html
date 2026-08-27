@@ -877,7 +877,7 @@
       blip(320, .25);   // 原来 140Hz：手机小喇叭物理上放不出这么低的频率，等于没有反馈
       S.lives -= 1; renderHud();
       if (S.lives <= 0) return onDead();
-      toast(t('notMine', { n: S.lives }));
+      toast(t('notMine', { lives: S.lives }));
     }
   }
 
@@ -1027,7 +1027,7 @@
     if (coinPatch) Object.assign(save, coinPatch);
     wsOnWin();   // 双连胜:A+1,B 周期推进/出票(2026-08-24)
     persist();
-    dialog(t('winTitle', { n: S.lv }), t('winBody', { n: S.size })
+    dialog(t('winTitle', { level: S.lv }), t('winBody', { count: S.size })
       + (coinPatch ? t('winCoins', { n: Coins.earnPerClear, total: Coins.balance(save) }) : ''),
       t('nextLevel'), function () { startLevel(save.level); }, t('toHome'), showHome,
       showHome);                      // 关掉这个窗（✕/点外部/Esc）= 回首页，不把人留在已结束的棋盘上
@@ -1048,7 +1048,7 @@
   function onTimeUp() {
     resetGestureState();
     S.done = true;
-    dialog(t('timeUpTitle'), t('timeUpBody', { n: AD_TIME_BONUS }),
+    dialog(t('timeUpTitle'), t('timeUpBody', { seconds: AD_TIME_BONUS }),
       /* 广告位 time-bonus（config: onFail=deny, capping.maxPerSession=3）：没看完不加时 */
       t('adGrant', { n: AD_TIME_BONUS + 's' }), function () {
         watchAdFor('time-bonus', function () {
@@ -1710,7 +1710,7 @@
     if (WinStreak.enabled && wsGet().pend) { wsKeepDialog(wsGet(), startGame); return; }
     renderHome();                        // 先按当前时间恢复体力再判定
     if (save.energy < Reward.E_COST) {
-      dialog(t('energyLowTitle'), t('energyLowBody', { have: save.energy, need: Reward.E_COST, grant: Reward.E_AD }),
+      dialog(t('energyLowTitle'), t('energyLowBody', { energy: save.energy, cost: Reward.E_COST, bonus: Reward.E_AD }),
         t('adGrant', { n: Reward.E_AD }), function () { watchAdFor('tool-refill', function () {
           save.energy += Reward.E_AD;    // 广告补体力可超上限（与 water 同规则，issue #7）
           if (save.energy >= Reward.E_MAX) save.lastTs = Date.now();
@@ -1984,7 +1984,7 @@
     if (!Plat || Plat.mode !== 'online' || Plat.user) return;
     if (!Plat.core.shouldPromptLogin({ clears: save.clears || 0, prompted: platPrompted })) return;
     platPrompted = true;
-    dialog(t('cloudPromptTitle'), t('cloudPromptBody', { n: save.clears || 0 }),
+    dialog(t('cloudPromptTitle'), t('cloudPromptBody', { clears: save.clears || 0 }),
       t('login'), function () { Plat.login(); }, t('later'), null);
   }
   function onIdentityClick() {

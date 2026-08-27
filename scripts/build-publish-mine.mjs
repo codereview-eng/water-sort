@@ -2,10 +2,17 @@
    产物形态与线上现状一致：
    - index.html = mine.html 把所有 <script src="./x.js"> 内联进来（线上 index.html 无任何外链 script）
    - 同时把仓库原始文件一并放进 checkpoint 树（线上 /core/platform.js、/mine-engine.js、/game.config.json 均 200）
-   fail-closed：内联后仍残留外链 script、或引用了二进制 assets、或 payload 超 1MiB，一律抛错不出产物。
-   用法：node scripts/build-publish-mine.mjs  → /tmp/cm-publish-payload.json
+   - 广场封面与卡片文案：产物根带 cover.webp（16:9）+ game.meta.json（title/tagline）。
+     网关 /templates/covers/play/<slug>.webp 是 live-first：产物根有 cover.webp 就随发布即翻新，
+     没有则退回平台自动截图（那张 720×450 的开局盘）。JSON payload 是 utf8 文本 map，
+     装不下二进制 —— 封面只能走目录产物 /tmp/cm-publish-dist。
+   fail-closed：内联后仍残留外链 script、或引用了二进制 assets、或 payload 超 1MiB、
+     或封面缺席/超 300KiB/非 16:9/非 WebP、或 meta 超网关上限，一律抛错不出产物。
+   用法：node scripts/build-publish-mine.mjs
+     → /tmp/cm-publish-dist（目录产物，publish_game 用这个）
+     → /tmp/cm-publish-payload.json（文本 payload，旧通道兼容；不含封面）
    规则：改 core 后默认只发 color-mines，其它游戏需用户特别指定。 */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
@@ -60,3 +67,75 @@ for (const marker of MARKERS) {
   if (!inlined.includes(marker)) throw new Error('产物缺少本次修复标记: ' + marker);
 }
 console.log('产物自检通过：' + MARKERS.join(' / ') + ' 均在');
+
+/* 5) 广场资产门禁 + 目录产物（唯一能承载二进制的形态） */
+const DIST = process.env.CM_DIST || '/tmp/cm-publish-dist';
+const COVER_SRC = join(ROOT, 'assets/cover/cover.webp');
+const META_SRC = join(ROOT, 'games/mine/game.meta.json');
+
+/** WebP 尺寸解析（VP8 有损 / VP8L 无损 / VP8X 扩展三种容器都认）。 */
+function webpSize(buf) {
+  if (buf.length < 30) return null;
+  if (buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WEBP') return null;
+  const fourcc = buf.toString('ascii', 12, 16);
+  if (fourcc === 'VP8 ') {
+    if (buf[23] !== 0x9d || buf[24] !== 0x01 || buf[25] !== 0x2a) return null; // keyframe start code
+    return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+  }
+  if (fourcc === 'VP8L') {
+    if (buf[20] !== 0x2f) return null;
+    const bits = buf.readUInt32LE(21);
+    return { w: (bits & 0x3fff) + 1, h: ((bits >>> 14) & 0x3fff) + 1 };
+  }
+  if (fourcc === 'VP8X') {
+    return {
+      w: 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16)),
+      h: 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16)),
+    };
+  }
+  return null;
+}
+
+// 封面：缺席就等于把广场封面交还给平台自动截图，这里 fail-close 拦住。
+if (!existsSync(COVER_SRC)) throw new Error('缺少封面 assets/cover/cover.webp（没有它广场会退回平台自动截图）');
+const coverBuf = readFileSync(COVER_SRC);
+const COVER_MAX = 300 * 1024; // 平台建议上限；网关硬顶 2MiB
+if (coverBuf.byteLength > COVER_MAX) {
+  throw new Error(`cover.webp ${(coverBuf.byteLength / 1024).toFixed(0)} KiB 超过 ${COVER_MAX / 1024} KiB 上限`);
+}
+const dim = webpSize(coverBuf);
+if (!dim) throw new Error('cover.webp 不是可解析的 WebP（RIFF/WEBP 头或帧头不对）');
+if (Math.abs(dim.w / dim.h - 16 / 9) > 0.02) {
+  throw new Error(`cover.webp 必须是 16:9，当前 ${dim.w}x${dim.h}（卡片会被裁切）`);
+}
+
+// meta：与网关 play-live-cover 同口径（整文件 ≤4KiB、title ≤80、tagline ≤200，超限即整条丢弃）
+const metaRaw = readFileSync(META_SRC, 'utf8');
+if (Buffer.byteLength(metaRaw) > 4096) throw new Error('game.meta.json 超过 4 KiB（网关会整条丢弃）');
+const meta = JSON.parse(metaRaw);
+if (typeof meta.title !== 'string' || meta.title.length === 0 || meta.title.length > 80) {
+  throw new Error('game.meta.json 的 title 必须是 1-80 字符的字符串');
+}
+if (meta.tagline !== undefined && (typeof meta.tagline !== 'string' || meta.tagline.length > 200)) {
+  throw new Error('game.meta.json 的 tagline 必须是 ≤200 字符的字符串');
+}
+
+// 目录产物：文本文件树 + 二进制封面 + meta
+rmSync(DIST, { recursive: true, force: true });
+for (const [rel, content] of Object.entries(files)) {
+  const dest = join(DIST, rel);
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, content);
+}
+writeFileSync(join(DIST, 'cover.webp'), coverBuf);
+writeFileSync(join(DIST, 'game.meta.json'), metaRaw);
+
+// 回读校验：写进产物的封面必须与源逐字节一致（防静默截断/编码污染）
+const coverBack = readFileSync(join(DIST, 'cover.webp'));
+if (!coverBack.equals(coverBuf)) throw new Error('产物 cover.webp 与源文件不一致（写入被污染）');
+if (!existsSync(join(DIST, 'index.html'))) throw new Error('产物缺少 index.html');
+
+console.log(`目录产物 → ${DIST}`);
+console.log(`  cover.webp ${dim.w}x${dim.h} ${(coverBuf.byteLength / 1024).toFixed(1)} KB`);
+console.log(`  game.meta.json title="${meta.title}" tagline="${meta.tagline ?? ''}"`);
+console.log(`  文件 ${Object.keys(files).length + 2} 个（含封面与 meta）`);

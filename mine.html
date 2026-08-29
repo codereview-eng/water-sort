@@ -265,7 +265,8 @@
 
   /* 设置页底部的构建标记：一眼分辨设备拿到的是哪一版（排查「到底更没更新」用） */
   .buildline{margin-top:10px; text-align:center; font-size:11px; color:var(--ink-3);
-    user-select:text; -webkit-user-select:text;}
+    user-select:text; -webkit-user-select:text; white-space:pre-line; word-break:break-all;
+    cursor:pointer;}
 
   /* ---------- 首页（与 water.html home 同款布局） ---------- */
   [hidden]{display:none !important;}
@@ -545,6 +546,20 @@
   // hash 带着手动选的语言、而本地镜像对不上（存储被清/被隔离）→ 顺手补回本地一份
   if (savedLangRead.hash && savedLang !== LANG) {
     try { window.localStorage.setItem(LANG_KEY, LANG); } catch (e) {}
+  }
+  /* 通道诊断（2026-08-29）：语言在内嵌 webview 里反复丢，靠猜定位不了——
+     把三条通道（本地镜像 / URL hash / 云存档）的实际值摊开，点设置页的构建号那行即可看到。
+     玩家平时看不到，排障时一眼定位是哪条没存住。 */
+  var LANG_DIAG = {
+    mode: '-', user: '-', cloudLang: '-', cloudSfx: '-', localFresh: '-', merged: '-', err: ''
+  };
+  function langDiagText() {
+    var r = LocaleCore.readSavedLang(window, LANG_KEY);
+    return 'now=' + LANG + ' local=' + (r.local || '-') + ' hash=' + (r.hash || '-')
+      + ' cloud=' + LANG_DIAG.cloudLang + ' sfx=' + LANG_DIAG.cloudSfx
+      + ' merged=' + LANG_DIAG.merged + ' fresh=' + LANG_DIAG.localFresh
+      + ' plat=' + LANG_DIAG.mode + '/' + LANG_DIAG.user
+      + (LANG_DIAG.err ? ' err=' + LANG_DIAG.err : '');
   }
 
   /* t(key, vars)：取词 + {占位符} 插值。缺 key 由 core 抛错（宁可炸也不显示空白）。 */
@@ -1977,6 +1992,14 @@
        → 再回填静态文案（applyStaticI18n 内含 fillLangOptions）→ 最后刷数值。 */
     buildHome(); bindHome(); applyStaticI18n(); renderHome();
     if (S && !S.done) renderHud();          // 关内 HUD 标签也要跟着换
+    /* 语言不能等防抖：queueSync 默认 1.5s 才落云端，玩家切完语言立刻退出/刷新，
+       云端根本没收到，下次进来又是旧语言。显式偏好立即冲刷。
+       放在重建 DOM 之后：网络写入与 UI 无关，别挡住界面切换。 */
+    if (Plat && Plat.mode === 'online' && Plat.user) {
+      try { Plat.flush(function () { return save; }); } catch (e) {
+        LANG_DIAG.err = 'flush:' + (e && e.name || 'Error') + ':' + String(e && e.message || e).slice(0, 60);
+      }
+    }
   }
 
   buildHome();
@@ -2171,6 +2194,10 @@
     line.className = 'buildline';
     line.id = 'buildLine';
     line.textContent = 'build ' + build;
+    /* 点一下展开通道诊断：排障时不用再来回问「到底存进哪条通道了」 */
+    line.addEventListener('click', function () {
+      line.textContent = 'build ' + build + '\n' + langDiagText();
+    });
     list.appendChild(line);
   }
 
@@ -2434,6 +2461,9 @@
         console.warn('[mine cloud] 云存档回写失败（累计 ' + SYNC_FAILS + ' 次）：' +
           ((err && (err.code || err.name)) || 'unknown') + ' / ' +
           String((err && err.message) || err).slice(0, 200) + ' status=' + (err && err.status));
+        // 同一条异常也进通道诊断：设置页点构建号就能看到，不用连手机看控制台
+        LANG_DIAG.err = 'saveCloud#' + SYNC_FAILS + ':' + ((err && (err.code || err.name)) || 'unknown')
+          + ':' + String((err && err.message) || err).slice(0, 60);
       }
     });
   }
@@ -2460,6 +2490,9 @@
   }
   PlatformCore.connect(CFG.platform).then(function (session) {
     Plat = session;
+    LANG_DIAG.mode = session.mode || '-';
+    LANG_DIAG.user = session.user ? 'yes' : 'no';
+    if (session.mode !== 'online') LANG_DIAG.err = 'local:' + (session.reason || '?');
     if (session.user) PLAT_EXPIRED = false;
     renderIdentity();
     finishRenameReturn(session);
@@ -2468,19 +2501,26 @@
     if (!session.user) return;
     // 登录态：拉云档 → 字段级合并（进度取大、道具/体力按时间戳取新）→ 落本地并回写云端
     session.loadCloud().then(function (row) {
+      // 诊断：云端那一行到底有没有 lang 列（对照 sfx 这个老字段，能分辨「列没建」还是「没写上」）
+      LANG_DIAG.cloudLang = row && row.lang != null ? String(row.lang) : 'none';
+      LANG_DIAG.cloudSfx = row && row.sfx != null ? String(row.sfx) : 'none';
       // localFresh：本地没有实际游玩痕迹（换设备刚打开就登录），云端优先，防默认档覆盖云档
       var localFresh = (save.clears || 0) === 0 && save.level <= 1;
+      LANG_DIAG.localFresh = localFresh ? 'yes' : 'no';
       var merged = session.core.mergeSave(save, row, { localFresh: localFresh }).save;
       Object.keys(merged).forEach(function (k) { save[k] = merged[k]; });
       // 云端老行只有旧「库存数」列时按它推导 granted/spent；已有账本则原样保留（migrate 幂等）
       Object.assign(save, Stock.migrate(save));
       ensureTempName(); persist(); renderHome();
+      LANG_DIAG.merged = save.lang != null ? String(save.lang) : 'none';
       /* 云端语言是权威（跟账号走）：本地那两条通道在内嵌 webview 里可能一条都不剩，
          云档回来后按它切过去。?lang= 调试参数在场时不夺权；相同值由 setLang 自己短路。 */
       if (save.lang && !/[?&]lang=/.test(location.search)) setLang(save.lang);
       if (S && !S.done) renderHud();
     }).catch(function (err) {
       console.warn('[mine identity] 云存档载入失败：' + String(err && err.message || err));
+      LANG_DIAG.err = 'loadCloud:' + (err && err.name || 'Error') + ':'
+        + String(err && err.message || err).slice(0, 60);
       renderIdentity();
     });
   });

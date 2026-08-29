@@ -472,8 +472,12 @@
     return [
       ':root{--hm-accent:' + t.accent + ';--hm-accent-ink:' + t.accentInk + ';--hm-accent-shadow:' + t.accentShadow +
         ';--hm-hero-1:' + t.heroFrom + ';--hm-hero-2:' + t.heroMid + ';--hm-hero-3:' + t.heroTo + ';}',
-      '.home{display:flex;flex-direction:column;gap:12px;padding-top:4px;flex:1 1 auto;min-height:calc(100vh - 34px);}',
-      '@supports (height:100dvh){.home{min-height:calc(100dvh - 34px);}}',
+      /* 减去安全区：页面若开了 viewport-fit=cover，视口高度含刘海/手势条那两条，
+         而 .home 外面的 .wrap 已经把它们做成 padding 让位了。这里不减就会多出
+         「刘海高 + 手势条高」的溢出，首页凭空可滚一截。没开 cover 的页 env() 恒为 0，取值不变。 */
+      '.home{display:flex;flex-direction:column;gap:12px;padding-top:4px;flex:1 1 auto;' +
+        'min-height:calc(100vh - 34px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));}',
+      '@supports (height:100dvh){.home{min-height:calc(100dvh - 34px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));}}',
       /* HUD 条 */
       '.hudbar{display:flex;align-items:center;gap:8px;}',
       '.hudright{margin-left:auto;display:flex;gap:8px;align-items:stretch;}',

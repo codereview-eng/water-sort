@@ -118,3 +118,112 @@ test('无配置也不炸：count 缺省为 0 ⇒ 空图鉴而不是抛错', () =
   assert.strictEqual(s.list(9999).length, 0);
   assert.ok(s.galleryHtml({ level: 1, t: (k) => k }).html.includes('storyEmpty'));
 });
+
+/* ── 播放机的声音路径：用可注入的假 window 真跑一遍 ────────────────────────
+   首坏（2026-08-29）：图鉴点「重播」全程无声。CG 的 mp4 没有音轨，声音 100%
+   来自 BGM；而 startBgm 被 st.muted 挡着，只有「播放开始之后再来一次手势」
+   才解锁 —— 触发重播的那次点击的 pointerdown 早于播放机注册监听器，于是
+   永远等不到那次手势。这里锁的是「由手势触发的播放必须直接有声」。 */
+function fakeWin() {
+  const nodes = {};
+  const listeners = { pointerdown: [], keydown: [] };
+  const audios = [];
+  let audioPlayResult = () => Promise.resolve();
+  const mkNode = (id) => {
+    const n = {
+      id,
+      style: {},
+      textContent: '',
+      innerHTML: '',
+      readyState: 4,
+      muted: null,
+      defaultMuted: null,
+      volume: null,
+      src: null,
+      playCalls: 0,
+      setAttribute() {},
+      removeAttribute() {},
+      appendChild() {},
+      load() {},
+      pause() {},
+      play() { n.playCalls++; return Promise.resolve(); },
+      querySelector(sel) { return (nodes[sel] = nodes[sel] || mkNode(sel)); }
+    };
+    return n;
+  };
+  const store = {};
+  return {
+    audios,
+    listeners,
+    node: (sel) => nodes[sel],
+    setAudioPlay(fn) { audioPlayResult = fn; },
+    fire(type) { listeners[type].slice().forEach((f) => f()); },
+    win: {
+      document: {
+        createElement: (tag) => mkNode(tag),
+        body: { appendChild() {} },
+        addEventListener(t, f) { if (listeners[t]) listeners[t].push(f); },
+        removeEventListener(t, f) {
+          if (!listeners[t]) return;
+          const i = listeners[t].indexOf(f);
+          if (i >= 0) listeners[t].splice(i, 1);
+        }
+      },
+      navigator: {},                     // 没有 userActivation ⇒ 只能靠 gesture 标记
+      location: { hash: '' },
+      localStorage: {
+        getItem: (k) => (k in store ? store[k] : null),
+        setItem: (k, v) => { store[k] = String(v); }
+      },
+      setTimeout: () => 0,
+      clearTimeout: () => {},
+      setInterval: () => 0,
+      clearInterval: () => {},
+      URL: { createObjectURL: () => 'blob:x' },
+      Audio: function (src) {
+        const a = { src, volume: 1, played: false, pause() {} };
+        a.play = function () { a.played = true; return audioPlayResult(); };
+        audios.push(a);
+        return a;
+      }
+    }
+  };
+}
+
+const PLAYCFG = { count: 2, cadence: 100, seenKey: 'k.seen', media: { video: 'cg/cg{i}.mp4', bgm: 'cg/bgm{i}.opus' } };
+
+test('图鉴重播必须直接有声：视频不静音 + BGM 立即起播（不等下一次手势）', () => {
+  const f = fakeWin();
+  const s = StoryCore.create(PLAYCFG, f.win);
+  s.replay('cg0', () => {});
+  const vid = f.node('#cgVideo');
+  assert.strictEqual(vid.muted, false, '由手势触发的重播不得静音起播');
+  vid.onplaying();                                   // 播放机在 playing 后才起 BGM
+  assert.strictEqual(f.audios.length, 1, '重播必须立刻创建 BGM，声音全靠它（mp4 无音轨）');
+  assert.strictEqual(f.audios[0].src, 'cg/bgm0.opus');
+  assert.ok(f.audios[0].played, 'BGM 必须真的 play()');
+});
+
+test('BGM 被自动播放策略挡掉后，下一次手势要能补回来（不能被幂等判定吃掉）', () => {
+  const f = fakeWin();
+  f.setAudioPlay(() => Promise.reject(new Error('NotAllowedError')));
+  const s = StoryCore.create(PLAYCFG, f.win);
+  s.replay('cg0', () => {});
+  f.node('#cgVideo').onplaying();
+  return Promise.resolve().then(() => {
+    f.setAudioPlay(() => Promise.resolve());
+    f.fire('pointerdown');
+    assert.strictEqual(f.audios.length, 2, '挡掉过一次后，手势必须能再起一次 BGM');
+    assert.ok(f.audios[1].played);
+  });
+});
+
+test('CG 收口必须摘掉手势监听器（否则每播一段泄漏一对）', () => {
+  const f = fakeWin();
+  const s = StoryCore.create(PLAYCFG, f.win);
+  s.replay('cg0', () => {});
+  assert.strictEqual(f.listeners.pointerdown.length, 1, '播放期间挂着手势兜底');
+  f.node('#cgSkip').onclick();                        // 跳过 ⇒ end()
+  assert.strictEqual(f.listeners.pointerdown.length, 0, 'end() 必须摘监听器');
+  assert.strictEqual(f.listeners.keydown.length, 0);
+});

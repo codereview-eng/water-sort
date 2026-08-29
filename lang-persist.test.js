@@ -52,8 +52,13 @@ test('hashLang / withHashLang：只动 lang，其它 hash 参数原样保留', (
   assert.ok(L.withHashLang(tg, 'en').includes('tgWebAppData=abc'));
 });
 
-test('resolveLang 优先级：?lang= > hash > 已保存 > Telegram > 浏览器 > 默认', () => {
-  assert.equal(L.resolveLang({ search: '?lang=zh', hash: '#lang=en', saved: 'en' }, AVAIL, 'en'), 'zh');
+test('resolveLang 优先级：hash > 已保存 > ?lang= > Telegram > 浏览器 > 默认', () => {
+  /* 手动选择（hash/local 两条镜像）必须压过 ?lang=：宿主每次带着 ?lang= 装载游戏时，
+     参数排在前面就会把玩家的选择每次顶回去——「改完重进又变回去」的一条真实路径。 */
+  assert.equal(L.resolveLang({ search: '?lang=zh', hash: '#lang=en', saved: 'en' }, AVAIL, 'zh'), 'en');
+  assert.equal(L.resolveLang({ search: '?lang=zh', saved: 'en' }, AVAIL, 'zh'), 'en');
+  // 没手动选过时 ?lang= 照旧生效（截图/自动化跑在干净环境里）
+  assert.equal(L.resolveLang({ search: '?lang=en', navigatorLanguage: 'zh-CN' }, AVAIL, 'zh'), 'en');
   // 关键项：存储被 webview 清空（saved 为空）时，hash 仍能把手动选择带过刷新
   assert.equal(L.resolveLang({ hash: '#lang=en', saved: null, navigatorLanguage: 'zh-CN' }, AVAIL, 'zh'), 'en');
   // hash 是每次手动切换都会刷新的一份，压过可能过期的存储镜像
@@ -148,7 +153,8 @@ test('mine：切语言写云档字段，云档回来按它切语言', () => {
   assert.ok(set.includes('persist()'), '写完必须 persist（persist 内含 platformSync）');
   const cloud = windowAfter(mine, 'ensureTempName(); persist(); renderHome();', 400, 'mine 云档合并出口');
   assert.ok(cloud.includes('setLang(save.lang)'), '云档合并后必须按云端语言切过去');
-  assert.ok(cloud.includes('lang=/.test(location.search)'), '?lang= 调试参数在场时云端不夺权');
+  assert.ok(!/if \(save\.lang && [^)]*location\.search/.test(cloud),
+    '云端夺权不得被 ?lang= 守卫挡住：宿主每次带着 ?lang= 装载时，云端存的玩家选择就永远拿不回来');
 });
 
 test('mine：设置页显示构建标记（分辨设备拿到的是哪一版）', () => {
@@ -166,8 +172,8 @@ test('mine：切语言立即冲刷云同步（不等 1.5s 防抖）', () => {
 });
 
 test('mine：三条通道与平台状态都进诊断（排障不靠猜）', () => {
-  const diag = windowAfter(mine, 'function langDiagText() {', 500, 'mine langDiagText');
-  for (const k of ['local=', 'hash=', 'cloud=', 'sfx=', 'merged=', 'plat=', 'err=']) {
+  const diag = windowAfter(mine, 'function langDiagText() {', 800, 'mine langDiagText');
+  for (const k of ['local=', 'hash=', 'q=', 'in=', 'cloud=', 'sfx=', 'merged=', 'plat=', 'err=']) {
     assert.ok(diag.includes(k), `诊断行缺 ${k}`);
   }
   // 云端两类失败都要留下异常本体（禁静默）

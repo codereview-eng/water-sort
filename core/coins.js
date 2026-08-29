@@ -26,6 +26,7 @@
   var DEFAULT_EARN_PER_CLEAR = 1;
   var DEFAULT_PRICE = 200;
   var DEFAULT_AMOUNT = 1;
+  var DEFAULT_AD_AMOUNT = 1;                 /* 看一次广告给几个（免费获取路径的发放量） */
   var DEFAULT_COINS_KEY = 'coins';
 
   function fail(msg) { throw new Error('coins config: ' + msg); }
@@ -62,7 +63,9 @@
     var shop = {};
     if (cfg.shop === undefined || cfg.shop === null) {
       // 整段没配：账本里除金币外的道具全部可买，走默认价与默认数量
-      buyable.forEach(function (k) { shop[k] = { price: DEFAULT_PRICE, amount: DEFAULT_AMOUNT }; });
+      buyable.forEach(function (k) {
+        shop[k] = { price: DEFAULT_PRICE, amount: DEFAULT_AMOUNT, adAmount: DEFAULT_AD_AMOUNT };
+      });
     } else {
       if (typeof cfg.shop !== 'object' || Array.isArray(cfg.shop)) fail('shop 必须是对象');
       var listed = Object.keys(cfg.shop);
@@ -72,10 +75,11 @@
           fail('shop.' + k + ' 不是可购买道具（stock.items 里没有它，或它就是金币本身）；可选：' + buyable.join(', '));
         }
         var e = cfg.shop[k];
-        if (typeof e !== 'object' || e === null || Array.isArray(e)) fail('shop.' + k + ' 必须是对象 {price?, amount?}');
+        if (typeof e !== 'object' || e === null || Array.isArray(e)) fail('shop.' + k + ' 必须是对象 {price?, amount?, adAmount?}');
         shop[k] = {
           price: e.price === undefined ? DEFAULT_PRICE : posInt(e.price, 'shop.' + k + '.price'),
-          amount: e.amount === undefined ? DEFAULT_AMOUNT : posInt(e.amount, 'shop.' + k + '.amount')
+          amount: e.amount === undefined ? DEFAULT_AMOUNT : posInt(e.amount, 'shop.' + k + '.amount'),
+          adAmount: e.adAmount === undefined ? DEFAULT_AD_AMOUNT : posInt(e.adAmount, 'shop.' + k + '.adAmount')
         };
       });
     }
@@ -84,6 +88,9 @@
     function balance(save) { return stock.stock(save, coinsKey); }
     function priceOf(itemKey) { var s = sku(itemKey); return s ? s.price : null; }
     function amountOf(itemKey) { var s = sku(itemKey); return s ? s.amount : null; }
+    /* 免费获取路径（看一段激励广告）一次给几个。不在货架上的道具返回 null =「没有获取入口」，
+       页面据此决定要不要给这一行画「+」——两条路径共用同一张货架表，避免两处各写一份清单。 */
+    function adAmountOf(itemKey) { var s = sku(itemKey); return s ? s.adAmount : null; }
     function canBuy(save, itemKey) {
       var s = sku(itemKey);
       return !!s && balance(save) >= s.price;
@@ -104,6 +111,14 @@
       return patch;
     }
 
+    /* 看完广告发放：只加道具、不动金币（免费路径）。不在货架上返回 null，
+       调用方必须先确认拿到补丁再提示「已获得」，不做乐观宣称。 */
+    function grantByAd(save, itemKey) {
+      var s = sku(itemKey);
+      if (!s) return null;
+      return stock.grant(save, itemKey, s.adAmount);
+    }
+
     /* 通关奖励：金币 earned + earnPerClear（earnPerClear 配成 0 就是关掉奖励，返回 null） */
     function rewardClear(save, times) {
       var n = earnPerClear * (times === undefined ? 1 : Math.max(0, Math.floor(times)));
@@ -118,12 +133,22 @@
       sku: sku,
       priceOf: priceOf,
       amountOf: amountOf,
+      adAmountOf: adAmountOf,
       balance: balance,
       canBuy: canBuy,
       buy: buy,
+      grantByAd: grantByAd,
       rewardClear: rewardClear
     };
   }
 
-  return { create: create, DEFAULTS: { earnPerClear: DEFAULT_EARN_PER_CLEAR, price: DEFAULT_PRICE, amount: DEFAULT_AMOUNT } };
+  return {
+    create: create,
+    DEFAULTS: {
+      earnPerClear: DEFAULT_EARN_PER_CLEAR,
+      price: DEFAULT_PRICE,
+      amount: DEFAULT_AMOUNT,
+      adAmount: DEFAULT_AD_AMOUNT
+    }
+  };
 });

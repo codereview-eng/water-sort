@@ -107,7 +107,9 @@
         }
       ],
       "houseSeconds": 5,
-      "timeoutMs": 20000
+      "timeoutMs": 20000,
+      "directDwellSec": 5,
+      "directLeaveWaitSec": 8
     },
     "verification": {
       "monetag": "2f9e3e08b43a9d525e226b36d0a22368",
@@ -362,6 +364,7 @@
         "adClose": "Close",
         "adReward": "Watch to earn your reward",
         "adFailed": "Ad not finished — no reward given",
+        "adTooShort": "You came back too fast — watch the ad for a few seconds to earn it",
         "adNone": "No ad available right now, try again later",
         "adCapped": "You have claimed this reward enough today — come back tomorrow",
         "close": "Close",
@@ -638,6 +641,7 @@
         "adClose": "关闭",
         "adReward": "看完可得奖励",
         "adFailed": "广告没看完，奖励未发放",
+        "adTooShort": "回来太快啦——广告看几秒才算数",
         "adNone": "暂时没有可播的广告，请稍后再试",
         "adCapped": "这个奖励今天看得够多了，明天再来",
         "close": "关闭",

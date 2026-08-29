@@ -25,7 +25,9 @@
      'directlink' Monetag Direct Link：玩家点击后新标签打开广告主页面，按访问计费。
                  六种网站格式里唯一「玩家主动触发」的一种，所以是网页端奖励流程的现实解；
                  需 url，且只适合 env:'web'（Telegram WebView 里开外部标签体验很差）。
-                 防刷用 placements 的 capping.maxPerDay，别把它当无限领奖入口。
+                 **发奖判据不是"标签开了"，而是"真的离开并停留够久才回来"**
+                 （directDwellSec / directLeaveWaitSec，issue #1）；再叠 placements 的
+                 capping.maxPerDay，别把它当无限领奖入口。
      'house'     自家兜底"广告"：本地全屏倒计时卡（无外部依赖，永远可用）
      'none'      不放广告，直接算失败（配合 onFail:'grant' 可退回旧的白送行为）
 
@@ -94,6 +96,19 @@
     var directUrl = c.directUrl === undefined ? null : c.directUrl;      // Direct Link 落地页
     if (directUrl !== null && !(typeof directUrl === 'string' && /^https:\/\//.test(directUrl))) {
       fail('directUrl 必须是 https:// 开头的字符串或省略');
+    }
+    /* Direct Link 的「看完了」判据（issue #1 · 广告奖励可信度）：
+       directDwellSec     玩家至少要在广告页停留这么久，回来才算数（默认 5 秒）
+       directLeaveWaitSec 点开之后等这么久，页面还没切走就判定他压根没去看（默认 8 秒）
+       为什么要有：Direct Link 按访问计费，没有"看完"回调，旧实现把
+       `window.open() 没被拦截` 当成看完 —— 实测点一下 0.24 秒就能拿走一个道具。 */
+    var directDwellSec = c.directDwellSec === undefined ? 5 : c.directDwellSec;
+    if (typeof directDwellSec !== 'number' || !isFinite(directDwellSec) || directDwellSec < 0) {
+      fail('directDwellSec 必须是非负数');
+    }
+    var directLeaveWaitSec = c.directLeaveWaitSec === undefined ? 8 : c.directLeaveWaitSec;
+    if (typeof directLeaveWaitSec !== 'number' || !isFinite(directLeaveWaitSec) || directLeaveWaitSec <= 0) {
+      fail('directLeaveWaitSec 必须是正数');
     }
 
     var d = deps || {};
@@ -270,18 +285,63 @@
       }), 'monetag');
     }
 
-    /* Direct Link：打开落地页即视为完成一次（按访问计费，没有"看完"回调可依赖）。
-       弹窗被浏览器拦下 → 判失败并降级，不能白发奖。 */
+    /* Direct Link：按访问计费，广告商**不会**回调告诉我们"看完了"，所以"看完"的判据
+       只能由我们自己定。旧实现把「window.open() 没被拦截」当成看完 —— 那等于
+       0.24 秒一个道具（issue #1 spike 实测 25/25 全发、约 300 个/分钟）。
+
+       现在的判据 = 玩家真的离开了页面，并且在外面待够 directDwellSec 秒才回来：
+         打开标签 → 本页 visibilitychange 变 hidden（记下离开时刻）
+                  → 回来变 visible → 停留时长够 = ok，不够 = too-short
+         点开后 directLeaveWaitSec 秒内页面压根没 hidden 过 = no-leave（他没去看）
+       故意不套 withTimeout：玩家在广告页待多久是他的自由，20 秒硬超时会把
+       认真看广告的人判死。没回来就一直挂着（页面关了整个上下文也就没了）。
+
+       坦白两条局限（不是安全、只是抬高成本，见 issue #1 的 seams 清单）：
+       ① 会开 DevTools 的人照样能伪造 visibilitychange；这条挡的是"零成本白嫖"。
+       ② 某些内嵌 webview 可能不触发 visibilitychange，那会误伤诚实玩家 ——
+          所以 no-leave 计数必须接反向阈值告警：它要是常态化 100%，几分钟内就该有人知道。 */
     function playDirectLink(src) {
       var url = urlOf(src);
-      return withTimeout(new Promise(function (resolve) {
+      return new Promise(function (resolve) {
         if (!url) return resolve({ ok: false, reason: 'directlink:no-url' });
+        var doc = d.doc || (typeof document !== 'undefined' ? document : null);
         var opened = false;
         try { opened = !!openUrl(url); } catch (e) {
           return resolve({ ok: false, reason: 'directlink:error:' + ((e && e.name) || 'unknown') });
         }
-        resolve(opened ? { ok: true } : { ok: false, reason: 'directlink:blocked' });
-      }), 'directlink');
+        if (!opened) return resolve({ ok: false, reason: 'directlink:blocked' });
+        if (!doc || typeof doc.addEventListener !== 'function') {
+          // 拿不到 document（Node/异常宿主）：没有任何"看完"证据，不发奖
+          return resolve({ ok: false, reason: 'directlink:no-visibility-api' });
+        }
+        /* 起手就已经是 hidden：说明标签页在我们挂监听之前就切走了（真浏览器实测会发生，
+           见 .spike/verify-real-visibility.mjs 抓到的首坏）。这时候「离开」这一跳不会
+           再来一次，必须当场记账，否则认真看广告的人回来时我们判不出他离开过。 */
+        var leftAt = doc.visibilityState === 'hidden' ? now() : 0;
+        var settled = false;
+        var leaveTimer = leftAt ? null : setTimeout(function () {   // 已经走了就别再催
+          finish({ ok: false, reason: 'directlink:no-leave' });
+        }, directLeaveWaitSec * 1000);
+        function finish(r) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(leaveTimer);
+          doc.removeEventListener('visibilitychange', onVis);
+          resolve(r);
+        }
+        function onVis() {
+          if (settled) return;
+          if (doc.visibilityState === 'hidden') {
+            if (!leftAt) { leftAt = now(); clearTimeout(leaveTimer); }   // 真的走了，别再催
+            return;
+          }
+          if (!leftAt) return;                                          // 没走过就变可见 = 无事发生
+          var dwell = now() - leftAt;
+          if (dwell >= directDwellSec * 1000) return finish({ ok: true });
+          finish({ ok: false, reason: 'directlink:too-short:' + Math.round(dwell / 100) / 10 + 's' });
+        }
+        doc.addEventListener('visibilitychange', onVis);
+      });
     }
 
     function playHouse() {

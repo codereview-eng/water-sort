@@ -306,16 +306,99 @@ test('向后兼容：老的字符串简写 + 顶层 zoneId 行为不变', async 
   assert.strictEqual(r.zone, 'OLD', '源上没写 zone 时回落到顶层 zoneId');
 });
 
-/* ---- Direct Link（2026-08-21）：Monetag 网站类六种格式里唯一玩家主动触发、可驱动奖励的一种 ---- */
-test('directlink：打开落地页视为完成一次，发奖', async () => {
+/* ---- Direct Link（2026-08-21）：Monetag 网站类六种格式里唯一玩家主动触发、可驱动奖励的一种 ----
+   2026-08-29 收紧（issue #1）：判据从「标签开了」改成「真的离开且停留够久才回来」。
+   旧判据实测 0.24 秒能白拿一个道具，等于按钮直接发奖。 */
+
+/* 假 document：能控制 visibilityState 并派发 visibilitychange，用来演玩家切走/切回 */
+function fakeDoc() {
+  const listeners = [];
+  return {
+    visibilityState: 'visible',
+    addEventListener: (t, fn) => { if (t === 'visibilitychange') listeners.push(fn); },
+    removeEventListener: (t, fn) => {
+      const i = listeners.indexOf(fn); if (t === 'visibilitychange' && i >= 0) listeners.splice(i, 1);
+    },
+    fire() { listeners.slice().forEach((fn) => fn()); },
+    leave() { this.visibilityState = 'hidden'; this.fire(); },
+    back() { this.visibilityState = 'visible'; this.fire(); }
+  };
+}
+/* 可控时钟：每次读表都停在 t 上，测试自己推进 */
+function fakeClock() {
+  let t = 1000;
+  return { now: () => t, advance(ms) { t += ms; } };
+}
+
+test('directlink：真的离开且停留够久才回来 → 发奖', async () => {
   const opened = [];
+  const doc = fakeDoc(); const clk = fakeClock();
   const a = AdPlay.create({
-    sources: [{ type: 'directlink', url: 'https://omg10.com/4/11622862', env: 'web' }, { type: 'house' }]
-  }, { env: {}, houseAd: houseWatched, openUrl: (u) => { opened.push(u); return true; } });
-  const r = await a.play();
+    sources: [{ type: 'directlink', url: 'https://omg10.com/4/11622862', env: 'web' }, { type: 'house' }],
+    directDwellSec: 5
+  }, { env: {}, houseAd: houseWatched, doc, now: clk.now, openUrl: (u) => { opened.push(u); return true; } });
+  const p = a.play();
+  doc.leave();
+  clk.advance(6000);      // 在广告页待了 6 秒
+  doc.back();
+  const r = await p;
   assert.strictEqual(r.ok, true);
   assert.strictEqual(r.source, 'directlink');
   assert.deepStrictEqual(opened, ['https://omg10.com/4/11622862']);
+});
+
+test('directlink：开了标签立刻关（0.24 秒白嫖那条路）→ 不发奖', async () => {
+  const doc = fakeDoc(); const clk = fakeClock();
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }],
+    directDwellSec: 5
+  }, { env: {}, doc, now: clk.now, openUrl: () => true });
+  const p = a.play();
+  doc.leave();
+  clk.advance(240);       // spike 实测的滥用速度：0.24 秒
+  doc.back();
+  const r = await p;
+  assert.strictEqual(r.ok, false);
+  assert.match(r.reason, /^directlink:too-short:/, '原因要带真实停留时长，便于事后判断阈值是否合理');
+});
+
+test('directlink：点开之后页面压根没切走 → 判定他没去看', async () => {
+  const doc = fakeDoc();
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }],
+    directLeaveWaitSec: 0.05
+  }, { env: {}, doc, openUrl: () => true });
+  const r = await a.play();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.reason, 'directlink:no-leave');
+  assert.strictEqual(a.stats().reasons['directlink:no-leave'], 1, 'no-leave 必须可计数：某些 webview 不触发 visibilitychange，常态化 no-leave 是误伤诚实玩家的信号');
+});
+
+test('directlink：玩家在广告页待多久是他的自由，不设硬超时', async () => {
+  const doc = fakeDoc(); const clk = fakeClock();
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }],
+    directDwellSec: 5, timeoutMs: 30       // 故意把通用超时设得极短
+  }, { env: {}, doc, now: clk.now, openUrl: () => true });
+  const p = a.play();
+  doc.leave();
+  await new Promise((r) => setTimeout(r, 60));   // 真等过通用超时
+  clk.advance(120000);                            // 他看了两分钟
+  doc.back();
+  assert.strictEqual((await p).ok, true, '认真看广告的人不能被 20 秒硬超时判死');
+});
+
+test('directlink：拿不到 document → 没有任何"看完"证据，不发奖', async () => {
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }, { type: 'house' }]
+  }, { env: {}, houseAd: houseWatched, doc: null, openUrl: () => true });
+  const r = await a.play();
+  assert.strictEqual(r.source, 'house', '没有可见性 API 就降级到兜底卡，而不是白发奖');
+});
+
+test('directDwellSec / directLeaveWaitSec 非法值加载期抛错', () => {
+  assert.throws(() => AdPlay.create({ sources: ['house'], directDwellSec: -1 }), /directDwellSec/);
+  assert.throws(() => AdPlay.create({ sources: ['house'], directLeaveWaitSec: 0 }), /directLeaveWaitSec/);
 });
 
 test('directlink：弹窗被拦 → 判失败并降级，不能白发奖', async () => {
@@ -381,9 +464,13 @@ test('完整链路：Telegram 用 TMA zone，浏览器用 Direct Link，都不�
   assert.strictEqual(r1.source, 'monetag');
   assert.strictEqual(r1.zone, '11440777');
 
-  const inWeb = AdPlay.create(cfg, { env: {}, houseAd: houseWatched, openUrl: () => true });
-  const r2 = await inWeb.play();
+  const doc = fakeDoc(); const clk = fakeClock();
+  const inWeb = AdPlay.create(cfg, { env: {}, houseAd: houseWatched, doc, now: clk.now, openUrl: () => true });
+  const p2 = inWeb.play();
+  doc.leave(); clk.advance(6000); doc.back();     // 浏览器里：真去看了 6 秒再回来
+  const r2 = await p2;
   assert.strictEqual(r2.source, 'directlink');
+  assert.strictEqual(r2.ok, true);
 
   // 浏览器里 Direct Link 也失败 → 兜底卡，玩家仍拿得到奖励
   const degraded = AdPlay.create(cfg, { env: {}, houseAd: houseWatched, openUrl: () => false });
@@ -446,4 +533,22 @@ test('失败原因直方图：能回答"为什么降级"，不是只有一个计
   assert.strictEqual(s.reasons['monetag:no-fill'], 2, '同一个原因要累计，才能看出常态化降级');
   assert.strictEqual(s.bySource.house.ok, 2);
   assert.strictEqual(s.reward.unknown, 2);
+});
+
+test('directlink：起手页面已经是 hidden（标签页先切走了）也要算他离开过', async () => {
+  /* 真浏览器实测抓到的首坏（.spike/verify-real-visibility.mjs）：
+     打开广告标签页有时快过我们挂监听，"变 hidden"那一跳我们根本收不到，
+     结果认真看了 3 秒回来的人被判成"没离开过"，白等一场。 */
+  const doc = fakeDoc(); const clk = fakeClock();
+  doc.visibilityState = 'hidden';                 // play() 之前就已经切走
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }],
+    directDwellSec: 2, directLeaveWaitSec: 0.05   // 极短的"没离开"窗口：一旦误判会立刻红
+  }, { env: {}, doc, now: clk.now, openUrl: () => true });
+  const p = a.play();
+  await new Promise((r) => setTimeout(r, 80));     // 等过 no-leave 窗口，证明没被误判
+  clk.advance(3000);
+  doc.back();
+  assert.deepStrictEqual(await p, { ok: true, source: 'directlink', zone: null, ms: 3000,
+    detail: { rewardEventType: 'unknown' } });
 });

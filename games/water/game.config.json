@@ -135,7 +135,9 @@
         }
       ],
       "houseSeconds": 6,
-      "timeoutMs": 25000
+      "timeoutMs": 25000,
+      "directDwellSec": 5,
+      "directLeaveWaitSec": 8
     },
     "passive": {
       "multitag": {

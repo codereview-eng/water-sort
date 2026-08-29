@@ -700,6 +700,110 @@
   "geoAccess": {
     "mode": "all"
   },
+  "story": {
+    "cadence": 100,
+    "count": 11,
+    "volume": 10,
+    "seenKey": "cm.story.seen",
+    "media": {
+      "video": "cg/cg{i}.mp4",
+      "bgm": "cg/bgm{i}.opus"
+    },
+    "overrides": {
+      "cg0": {
+        "cues": [
+          {
+            "t": 0.4,
+            "k": "cg0a"
+          },
+          {
+            "t": 2.6,
+            "k": "cg0b"
+          },
+          {
+            "t": 5,
+            "k": "cg0c"
+          },
+          {
+            "t": 7.2,
+            "k": "cg0d"
+          }
+        ]
+      }
+    },
+    "subs": {
+      "cg0a": {
+        "zh": "十年前，锈铁商会抽干了这里的矿脉。",
+        "en": "Ten years ago, Rustiron drained the veins beneath this town."
+      },
+      "cg0b": {
+        "zh": "灯落镇的光被一车车运走，家家户户从此黑着。",
+        "en": "They carted the light away. Every window has been dark since."
+      },
+      "cg0c": {
+        "zh": "祖父提着这盏灯下矿去追，再没上来。你是最后一个矿灯师。",
+        "en": "Grandfather took this lamp down after them, and never came back up. You are the last lampwright."
+      },
+      "cg0d": {
+        "zh": "把七种光一盏一盏找回来——让灯落镇重新亮起来。",
+        "en": "Bring the seven lights home, one lamp at a time. Make Lumen Hollow shine again."
+      },
+      "cg0": {
+        "zh": "把七种光一盏一盏找回来——让灯落镇重新亮起来。",
+        "en": "Bring the seven lights home, one lamp at a time."
+      },
+      "cg1": {
+        "zh": "光回来了，人也就回来了。",
+        "en": "The light came back. So did the people."
+      },
+      "cg2": {
+        "zh": "他到过这里，然后再没上去。",
+        "en": "He made it this far. He never went back up."
+      },
+      "cg3": {
+        "zh": "第一封信。他还在往更深的地方走。",
+        "en": "The first letter. He's still heading deeper."
+      },
+      "cg4": {
+        "zh": "七条脉之外，还有第八条。他把路留给了你。",
+        "en": "Beyond the seven veins lies an eighth. He left the way open for you."
+      },
+      "cg5": {
+        "zh": "哑火不是死的。它记着被夺走的一切。",
+        "en": "A cinder isn't dead. It remembers everything that was taken."
+      },
+      "cg6": {
+        "zh": "光没有消失——它被装箱、编号，运去了别处。",
+        "en": "The light never vanished. It was crated, tallied, and shipped away."
+      },
+      "cg7": {
+        "zh": "顺着这条铁轨，你第一次走出了灯落镇。",
+        "en": "You follow the rails, and leave Lumen Hollow for the first time."
+      },
+      "cg8": {
+        "zh": "这里的人整夜不熄灯。他们不知道光是从谁家偷来的。",
+        "en": "This city never turns its lights off. No one here knows whose light it is."
+      },
+      "cg9": {
+        "zh": "要把光还回去，这座城得先黑下来。",
+        "en": "To give the light back, this city must go dark first."
+      },
+      "cg10": {
+        "zh": "灯落镇亮了。可地平线那头，还有一片黑着的地方。",
+        "en": "Lumen Hollow shines. But out past the horizon, somewhere is still dark."
+      }
+    },
+    "ui": {
+      "skip": {
+        "zh": "跳过 ▶",
+        "en": "Skip ▶"
+      },
+      "loading": {
+        "zh": "加载中",
+        "en": "Loading"
+      }
+    }
+  },
   "screens": {
     "home": {
       "modules": [

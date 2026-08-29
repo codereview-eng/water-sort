@@ -171,7 +171,9 @@ if (cgBytes > CG_BUDGET) {
 /* 清单直接问模块本身要（不是正则扒源码）：剧情表现在由规则生成，
    源码里根本没有逐条字面量可扒，而且「构建核对的清单」与「运行时真正加载的清单」
    必须是同一份 —— 两处各自解析就会漂移。 */
-const Story = createRequire(import.meta.url)(join(ROOT, 'mine-story.js'));
+const StoryCore = createRequire(import.meta.url)(join(ROOT, 'core/story.js'));
+const Story = StoryCore.create(
+  JSON.parse(readFileSync(join(ROOT, 'games/mine/game.config.json'), 'utf8')).story || {});
 const uniq = [...new Set(Object.keys(Story.MEDIA || {}).map((k) => k.replace(/^cg\//, '')))]
   .filter((n) => CG_SHIPPED.test(n)).sort();
 if (!uniq.length) throw new Error('没能从 mine-story.js 解析出 CG 素材清单，构建假设已失效');

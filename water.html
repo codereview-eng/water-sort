@@ -1015,19 +1015,20 @@ const I18N = {
    → navigator.language → 默认。匹配按 RFC 4647 lookup，所以 zh-CN/zh-TW 都落到 zh。 */
 const LANG_AVAILABLE = Object.keys(I18N);
 const LANG_DEFAULT = 'en';
-function resolveLang(search, saved, tgCode, navLang) {
+function resolveLang(search, saved, tgCode, navLang, hash) {
   return LocaleCore.resolveLang({
-    search: search, saved: saved, tgLanguageCode: tgCode, navigatorLanguage: navLang
+    search: search, saved: saved, hash: hash, tgLanguageCode: tgCode, navigatorLanguage: navLang
   }, LANG_AVAILABLE, LANG_DEFAULT);
 }
 const LANG_KEY = 'sudoku_lang';
-/* 首屏同步读 localStorage 镜像,避免 CloudStorage 异步导致语言闪切;
-   CloudStorage 权威值在 boot() 里异步对账(跨设备迁移场景)。 */
-let savedLangMirror = null;
-try { savedLangMirror = window.localStorage.getItem(LANG_KEY); } catch (e) {}
+/* 首屏同步读已保存语言,避免 CloudStorage 异步导致语言闪切;
+   CloudStorage 权威值在 boot() 里异步对账(跨设备迁移场景)。
+   两条通道:URL hash(#lang=xx,内嵌 webview 里唯一跨刷新可靠的一份) + localStorage 镜像。 */
+const savedLangRead = LocaleCore.readSavedLang(window, LANG_KEY);
+let savedLangMirror = savedLangRead.local;
 let LANG = resolveLang(location.search, savedLangMirror,
   (tgUser() && tgUser().language_code) || null,
-  navigator.language);
+  navigator.language, location.hash);
 function t(key, vars) {
   let s = (I18N[LANG] && I18N[LANG][key] != null) ? I18N[LANG][key] : I18N.en[key];
   if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
@@ -1129,6 +1130,9 @@ applyStaticI18n();
 populateLangSel();
 document.getElementById('langSel').addEventListener('change', (e) => {
   Store.set(LANG_KEY, e.target.value); // 持久化:此后刷新/重开一律用所存语言,清档才回自动检测
+  // 再镜像一份进 URL hash：内嵌 webview（coder webview 等）里 localStorage 可能一刷新就是新的空存储，
+  // 那种形态写后读回也测不出来，hash 是唯一跨刷新一定还在的通道（issue: 刷新后语言回退默认）
+  LocaleCore.persistLang(window, LANG_KEY, e.target.value);
   applyLang(e.target.value);
 });
 
@@ -2855,8 +2859,10 @@ function emitWaterGt() {
 function boot() {
   // issue #18:语言持久化对账。首屏已同步用 localStorage 镜像渲染(不闪);
   // 这里异步读 CloudStorage 权威值(跨设备迁移场景),不一致且无 ?lang= 覆盖时切换过去并回写镜像。
+  // hash 里带着手动选的语言时,它就是权威(存储被 webview 清掉的场景全靠它),顺手回写两条镜像
+  if (savedLangRead.hash && I18N[LANG] && savedLangMirror !== LANG) Store.set(LANG_KEY, LANG);
   Store.get(LANG_KEY, (v) => {
-    if (v && I18N[v] && !/[?&]lang=/.test(location.search) && v !== LANG) {
+    if (v && I18N[v] && !/[?&]lang=/.test(location.search) && !savedLangRead.hash && v !== LANG) {
       try { window.localStorage.setItem(LANG_KEY, v); } catch (e) {}
       applyLang(v);
     }

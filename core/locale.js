@@ -90,12 +90,84 @@
     return null;
   }
 
+  /* ---- 语言持久化通道（2026-08-29）----
+     只写 localStorage 不够：内嵌 webview（coder webview / WKWebView 非持久化 data store /
+     带 sandbox 的 iframe）里，写入可能抛异常、被静默丢弃，或者「写得进也读得回，但一刷新
+     就是一份全新的空存储」。最后这种形态任何 write-then-read 自检都测不出来，
+     所以手动选的语言一律同时镜像进 URL hash（#lang=xx）——刷新必然带着 hash，
+     是唯一跨刷新一定还在的通道。hash 里其余参数（#autostart / tgWebAppData…）原样保留。 */
+  function splitHash(hash) {
+    var s = String(hash == null ? '' : hash).replace(/^#/, '');
+    return s === '' ? [] : s.split('&');
+  }
+
+  /* 从 location.hash 里取语言；没有则 null */
+  function hashLang(hash) {
+    var parts = splitHash(hash);
+    for (var i = 0; i < parts.length; i++) {
+      var m = /^lang=([A-Za-z-]+)$/.exec(parts[i]);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  /* 把语言写进 hash 字符串（幂等：已有的 lang= 被替换，其它参数保持原顺序） */
+  function withHashLang(hash, lang) {
+    var kept = [];
+    splitHash(hash).forEach(function (p) { if (!/^lang=/.test(p)) kept.push(p); });
+    kept.push('lang=' + String(lang));
+    return '#' + kept.join('&');
+  }
+
+  /* 读回当前已保存的语言：hash 优先（跨刷新可靠），其次 localStorage 镜像 */
+  function readSavedLang(win, key) {
+    var out = { hash: null, local: null, value: null };
+    try { out.hash = hashLang(win.location.hash); } catch (e) {}
+    try { out.local = win.localStorage.getItem(key); } catch (e) {}
+    out.value = out.hash || out.local;
+    return out;
+  }
+
+  /* 落盘：两条通道都写，各自读回验证，失败带异常本体大声记日志（禁裸 catch 静默降级）。
+     返回 { lang, local, hash, err_name, err_msg }，调用方可据此做可观测/上报。 */
+  function persistLang(win, key, lang, log) {
+    var report = { lang: String(lang), local: false, hash: false, err_name: '', err_msg: '' };
+    function note(e, name) {
+      if (report.err_name) return;
+      report.err_name = name || (e && e.name) || 'Error';
+      report.err_msg = String((e && e.message) != null ? (e && e.message) : e).slice(0, 200);
+    }
+    try {
+      win.localStorage.setItem(key, report.lang);
+      report.local = win.localStorage.getItem(key) === report.lang;  // setItem 不抛 ≠ 写成功
+      if (!report.local) note(null, 'StorageReadBackMismatch');
+    } catch (e) { note(e); }
+    try {
+      var next = withHashLang(win.location.hash, report.lang);
+      try {
+        // replaceState：不新增历史项、不触发导航；被沙箱禁掉时退回直接改 hash
+        if (win.history && win.history.replaceState) win.history.replaceState(null, '', next);
+        else win.location.hash = next;
+      } catch (e2) { note(e2); win.location.hash = next; }
+      report.hash = hashLang(win.location.hash) === report.lang;
+      if (!report.hash) note(null, 'HashReadBackMismatch');
+    } catch (e3) { note(e3); }
+    if (!report.local || !report.hash) {
+      try {
+        var w = log || (win.console && win.console.warn && win.console.warn.bind(win.console));
+        if (w) w('[lang] persist degraded', report);
+      } catch (e4) {}
+    }
+    return report;
+  }
+
   function resolveLang(inputs, available, def) {
     inputs = inputs || {};
     if (!Array.isArray(available) || available.length === 0) fail('resolveLang: available 必须是非空数组');
     if (available.indexOf(def) === -1) fail('resolveLang: 默认语言 "' + def + '" 不在 available 里');
     var q = /[?&]lang=([A-Za-z-]+)/.exec(inputs.search || '');
-    var chain = [q && q[1], inputs.saved, inputs.tgLanguageCode, inputs.navigatorLanguage];
+    // hash 排在 saved 之前：hash 是每次手动切换都会刷新的那一份，且存储被清掉时它还在
+    var chain = [q && q[1], hashLang(inputs.hash), inputs.saved, inputs.tgLanguageCode, inputs.navigatorLanguage];
     for (var i = 0; i < chain.length; i++) {
       var hit = matchLang(chain[i], available);
       if (hit) return hit;
@@ -144,6 +216,10 @@
     GEO_MODES: GEO_MODES,
     resolveLang: resolveLang,
     matchLang: matchLang,
-    htmlLang: htmlLang
+    htmlLang: htmlLang,
+    hashLang: hashLang,
+    withHashLang: withHashLang,
+    readSavedLang: readSavedLang,
+    persistLang: persistLang
   };
 });

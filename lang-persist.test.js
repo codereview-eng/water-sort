@@ -52,20 +52,30 @@ test('hashLang / withHashLang：只动 lang，其它 hash 参数原样保留', (
   assert.ok(L.withHashLang(tg, 'en').includes('tgWebAppData=abc'));
 });
 
-test('resolveLang 优先级：hash > 已保存 > ?lang= > Telegram > 浏览器 > 默认', () => {
-  /* 手动选择（hash/local 两条镜像）必须压过 ?lang=：宿主每次带着 ?lang= 装载游戏时，
-     参数排在前面就会把玩家的选择每次顶回去——「改完重进又变回去」的一条真实路径。 */
+test('resolveLang 优先级：已保存 > hash > ?lang= > Telegram > 浏览器 > 默认', () => {
+  /* owner 拍板 2026-08-29：云端 > 本地存储 > URL。
+     云端那份是异步的，由页面在云档回来时覆盖（不在本函数内）；本函数只管首屏的本地决策。
+     URL 垫底的理由：宿主每次带着 ?lang= 装载游戏时，参数排在前面就会把玩家的选择
+     每次顶回去——「改完重进又变回去」的真实路径，已 headless 复现。 */
+  assert.equal(L.resolveLang({ saved: 'zh', hash: '#lang=en', search: '?lang=en' }, AVAIL, 'en'), 'zh',
+    '本地存储压过 hash 与 URL 参数');
   assert.equal(L.resolveLang({ search: '?lang=zh', hash: '#lang=en', saved: 'en' }, AVAIL, 'zh'), 'en');
   assert.equal(L.resolveLang({ search: '?lang=zh', saved: 'en' }, AVAIL, 'zh'), 'en');
   // 没手动选过时 ?lang= 照旧生效（截图/自动化跑在干净环境里）
   assert.equal(L.resolveLang({ search: '?lang=en', navigatorLanguage: 'zh-CN' }, AVAIL, 'zh'), 'en');
   // 关键项：存储被 webview 清空（saved 为空）时，hash 仍能把手动选择带过刷新
   assert.equal(L.resolveLang({ hash: '#lang=en', saved: null, navigatorLanguage: 'zh-CN' }, AVAIL, 'zh'), 'en');
-  // hash 是每次手动切换都会刷新的一份，压过可能过期的存储镜像
-  assert.equal(L.resolveLang({ hash: '#autostart=3&lang=en', saved: 'zh' }, AVAIL, 'zh'), 'en');
+  // hash 只在本地存储没有值时兜底
+  assert.equal(L.resolveLang({ hash: '#autostart=3&lang=en', saved: null }, AVAIL, 'zh'), 'en');
   // hash 里没有 lang → 决策链与改动前完全一致
   assert.equal(L.resolveLang({ hash: '#autostart=3', saved: 'zh', navigatorLanguage: 'en-US' }, AVAIL, 'en'), 'zh');
   assert.equal(L.resolveLang({ hash: '#lang=fr', saved: 'zh' }, AVAIL, 'en'), 'zh', '无字典的 hash 语言要跳过');
+});
+
+test('云端是第一优先：云档回来无条件覆盖当前语言（owner 拍板 2026-08-29）', () => {
+  const cloud = windowAfter(mine, 'ensureTempName(); persist(); renderHome();', 500, 'mine 云档合并出口');
+  assert.ok(/if \(save\.lang\) setLang\(save\.lang\);/.test(cloud),
+    '云端有语言就必须切过去，不许被任何本地条件挡住');
 });
 
 test('persistLang：正常环境两条通道都写成功，且不新增历史项', () => {

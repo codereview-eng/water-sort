@@ -1384,11 +1384,14 @@ function houseAd(seconds, done) {
   skip.textContent = t('adSkipBtn');
   mask.hidden = false;
   skip.onclick = () => finish(false);
+  /* 只在页面可见时走表（issue #1 · S2）：以前切到别的标签/别的 App 表照走，
+     回来奖励已经到手 —— 那是一条"什么都不用看"的白拿通道。 */
+  const clock = AdPlayCore.createWatchClock(seconds, {});
   timer = setInterval(() => {
-    left -= 1;
-    if (left <= 0) { document.getElementById('adCd').textContent = ''; finish(true); return; }
-    document.getElementById('adCd').textContent = t('adWatching', { n: left });
-  }, 1000);
+    const s = clock.sample();
+    if (s.done) { document.getElementById('adCd').textContent = ''; finish(true); return; }
+    if (s.leftSec !== left) { left = s.leftSec; document.getElementById('adCd').textContent = t('adWatching', { n: left }); }
+  }, 250);
 }
 
 /* ====================== 每周活动（唯一实现在 core/weekly.js） ======================

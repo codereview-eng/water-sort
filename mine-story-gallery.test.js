@@ -13,10 +13,12 @@ const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 
 const ROOT = __dirname;
-const Story = require('./mine-story.js');
 const mine = readFileSync(join(ROOT, 'mine.html'), 'utf8');
 const cfg = JSON.parse(readFileSync(join(ROOT, 'games/mine/game.config.json'), 'utf8'));
 const scan = readFileSync(join(ROOT, 'scripts/i18n-cjk-scan.mjs'), 'utf8');
+/* 剧情层已下沉 core/story.js（2026-08-29）：这里用彩雷自己的配置造一个实例，
+   测的是「彩雷这份配置 + 通用 core」合起来的行为；core 的通用性由 core/story.test.js 把关。 */
+const Story = require('./core/story.js').create(cfg.story);
 
 function windowAfter(src, anchor, span, label) {
   const i = src.indexOf(anchor);
@@ -105,17 +107,16 @@ test('接线：story 在 action 白名单里，且静态文案按 tabStory 回�
 
 test('接线：图鉴弹窗真的画出锁 / 重播按钮，并在重播前先收窗', () => {
   const fn = windowAfter(mine, 'function openStory() {', 7000, 'mine openStory');
-  assert.ok(fn.includes('MineStory'), '图鉴必须读 MineStory，不许自己另存一份解锁态');
-  assert.ok(fn.includes('.list('), '解锁判定必须走 MineStory.list（唯一权威）');
-  assert.ok(fn.includes('🔒'), '没解锁的条目必须显示一把锁');
-  assert.ok(fn.includes('data-cg='), '已解锁的条目必须带 data-cg，才能点开重播');
-  assert.ok(fn.includes("t('storyLockedAt'") && fn.includes("t('storyLockedStart'"),
-    '锁着的条目必须写清解锁条件（通关第几关）');
-  assert.ok(fn.includes('.replay('), '点已解锁条目必须调 MineStory.replay 重播');
+  assert.ok(fn.includes('MineStory'), '图鉴必须读实例，不许自己另存一份解锁态');
+  assert.ok(fn.includes('.galleryHtml('), '列表 markup 必须由 core 产出（别的游戏才零抄代码）');
+  assert.ok(fn.includes('.replay('), '点已解锁条目必须调 replay 重播');
   const order = fn.indexOf('hideDialog()') < fn.indexOf('.replay(');
   assert.ok(fn.includes('hideDialog()') && order, 'CG 是全屏层：必须先收弹窗再播，否则弹窗压在动画上');
   assert.ok(fn.includes('dialog(') && fn.includes("t('gotIt')"),
     '图鉴弹窗必须走统一 dialog（带✕/遮罩/Esc 三条退出路）');
+  // markup 不该再留在页面里：留一份就等于以后两处各改一遍（选择器不算 markup）
+  assert.ok(!fn.includes('class="bagrow volrow"') && !fn.includes('class="bagrow cgrow'),
+    '行/卷头的 markup 应该在 core，不在页面');
 });
 
 test('P0 容器：任何弹窗都必须有高度上限，列表区自己滚', () => {
@@ -130,15 +131,37 @@ test('P0 容器：任何弹窗都必须有高度上限，列表区自己滚', ()
   assert.ok(/min-height:\s*0/.test(listCss), 'flex 子项不写 min-height:0 就不会真正滚（会把父容器撑破）');
 });
 
-test('P1 分卷：卷头带进度、连续锁段合并、默认展开当前卷并滚过去', () => {
+test('P1 分卷：彩雷这份配置真的分出卷、合并锁段、并定位到当前卷', () => {
+  const t = (k, v) => k + (v ? ':' + Object.keys(v).map((x) => v[x]).join('-') : '');
+  const view = Story.galleryHtml({ level: 250, t });
+  assert.ok(view.html.includes('storyChapterRange:3-10'),
+    '第 3–10 章应合并成一行（第 250 关时它们连续锁着）');
+  assert.strictEqual(view.current, 1, '第 250 关的玩家还在第 1 卷');
+  /* 今天彩雷只有 11 段、一卷装得下 ⇒ 不画卷头（段数还少时不多一层壳）。
+     卷头要等剧情铺到第二卷才出现，这里用规模化实例验它确实会出现。 */
+  assert.ok(!view.html.includes('data-vol='), '只有一卷时不该画卷头');
+  const before = Story.plan();
+  try {
+    Story.setPlan({ count: 101 });
+    const big = Story.galleryHtml({ level: 250, t });
+    assert.strictEqual((big.html.match(/data-vol=/g) || []).length, 10, '1 万关应分成 10 卷');
+    assert.ok(big.html.includes('storyVolumeProgress'), '卷头必须显示这一卷解锁了几段');
+  } finally { Story.setPlan(before); }
   const fn = windowAfter(mine, 'function openStory() {', 7000, 'mine openStory');
-  assert.ok(fn.includes('data-vol='), '必须有可折叠的卷头（否则万关就是一条长列表）');
-  assert.ok(fn.includes("t('storyVolumeProgress'"), '卷头必须显示这一卷解锁了几段');
-  assert.ok(fn.includes("t('storyChapterRange'") && fn.includes("t('storyLockedFrom'"),
-    '连续锁着的段必须合并成一行「第 N–M 章 · 从第 X 关起解锁」');
-  assert.ok(/anyLocked|openG/.test(fn), '必须算出「玩家正在推进的那一卷」作为默认展开项');
   assert.ok(fn.includes('scrollTop'), '打开图鉴必须滚到当前卷，不能让玩家自己找');
   assert.ok(fn.includes('list.onclick'), '卷会反复开合、列表整块重画 ⇒ 必须事件委托，不能逐个绑');
+});
+
+test('核心化接线：实例由配置创建，样式也来自 core', () => {
+  assert.ok(/window\.MineStory\s*=\s*StoryCore\.create\(CFG\.story\)/.test(mine),
+    '剧情实例必须由 core + config 创建（页面不许再内置一份剧情表）');
+  assert.ok(mine.includes('StoryCore.styles()'), '图鉴样式必须来自 core，否则别的游戏还得抄 CSS');
+  assert.ok(mine.includes('./core/story.js'), '页面必须加载 core/story.js');
+  assert.ok(!mine.includes('./mine-story.js'), '旧的游戏私有剧情层必须彻底下线');
+  // 存档键必须由配置给：两个游戏共用一个键会互相污染「已看过」
+  assert.strictEqual(cfg.story.seenKey, 'cm.story.seen', '彩雷的已看记录键必须保持不变（线上玩家的记录）');
+  assert.ok(cfg.story.count > 0 && cfg.story.cadence > 0, 'config 必须声明剧情节奏');
+  assert.ok(Object.keys(cfg.story.subs).length > 0, '字幕必须活在配置里，不在代码里');
 });
 
 test('P2 规模：加关卡只改一个数字，1 万关的表由规则生成', () => {

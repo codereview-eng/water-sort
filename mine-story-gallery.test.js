@@ -104,7 +104,7 @@ test('接线：story 在 action 白名单里，且静态文案按 tabStory 回�
 });
 
 test('接线：图鉴弹窗真的画出锁 / 重播按钮，并在重播前先收窗', () => {
-  const fn = windowAfter(mine, 'function openStory() {', 2400, 'mine openStory');
+  const fn = windowAfter(mine, 'function openStory() {', 7000, 'mine openStory');
   assert.ok(fn.includes('MineStory'), '图鉴必须读 MineStory，不许自己另存一份解锁态');
   assert.ok(fn.includes('.list('), '解锁判定必须走 MineStory.list（唯一权威）');
   assert.ok(fn.includes('🔒'), '没解锁的条目必须显示一把锁');
@@ -116,6 +116,51 @@ test('接线：图鉴弹窗真的画出锁 / 重播按钮，并在重播前先�
   assert.ok(fn.includes('hideDialog()') && order, 'CG 是全屏层：必须先收弹窗再播，否则弹窗压在动画上');
   assert.ok(fn.includes('dialog(') && fn.includes("t('gotIt')"),
     '图鉴弹窗必须走统一 dialog（带✕/遮罩/Esc 三条退出路）');
+});
+
+test('P0 容器：任何弹窗都必须有高度上限，列表区自己滚', () => {
+  /* 首坏就是这条：.dialog 没有 max-height/overflow，内容多高窗就多高，
+     底部按钮被顶出视口且没有任何东西可滚（剧情图鉴 11 行就撞线）。
+     断言写在通用容器上，背包/连胜/设置窗一并受保护。 */
+  const css = mine.slice(mine.indexOf('.dialog{'), mine.indexOf('.dialog{') + 700);
+  assert.ok(/max-height:\s*calc\(100vh/.test(css), '.dialog 必须有视口高度上限');
+  assert.ok(/max-height:\s*calc\(100dvh/.test(css), '.dialog 应同时给 dvh（移动端浏览器工具条会吃掉 vh）');
+  const listCss = mine.slice(mine.indexOf('#dlgList{'), mine.indexOf('#dlgList{') + 240);
+  assert.ok(/overflow-y:\s*auto/.test(listCss), '列表区必须自己滚');
+  assert.ok(/min-height:\s*0/.test(listCss), 'flex 子项不写 min-height:0 就不会真正滚（会把父容器撑破）');
+});
+
+test('P1 分卷：卷头带进度、连续锁段合并、默认展开当前卷并滚过去', () => {
+  const fn = windowAfter(mine, 'function openStory() {', 7000, 'mine openStory');
+  assert.ok(fn.includes('data-vol='), '必须有可折叠的卷头（否则万关就是一条长列表）');
+  assert.ok(fn.includes("t('storyVolumeProgress'"), '卷头必须显示这一卷解锁了几段');
+  assert.ok(fn.includes("t('storyChapterRange'") && fn.includes("t('storyLockedFrom'"),
+    '连续锁着的段必须合并成一行「第 N–M 章 · 从第 X 关起解锁」');
+  assert.ok(/anyLocked|openG/.test(fn), '必须算出「玩家正在推进的那一卷」作为默认展开项');
+  assert.ok(fn.includes('scrollTop'), '打开图鉴必须滚到当前卷，不能让玩家自己找');
+  assert.ok(fn.includes('list.onclick'), '卷会反复开合、列表整块重画 ⇒ 必须事件委托，不能逐个绑');
+});
+
+test('P2 规模：加关卡只改一个数字，1 万关的表由规则生成', () => {
+  const before = Story.plan();
+  try {
+    const p = Story.setPlan({ count: 101 });          // 序章 + 100 章 = 第 10000 关
+    assert.strictEqual(p.count, 101);
+    assert.strictEqual(Story.CG.length, 101, '段数应跟着 count 走');
+    const last = Story.CG[100];
+    assert.strictEqual(last.at, 10000, '第 100 章应落在第 10000 关');
+    assert.strictEqual(last.v, 'cg/cg100.mp4', '素材路径必须由规则推出，不靠手写');
+    assert.ok(Story.MEDIA['cg/cg100.mp4'] && Story.MEDIA['cg/bgm100.opus'],
+      '映射表必须跟着一起生成（构建的齐全性核对读的就是它）');
+    const rows = Story.list(10001);
+    assert.strictEqual(rows.length, 101);
+    assert.ok(rows.every((r) => r.unlocked), '全通关后 101 段应全部解锁');
+    // 序章没字幕会回落成空串，但绝不能让整表崩掉：只有 cg0..cg10 写了字幕
+    assert.strictEqual(rows[100].caption, '', '没写字幕的段应安静地没有字幕，而不是报错');
+  } finally {
+    Story.setPlan(before);
+    assert.strictEqual(Story.CG.length, 11, '测试后必须还原成当前真实节奏');
+  }
 });
 
 test('多语言运行时 gate 覆盖到图鉴弹窗', () => {

@@ -167,11 +167,12 @@ if (cgBytes > CG_BUDGET) {
    照剧情表（mine-story.js 的 MEDIA 映射，唯一权威）逐件核对产物，缺一件就抛错。
    否则在没有素材的检出上构建会**静默**产出一个零 CG 的包 —— 页面照常可玩、
    播放机对缺资源静默跳过，玩家只是「再也看不到剧情」，没有任何人会发现。 */
-const storySrc = readFileSync(join(ROOT, 'mine-story.js'), 'utf8');
-const mediaBlock = storySrc.slice(storySrc.indexOf('var MEDIA = {'), storySrc.indexOf('/* ── ②'));
-const wanted = [...mediaBlock.matchAll(/'cg\/([^']+)'\s*:/g)].map((m) => m[1])
-  .filter((n) => CG_SHIPPED.test(n));
-const uniq = [...new Set(wanted)].sort();
+/* 清单直接问模块本身要（不是正则扒源码）：剧情表现在由规则生成，
+   源码里根本没有逐条字面量可扒，而且「构建核对的清单」与「运行时真正加载的清单」
+   必须是同一份 —— 两处各自解析就会漂移。 */
+const Story = createRequire(import.meta.url)(join(ROOT, 'mine-story.js'));
+const uniq = [...new Set(Object.keys(Story.MEDIA || {}).map((k) => k.replace(/^cg\//, '')))]
+  .filter((n) => CG_SHIPPED.test(n)).sort();
 if (!uniq.length) throw new Error('没能从 mine-story.js 解析出 CG 素材清单，构建假设已失效');
 const missing = uniq.filter((n) => !cgNames.includes(n));
 if (missing.length) {

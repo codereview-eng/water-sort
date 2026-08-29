@@ -117,9 +117,12 @@ async function main() {
     await s.ev(`document.getElementById('dkStory').click()`);
     await sleep(400);
     const rows = await s.ev(ROWS);
-    const total = await s.ev(`window.MineStory.CG.length`);
-    check('图鉴列出全部 CG', rows.n === total, rows);
-    check('新玩家全部锁着且每行都有锁图标', rows.locked === total && rows.lockIcon === total, rows);
+    const total = await s.ev(`window.MineStory.list(1).length`);
+    check('数据层仍然覆盖全部 CG', total === 11, total);
+    /* 连续锁段合并后，11 段全锁 = 2 行（序章 + 「第 1–10 章」）：
+       锁着的段没有信息量，逐行铺开只是让玩家白滚。 */
+    check('新玩家：11 段收成 2 行（序章 + 合并区间）', rows.n === 2, rows);
+    check('每行都带锁图标', rows.locked === rows.n && rows.lockIcon === rows.n, rows);
     check('锁着的一个都点不了（没有 data-cg）', rows.playable === 0, rows);
     check('锁着的行写清了解锁条件', /解锁/.test(rows.first), rows.first);
     console.log('  锁态截图 → ' + await s.shot('gallery'));
@@ -175,6 +178,53 @@ async function main() {
     check('英文模式下图鉴真的解锁了条目（否则这一屏等于没扫）', cjk.unlocked === 3, cjk.unlocked);
     check('英文模式下图鉴零残留中文（含 CG 字幕说明）', cjk.bad.length === 0, cjk.bad);
     console.log('  英文截图 → ' + await s.shot('gallery'));
+    await s.close();
+  }
+
+  /* 场景 D：把剧情节奏调到 1 万关（101 段）—— 这是本次扩展方案的验收本体。
+     平铺 101 行 ≈ 8.6 屏，分卷后必须回到「一屏多一点」，且底部按钮不能被顶出视口。 */
+  {
+    const s = await scenario('scale', { level: 250, energy: 120, lastTs: Date.now(), sfx: true, cg: true });
+    const plan = await s.ev(`JSON.stringify(window.MineStory.setPlan({ count: 101 }))`);
+    check('运行时可把节奏调到 101 段（加关卡只改一个数字）',
+      JSON.parse(plan).count === 101, plan);
+    await s.ev(`document.getElementById('dkStory').click()`);
+    await sleep(400);
+    const m = await s.ev(`(() => {
+      const box = document.getElementById('dlgList');
+      const btn = document.getElementById('dlgMain');
+      const vis = [...box.querySelectorAll('.bagrow')];
+      return {
+        rows: vis.length,
+        vols: box.querySelectorAll('[data-vol]').length,
+        // 合并行 = 带锁 + 标题是「第 N–M 章 / Chapters N–M」这种区间（注意行首是图标节点）
+        ranges: vis.filter((r) => (r.innerText || '').includes('🔒')
+          && /(第\\s*\\d+–\\d+\\s*章|Chapters\\s*\\d+–\\d+)/.test(r.innerText || '')).length,
+        scrollable: box.scrollHeight > box.clientHeight + 2,
+        listH: box.clientHeight, pageH: window.innerHeight,
+        btnBottom: Math.round(btn.getBoundingClientRect().bottom),
+        dialogFits: Math.round(document.querySelector('.dialog').getBoundingClientRect().bottom) <= window.innerHeight,
+        openVol: (box.querySelector('[aria-expanded="true"]') || {}).innerText || ''
+      };
+    })()`);
+    check('101 段时可见行数被压到 25 行以内（平铺会是 101 行）', m.rows <= 25, m.rows);
+    check('分成 10 卷', m.vols === 10, m.vols);
+    check('连续锁段合并成了区间行', m.ranges >= 1, m.ranges);
+    check('列表区自己能滚', m.scrollable === true, m);
+    check('弹窗与底部按钮都在视口内（P0 首坏就是这条）',
+      m.dialogFits === true && m.btnBottom <= m.pageH, m);
+    check('默认展开的是玩家正在推进的那一卷', /第 1 卷|Volume 1/.test(m.openVol), m.openVol.split('\n')[0]);
+    console.log('  万关规模截图 → ' + await s.shot('gallery'));
+    // 折叠/展开另一卷：卷必须真的能开合
+    await s.ev(`document.querySelectorAll('#dlgList [data-vol]')[3].click()`);
+    await sleep(250);
+    const after = await s.ev(`(() => {
+      const box = document.getElementById('dlgList');
+      return { rows: box.querySelectorAll('.bagrow').length,
+               open: box.querySelectorAll('[aria-expanded="true"]').length };
+    })()`);
+    check('点另一卷能展开（两卷同时展开，行数变多）', after.open === 2 && after.rows > m.rows, after);
+    console.log('  展开第 4 卷截图 → ' + await s.shot('vol4'));
     await s.close();
   }
 

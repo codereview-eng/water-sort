@@ -16,58 +16,44 @@
 (function (root) {
   'use strict';
 
-  /* ── ① 资源映射表：逻辑键 → 真实路径（唯一改托管的地方）───────────── */
-  var MEDIA = {
-    'cg/cg0.mp4': 'cg/cg0.mp4',
-    'cg/bgm0.opus': 'cg/bgm0.opus',
-    'cg/cg1.mp4': 'cg/cg1.mp4',
-    'cg/bgm1.opus': 'cg/bgm1.opus',
-    'cg/cg2.mp4': 'cg/cg2.mp4',
-    'cg/bgm2.opus': 'cg/bgm2.opus',
-    'cg/cg3.mp4': 'cg/cg3.mp4',
-    'cg/bgm3.opus': 'cg/bgm3.opus',
-    'cg/cg4.mp4': 'cg/cg4.mp4',
-    'cg/bgm4.opus': 'cg/bgm4.opus',
-    'cg/cg5.mp4': 'cg/cg5.mp4',
-    'cg/bgm5.opus': 'cg/bgm5.opus',
-    'cg/cg6.mp4': 'cg/cg6.mp4',
-    'cg/bgm6.opus': 'cg/bgm6.opus',
-    'cg/cg7.mp4': 'cg/cg7.mp4',
-    'cg/bgm7.opus': 'cg/bgm7.opus',
-    'cg/cg8.mp4': 'cg/cg8.mp4',
-    'cg/bgm8.opus': 'cg/bgm8.opus',
-    'cg/cg9.mp4': 'cg/cg9.mp4',
-    'cg/bgm9.opus': 'cg/bgm9.opus',
-    'cg/cg10.mp4': 'cg/cg10.mp4',
-    'cg/bgm10.opus': 'cg/bgm10.opus'
-  };
+  /* ── ① 剧情节奏：整张表由规则生成（2026-08-29 起）────────────────────
+     cadence = 每多少关一段；count = 段数（含序章 cg0）。
+     **加 1000 关 = 把 count 加 10**，不必手写任何 id / 路径 / 映射 —— 手写清单
+     到 100 段就没人维护得动，且漏配只会在发布时才炸。
+     段 i：id=cgN，at = i===0 ? 0 : i*cadence，素材 cg/cgN.mp4 + cg/bgmN.opus。
+     字幕 key 同 id；SUBS 里没写的段自动没有字幕（章节名照常显示，不阻塞加关卡）。 */
+  var plan = { cadence: 100, count: 11 };
 
-  /* ── ② 剧情表：at===0 首启；at>0 通关第 at 关结算后 ───────────────────
-     cues = 分句字幕时间轴（秒）。开场 CG 必须把「你是谁 / 出了什么事 /
-     你要去干什么」讲清楚——单句字幕只有气氛没有目标，玩家没有代入感。
-     缺省无 cues 时回落到单句 k（章节 CG 仍是一句顶一句）。 */
-  var CG = [
-    {
-      id: 'cg0', at: 0, v: 'cg/cg0.mp4', m: 'cg/bgm0.opus', k: 'cg0',
+  /* 例外覆盖：只有需要特殊待遇的段写在这里，其余全靠规则。
+     目前唯一的例外是序章的分句字幕时间轴 —— 开场必须把「你是谁 / 出了什么事 /
+     你要去干什么」讲清楚，单句字幕只有气氛没有目标。 */
+  var OVERRIDES = {
+    cg0: {
       cues: [
         { t: 0.4, k: 'cg0a' },
         { t: 2.6, k: 'cg0b' },
         { t: 5.0, k: 'cg0c' },
         { t: 7.2, k: 'cg0d' }
       ]
-    },
-    { id: 'cg1', at: 100, v: 'cg/cg1.mp4', m: 'cg/bgm1.opus', k: 'cg1' },
-    { id: 'cg2', at: 200, v: 'cg/cg2.mp4', m: 'cg/bgm2.opus', k: 'cg2' },
-    { id: 'cg3', at: 300, v: 'cg/cg3.mp4', m: 'cg/bgm3.opus', k: 'cg3' },
-    /* 第二部 L301–1000（2026-08-29）：家园 → 追查 → 走出去 → 道德反转 → 归来 */
-    { id: 'cg4', at: 400, v: 'cg/cg4.mp4', m: 'cg/bgm4.opus', k: 'cg4' },
-    { id: 'cg5', at: 500, v: 'cg/cg5.mp4', m: 'cg/bgm5.opus', k: 'cg5' },
-    { id: 'cg6', at: 600, v: 'cg/cg6.mp4', m: 'cg/bgm6.opus', k: 'cg6' },
-    { id: 'cg7', at: 700, v: 'cg/cg7.mp4', m: 'cg/bgm7.opus', k: 'cg7' },
-    { id: 'cg8', at: 800, v: 'cg/cg8.mp4', m: 'cg/bgm8.opus', k: 'cg8' },
-    { id: 'cg9', at: 900, v: 'cg/cg9.mp4', m: 'cg/bgm9.opus', k: 'cg9' },
-    { id: 'cg10', at: 1000, v: 'cg/cg10.mp4', m: 'cg/bgm10.opus', k: 'cg10' }
-  ];
+    }
+  };
+
+  /* ── ② 资源映射表：逻辑键 → 真实路径（唯一改托管的地方，不变量 4）─────
+     现在由规则生成；改成 CDN/对象存储时只改这里的右值，播放机零改动。 */
+  var MEDIA = {};
+  var CG = [];
+  function rebuild() {
+    MEDIA = {}; CG = [];
+    for (var i = 0; i < plan.count; i++) {
+      var v = 'cg/cg' + i + '.mp4', m = 'cg/bgm' + i + '.opus';
+      MEDIA[v] = v; MEDIA[m] = m;
+      var seg = { id: 'cg' + i, at: i === 0 ? 0 : i * plan.cadence, v: v, m: m, k: 'cg' + i };
+      var ov = OVERRIDES[seg.id];
+      if (ov) { for (var key in ov) { if (Object.prototype.hasOwnProperty.call(ov, key)) seg[key] = ov[key]; } }
+      CG.push(seg);
+    }
+    if (api) { api.CG = CG; api.MEDIA = MEDIA; }
+  }
 
   /* ── ③ 字幕 catalog：zh/en 成对（唯一合法的中文出现点）─────────────── */
   var SUBS = {
@@ -393,7 +379,17 @@
   var api = {
     telemetry: telemetry,
     CG: CG,
+    MEDIA: MEDIA,
     SUBS: SUBS,
+    /** 当前节奏（只读快照）。加关卡改这里，不改任何清单。 */
+    plan: function () { return { cadence: plan.cadence, count: plan.count }; },
+    /** 改节奏并重建整张表（加关卡 / 测试造规模都走这里）。 */
+    setPlan: function (p) {
+      if (p && p.cadence > 0) plan.cadence = Math.floor(p.cadence);
+      if (p && p.count > 0) plan.count = Math.floor(p.count);
+      rebuild();
+      return { cadence: plan.cadence, count: plan.count };
+    },
     setLang: function (l) { lang = (l === 'en') ? 'en' : 'zh'; },
     /** 已解锁（看过）的 CG，供首页「回忆」入口列出。 */
     unlocked: function () {
@@ -444,6 +440,7 @@
     }
   };
 
+  rebuild();          // api 建好后生成第一版表（api.CG / api.MEDIA 由它填）
   root.MineStory = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 }(typeof self !== 'undefined' ? self : this));

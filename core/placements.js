@@ -97,7 +97,14 @@
           lastAt: now
         };
         if (p.format === 'interstitial') return { shown: true, granted: false, state: next };
-        return { shown: true, granted: ok || p.onFail === 'grant', retry: !ok && p.onFail === 'retry', state: next };
+        /* rewarded 的频控计的是「今天领到了几次奖励」，不是「点了几次按钮」（issue #1）。
+           为什么改：#43 之后「没真的离开就不发奖」，如果失败也扣额度，那么某个内嵌
+           webview 一旦不支持这个判据，诚实玩家不但一次奖励都拿不到，还会在 20 次失败后
+           被彻底锁死到明天。重试的成本已经由「必须真的离开 N 秒」承担了，
+           频控不需要再兜一层——它的职责是限制奖励频次，不是限制尝试次数。 */
+        var granted = ok || p.onFail === 'grant';
+        return { shown: true, granted: granted, retry: !ok && p.onFail === 'retry',
+          state: granted ? next : state };
       }
     };
     return api;

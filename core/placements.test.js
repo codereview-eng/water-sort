@@ -68,3 +68,43 @@ test('fail-fast：未知 format/rewarded 缺 onFail/插屏带 onFail/负值/矛�
   assert.throws(() => PL.create({ a: { format: 'interstitial', priority: 1 } }, () => true), /未知键/);
   assert.throws(() => PL.create({}, null), /需要 provider/);
 });
+
+/* ---- rewarded 频控只数「领到的奖励」（issue #1）----
+   收紧 Direct Link 判据之后，失败会变多；如果失败也扣今天的额度，
+   某个不支持该判据的 webview 会让诚实玩家 20 次之后被锁死到明天。 */
+test('rewarded：没发成奖励不扣今天的额度，玩家还能再试', () => {
+  let ok = false;
+  const pl = PL.create({ r: { format: 'rewarded', onFail: 'deny', capping: { maxPerDay: 2 } } }, () => ok);
+  let st = {};
+  for (let i = 0; i < 5; i++) {
+    const r = pl.show('r', st, 1000);
+    assert.strictEqual(r.granted, false);
+    st = r.state;
+  }
+  assert.ok(!st.dayN, '五次失败一次额度都不该扣，得到 dayN=' + st.dayN);
+  ok = true;                                   // 这次真看完了
+  const good = pl.show('r', st, 1000);
+  assert.strictEqual(good.granted, true);
+  assert.strictEqual(good.state.dayN, 1, '领到奖励才计一次');
+});
+
+test('rewarded：领满上限后照旧拦下（额度语义没被改松）', () => {
+  const pl = PL.create({ r: { format: 'rewarded', onFail: 'deny', capping: { maxPerDay: 2 } } }, () => true);
+  let st = {};
+  st = pl.show('r', st, 1000).state;
+  st = pl.show('r', st, 1000).state;
+  const third = pl.show('r', st, 1000);
+  assert.deepStrictEqual({ shown: third.shown, granted: third.granted }, { shown: false, granted: false });
+});
+
+test('rewarded onFail=grant：广告坏了照发奖，这次算领过（额度照扣）', () => {
+  const pl = PL.create({ r: { format: 'rewarded', onFail: 'grant', capping: { maxPerDay: 1 } } }, () => false);
+  const r = pl.show('r', {}, 1000);
+  assert.strictEqual(r.granted, true);
+  assert.strictEqual(r.state.dayN, 1);
+});
+
+test('interstitial：曝光型照旧按"展示过"计数（语义不变）', () => {
+  const pl = PL.create({ a: { format: 'interstitial', capping: { maxPerDay: 2 } } }, () => false);
+  assert.strictEqual(pl.show('a', {}, 1000).state.dayN, 1);
+});

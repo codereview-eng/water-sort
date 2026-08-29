@@ -108,3 +108,16 @@ test('配置：阈值在真配置里声明过（不是只吃 core 默认值）',
     assert.strictEqual(typeof cfg.ads.health[k], 'number', 'ads.health 缺 ' + k);
   }
 });
+
+test('接线：两个游戏的兜底广告卡都改成"只在可见时走表"，不再硬减秒', () => {
+  /* issue #1 · S2：切到别的标签表照走 = 什么都不用看就能拿奖。
+     这条门禁盯的是"没人偷偷把它改回硬减秒"。 */
+  const water = fs.readFileSync(path.join(__dirname, 'water.html'), 'utf8');
+  for (const [name, src] of [['mine.html', html], ['water.html', water]]) {
+    const i = src.indexOf('function houseAd(');
+    assert.ok(i !== -1, name + ' 缺 houseAd');
+    const body = src.slice(i, i + 1400);
+    assert.ok(body.includes('createWatchClock('), name + ' 的兜底广告卡没用可见性计时器');
+    assert.ok(!/left -= 1/.test(body), name + ' 的兜底广告卡还在硬减秒（切后台照走）');
+  }
+});

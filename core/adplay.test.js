@@ -598,3 +598,54 @@ test('mergeStats：跨会话累计，单次会话回答不了"最近是不是一
   // 脏数据不能把累计搞崩
   assert.strictEqual(AdPlay.mergeStats(null, undefined).attempts, 0);
 });
+
+/* ---- 兜底广告卡：切走就停表（issue #1 · shams 清单 S2）----
+   原来那张卡是 setInterval 硬减秒，切到别的标签/别的 App 表照走，
+   回来奖励已经到账 —— 一条"什么都不用看"的白拿通道。 */
+test('watchClock：一直在看 → 到点算看完', () => {
+  const doc = fakeDoc(); const clk = fakeClock();
+  const c = AdPlay.createWatchClock(5, { doc, now: clk.now, maxStepMs: 5000 });
+  clk.advance(3000);
+  assert.deepStrictEqual(c.sample().leftSec, 2);
+  clk.advance(2000);
+  assert.strictEqual(c.sample().done, true);
+});
+
+test('watchClock：手机把后台定时器冻住，回来那一下不能一次性补上整段', () => {
+  /* 这是宿主真正会遇到的形态：切走期间一次采样都没跑，回到前台第一次采样看到
+     一个巨大的时间差，而那时 visibilityState 已经是 visible。不夹刀就等于白送。 */
+  const doc = fakeDoc(); const clk = fakeClock();
+  const c = AdPlay.createWatchClock(5, { doc, now: clk.now });   // maxStepMs 默认 1 秒
+  c.sample();
+  doc.visibilityState = 'hidden';
+  clk.advance(60000);                       // 切走一分钟，期间定时器完全冻结（没有采样）
+  doc.visibilityState = 'visible';          // 回来
+  const back = c.sample();
+  assert.strictEqual(back.done, false, '切走一分钟不能算成看完了广告');
+  assert.ok(back.watchedMs <= 1000, '最多只能补记 1 秒，得到 ' + back.watchedMs);
+});
+
+/* 宿主是每 250ms 采一次样的，测试也照这个节奏推时钟 */
+function watchFor(c, clk, ms) {
+  let out = null;
+  for (let t = 0; t < ms; t += 250) { clk.advance(250); out = c.sample(); }
+  return out;
+}
+
+test('watchClock：切到后台的那段时间不算数', () => {
+  const doc = fakeDoc(); const clk = fakeClock();
+  const c = AdPlay.createWatchClock(5, { doc, now: clk.now });
+  watchFor(c, clk, 1000);
+  doc.visibilityState = 'hidden';
+  const away = watchFor(c, clk, 60000);     // 切走一分钟（定时器仍在跑，只是页面不可见）
+  assert.strictEqual(away.done, false, '人不在场就不该算看完');
+  assert.strictEqual(away.leftSec, 4, '倒计时应该停在切走那一刻');
+  doc.visibilityState = 'visible';
+  assert.strictEqual(watchFor(c, clk, 4000).done, true, '回来接着看够了就该算数');
+});
+
+test('watchClock：拿不到 document（Node/异常宿主）时退回按真实时间走，不卡死玩家', () => {
+  const clk = fakeClock();
+  const c = AdPlay.createWatchClock(2, { doc: null, now: clk.now });
+  assert.strictEqual(watchFor(c, clk, 2000).done, true);
+});

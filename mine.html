@@ -1482,11 +1482,14 @@
     skip.disabled = false;
     mask.hidden = false;
     skip.onclick = function () { finish(false); };          // 用户主动放弃
+    /* 只在页面可见时走表（issue #1 · S2）：以前切到别的标签/别的 App 表照走，
+       回来奖励已经到手 —— 那是一条"什么都不用看"的白拿通道。 */
+    var clock = AdPlayCore.createWatchClock(seconds, {});
     timer = setInterval(function () {
-      left -= 1;
-      if (left <= 0) { $('adCd').textContent = ''; finish(true); return; }
-      $('adCd').textContent = t('adWatching', { n: left });
-    }, 1000);
+      var s = clock.sample();
+      if (s.done) { $('adCd').textContent = ''; finish(true); return; }
+      if (s.leftSec !== left) { left = s.leftSec; $('adCd').textContent = t('adWatching', { n: left }); }
+    }, 250);
   }
 
   /* 按需加载某个 Monetag zone 的 SDK。

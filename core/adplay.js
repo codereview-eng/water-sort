@@ -421,6 +421,40 @@
     };
   }
 
+  /* ---- 兜底广告卡的「看完」计时（issue #1 · shams 清单 S2）----
+     原来那张 5 秒倒计时卡是 setInterval 硬减秒：玩家切到别的标签/别的 App，
+     表照走，回来奖励已经到手 —— 等于一条"什么都不用看"的白拿通道。
+     这里改成**只有页面可见时才累计观看时长**，切走就停表。
+
+     写成纯累计器（不自己持有定时器）的原因：定时器和 DOM 归宿主，
+     核心逻辑要能在 Node 里用可控时钟直接测。宿主每隔几百毫秒调一次 sample()。 */
+  function createWatchClock(seconds, deps) {
+    var d = deps || {};
+    var doc = d.doc !== undefined ? d.doc : (typeof document !== 'undefined' ? document : null);
+    var now = d.now || function () { return Date.now(); };
+    var totalMs = Math.max(0, (+seconds || 0) * 1000);
+    /* 单次采样最多能记多少（默认 1 秒）：手机把后台页面的定时器直接冻住时，
+       回到前台的第一次采样会看到一个巨大的时间差，而那时页面已经是 visible ——
+       不夹这一刀，切走一分钟再回来就等于"看完了"，白拿通道原样还在。 */
+    var maxStepMs = d.maxStepMs === undefined ? 1000 : d.maxStepMs;
+    var watched = 0;
+    var last = now();
+    function visible() { return !doc || doc.visibilityState !== 'hidden'; }
+    return {
+      /* 返回 { leftSec, done, watchedMs }：leftSec 给 UI 显示，done=true 表示真看够了 */
+      sample: function () {
+        var t = now();
+        if (visible()) watched += Math.min(Math.max(0, t - last), maxStepMs);
+        last = t;
+        return {
+          leftSec: Math.max(0, Math.ceil((totalMs - watched) / 1000)),
+          watchedMs: watched,
+          done: watched >= totalMs
+        };
+      }
+    };
+  }
+
   /* ---- 反向阈值告警（本机纪律第 5 条 · issue #1）----
      降级分支的设计意图就是"出错时不要声张"，所以它是 bug 最理想的藏身处：
      100% 必败可以伪装成正常的偶发降级。常规告警只盯异常抛出，而这里的特征恰恰是
@@ -498,5 +532,6 @@
   }
 
   return { create: create, SOURCES: SOURCES, DEFAULTS: DEFAULTS,
-    health: health, mergeStats: mergeStats, HEALTH_DEFAULTS: HEALTH_DEFAULTS };
+    health: health, mergeStats: mergeStats, HEALTH_DEFAULTS: HEALTH_DEFAULTS,
+    createWatchClock: createWatchClock };
 });

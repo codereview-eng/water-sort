@@ -127,12 +127,44 @@
       return src.env === 'telegram' ? inTelegram() : !inTelegram();
     }
 
-    var stats = { attempts: 0, ok: 0, failed: 0, bySource: {}, lastReason: null };
-    function bump(source, ok, reason) {
+    /* 从广告源的返回值里抽出「广告商自己的判定」。
+       Monetag 的 show_<zone>() resolve 出一个对象，里面有 reward_event_type：
+         'valued'     这次曝光真的变现了（广告商付钱了）
+         'not_valued' 广告展示了，但没变现
+       文档：https://docs.monetag.com/docs/sdk-reference/
+       老版本 SDK / 其它广告源不返回对象 → 'unknown'（不代表异常，别当失败用）。 */
+    function rewardDetail(res) {
+      if (!res || typeof res !== 'object') return { rewardEventType: 'unknown' };
+      var out = { rewardEventType: typeof res.reward_event_type === 'string' ? res.reward_event_type : 'unknown' };
+      if (typeof res.estimated_price === 'number') out.estimatedPrice = res.estimated_price;
+      if (res.zone_id !== undefined) out.zoneId = String(res.zone_id);
+      if (res.sub_zone_id !== undefined) out.subZoneId = String(res.sub_zone_id);
+      return out;
+    }
+
+    /* stats 是本层唯一的可观测出口（本机纪律：降级分支必须可观测 + 反向告警）：
+         ok/failed/bySource  —— 广告源是不是常态化失败、是不是全落到 house
+         reasons             —— 失败原因直方图，能回答"为什么降级"，不是只有一个计数
+         reward              —— 发出去的奖励里，广告商判定为 valued / not_valued / unknown 各多少。
+                                valued 率长期极低 = 我们在白发奖却没赚到钱，是反向告警的输入。 */
+    var stats = { attempts: 0, ok: 0, failed: 0, bySource: {}, lastReason: null,
+      reasons: {}, reward: { valued: 0, not_valued: 0, unknown: 0 } };
+    function bump(source, ok, reason, detail) {
       stats.attempts += 1;
-      if (ok) stats.ok += 1; else { stats.failed += 1; stats.lastReason = reason || 'unknown'; }
+      if (ok) stats.ok += 1;
+      else {
+        stats.failed += 1;
+        var rk = String(reason || 'unknown');
+        stats.lastReason = rk;
+        stats.reasons[rk] = (stats.reasons[rk] || 0) + 1;
+      }
       var s = stats.bySource[source] || (stats.bySource[source] = { ok: 0, failed: 0 });
       if (ok) s.ok += 1; else s.failed += 1;
+      if (ok) {
+        var t = (detail && detail.rewardEventType) || 'unknown';
+        if (stats.reward[t] === undefined) stats.reward[t] = 0;
+        stats.reward[t] += 1;
+      }
     }
 
     /* 单个源可用吗：环境限定 + 该环境有没有这个能力（不做网络探测，避免拖慢首屏） */
@@ -219,7 +251,11 @@
           if (typeof fn !== 'function') return resolve({ ok: false, reason: 'monetag:sdk-missing' });
           var out;
           try { out = fn(); } catch (e) { return reject(e); }
-          Promise.resolve(out).then(function () { resolve({ ok: true }); },
+          /* resolve = 这次 rewarded interstitial 走完了 → 发奖。
+             返回对象里的 reward_event_type 只记账、**不当发奖开关**：
+             not_valued 的意思是"展示了但没变现"，那是我们和广告商之间的事，
+             玩家确实看完了，扣他奖励等于让玩家替我们的填充率背锅。 */
+          Promise.resolve(out).then(function (res) { resolve({ ok: true, detail: rewardDetail(res) }); },
             function (e) { resolve({ ok: false, reason: 'monetag:' + ((e && (e.message || e)) || 'failed') }); });
         };
         /* 按需加载该 zone 的 SDK：一个页面可能配了两个 zone（TMA 一个、Web 一个），
@@ -279,8 +315,9 @@
           : source === 'directlink' ? playDirectLink(src) : playHouse();
         return p.then(function (r) {
           if (r.ok) {
-            bump(source, true);
-            return { ok: true, source: source, zone: zoneOf(src) || null, ms: now() - t0 };
+            var detail = r.detail || { rewardEventType: 'unknown' };
+            bump(source, true, null, detail);
+            return { ok: true, source: source, zone: zoneOf(src) || null, ms: now() - t0, detail: detail };
           }
           bump(source, false, r.reason);
           // 用户主动放弃 → 不再往下降级（他不是没广告可看，是不想看）

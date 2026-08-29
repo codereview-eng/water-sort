@@ -391,3 +391,59 @@ test('完整链路：Telegram 用 TMA zone，浏览器用 Direct Link，都不�
   assert.strictEqual(r3.source, 'house');
   assert.strictEqual(r3.ok, true);
 });
+
+/* ---- 广告商判定（reward_event_type）与失败原因直方图 · issue #1 广告奖励可信度 ----
+   为什么加：Monetag SDK 的 Promise 其实 resolve 出一个对象，带 reward_event_type
+   （'valued' = 这次曝光真变现了 / 'not_valued' = 展示了但没变现，见
+   https://docs.monetag.com/docs/sdk-reference/）。以前我们只看"有没有 resolve"，
+   把这个唯一能在客户端拿到的真伪信号扔了，于是没人回答得了
+   「我们发出去的奖励里，有多少真的赚到钱」。
+   注意底线：这个信号**只记账、不当发奖开关** —— 玩家确实看完了，没变现是我们和
+   广告商之间的事，扣他的奖励等于让玩家替填充率背锅。 */
+function envMonetagResolving(zone, value) {
+  const env = {};
+  env['show_' + zone] = () => Promise.resolve(value);
+  return env;
+}
+
+test('monetag：valued 被记进 stats().reward，奖励照发', async () => {
+  const a = AdPlay.create({ sources: ['monetag'], zoneId: 'z' },
+    { env: envMonetagResolving('z', { reward_event_type: 'valued', estimated_price: 0.0023, zone_id: 123 }) });
+  const r = await a.play();
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.detail.rewardEventType, 'valued');
+  assert.strictEqual(r.detail.estimatedPrice, 0.0023);
+  assert.strictEqual(r.detail.zoneId, '123');
+  assert.deepStrictEqual(a.stats().reward, { valued: 1, not_valued: 0, unknown: 0 });
+});
+
+test('monetag：not_valued 也照发奖（玩家看完了），但单独计数以便发现"白发奖没赚钱"', async () => {
+  const a = AdPlay.create({ sources: ['monetag'], zoneId: 'z' },
+    { env: envMonetagResolving('z', { reward_event_type: 'not_valued' }) });
+  const r = await a.play();
+  assert.strictEqual(r.ok, true, 'not_valued 不是玩家的错，必须照发');
+  assert.strictEqual(r.detail.rewardEventType, 'not_valued');
+  assert.deepStrictEqual(a.stats().reward, { valued: 0, not_valued: 1, unknown: 0 });
+});
+
+test('老 SDK / 其它广告源不返回对象 → unknown，不当失败', async () => {
+  const a = AdPlay.create({ sources: ['monetag'], zoneId: 'z' }, { env: envMonetagResolving('z', undefined) });
+  assert.strictEqual((await a.play()).ok, true);
+  assert.deepStrictEqual(a.stats().reward, { valued: 0, not_valued: 0, unknown: 1 });
+
+  const h = AdPlay.create({ sources: ['house'] }, { houseAd: houseWatched });
+  const hr = await h.play();
+  assert.strictEqual(hr.detail.rewardEventType, 'unknown');
+  assert.strictEqual(h.stats().reward.unknown, 1);
+});
+
+test('失败原因直方图：能回答"为什么降级"，不是只有一个计数', async () => {
+  const a = AdPlay.create({ sources: [{ type: 'monetag', zoneId: 'z' }, { type: 'house' }] },
+    { env: envMonetag('z', 'reject'), houseAd: houseWatched });
+  await a.play();
+  await a.play();
+  const s = a.stats();
+  assert.strictEqual(s.reasons['monetag:no-fill'], 2, '同一个原因要累计，才能看出常态化降级');
+  assert.strictEqual(s.bySource.house.ok, 2);
+  assert.strictEqual(s.reward.unknown, 2);
+});

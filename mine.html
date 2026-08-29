@@ -46,7 +46,17 @@
     box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 0 rgba(0,0,0,.18);}
   .cell.small{font-size:20px; border-radius:5px;}
   .cell .mk{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    color:rgba(0,0,0,.62); text-shadow:0 1px 0 rgba(255,255,255,.25); pointer-events:none;}
+    color:rgba(0,0,0,.62); text-shadow:0 1px 0 rgba(255,255,255,.25); pointer-events:none; z-index:1;}
+  /* 理由里说「第 9 行已经有雷了」，可棋盘没有行号，玩家得自己从上往下数——
+     四位独立视觉评审各自都提了这一条。讲到某一行/某一列时就把那一整条淡淡点亮：
+     不占版面、不加坐标轴、也不跟三种高亮的 outline 抢语义（这里走 ::after 覆盖层）。 */
+  /* 只靠半透明提亮不够：棋盘色块饱和度很高，白纱盖上去几乎看不出（视觉评审两轮实测
+     「接近不可感知」）。改成沿行/列方向拉两条贯通的亮边 —— 整条像被一根标尺框住，
+     既一眼可见、又不洗掉格子本来的颜色（颜色还要用来认色块）。 */
+  .cell.clueline::after{content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+    box-sizing:border-box; background:rgba(255,255,255,.22);}
+  .cell.clueline-row::after{border-top:3px solid rgba(255,255,255,.92); border-bottom:3px solid rgba(255,255,255,.92);}
+  .cell.clueline-col::after{border-left:3px solid rgba(255,255,255,.92); border-right:3px solid rgba(255,255,255,.92);}
   .cell .mk::before{font-size:32px; line-height:1;}
   .cell.small .mk::before{font-size:20px;}
   @supports (font-size:1cqi){
@@ -62,7 +72,62 @@
   .cell.cluespot{outline:3px solid #ffd07a; outline-offset:-1px; z-index:3;
     box-shadow:0 0 0 4px rgba(255,180,84,.35), 0 0 22px 6px rgba(255,180,84,.55);
     animation:cluepulse 1.1s ease-in-out infinite;}
-  .cell.cluespot .mk::before{content:'❓'; color:#20160a; text-shadow:none;}
+  /* ❓ 必须小：视觉评审两位判读者都把目标格的底色认错了（实际与被排除格同属一个色块，
+     底色 rgb(143,143,240) 完全一致）。大号 emoji 把格子铺满，玩家就看不出它归哪个色块，
+     「这个色块其它格都排除了」这句话在画面上便无从验算。缩到六成，露出底色。 */
+  .cell.cluespot .mk::before{content:'❓'; color:#20160a; text-shadow:none; font-size:.62em;}
+  /* 「这一格已经被这条线索排除了」（2026-08-27 修 RCA）：此前组内所有格都涂同一个
+     .cluegroup，玩家分不清「引擎已经排掉的」和「还可能是雷的」，于是线索看上去像
+     给了多个选择、却只解释了一个。三态分开：已排除 = 灰虚框 + 淡 ✕；
+     当前正在讲的这一步 = 绿实框（跟着理由逐步点亮）；还没排除的 = 紫框 + ? 。 */
+  /* 已排除格必须**保住原来的色相**（玩家要靠颜色认出它属于哪个色块，理由才对得上），
+     所以只降饱和压暗，绝不用 opacity —— 视觉评审实测：opacity 会把格子压成一片深紫，
+     玩家认不出它归哪个色块，「这个色块其它格都排除了」这句话在画面上就没法自证。
+     ✕ 同时要能看清：白字 + 深描边，不跟着背景一起变淡。 */
+  /* 虚线用中性白：色块归属已经靠保留下来的底色表达了，再用橙色会跟目标格的橙实框抢注意力 */
+  .cell.clueruled{outline:2px dashed rgba(255,255,255,.6); outline-offset:-2px; z-index:2;
+    filter:saturate(.8) brightness(.8);}
+  .cell.clueruled .mk::before{content:'✕'; color:#fff; font-weight:900;
+    -webkit-text-stroke:.045em rgba(0,0,0,.6); text-shadow:none;}
+  /* 正在讲的这一步：绿色是全屏唯一的「当前焦点」语义，配脉冲，好跟目标格的橙色分开 */
+  .cell.cluestep{outline:3px solid #5fe0a6; outline-offset:-1px; z-index:3;
+    box-shadow:0 0 0 4px rgba(95,224,166,.42), 0 0 18px 5px rgba(95,224,166,.5);
+    animation:cluestepglow 1.1s ease-in-out infinite;}
+  .cell.cluestep .mk::before{content:'✕'; color:#04361a; font-weight:900;
+    -webkit-text-stroke:.04em rgba(255,255,255,.7); text-shadow:none;}
+  @keyframes cluestepglow{50%{box-shadow:0 0 0 7px rgba(95,224,166,.26), 0 0 24px 8px rgba(95,224,166,.38);}}
+  /* 「雷就在这几格里」的范围态（2026-08-29）：**绝不能复用 .cluestep**——那个样式画的是 ✕
+     「这格已排除」，跟「这几格里有雷」正好相反，真页面截图当场就露馅了。
+     所以给范围格一套自己的语义：紫框 + ❓（与结论格 .cluespot 的橙框区分开：
+     橙 = 就是这一格，紫 = 还不知道是哪一格）。 */
+  .cell.cluerange{outline:3px solid #b39dff; outline-offset:-1px; z-index:3;
+    box-shadow:0 0 0 4px rgba(179,157,255,.34), 0 0 16px 4px rgba(179,157,255,.42);}
+  /* ❓ 要带白描边：范围格的底色是各色块自己的颜色，深色符号落在粉/红底上会被读成
+     「危险/这里是雷」（独立视觉评审 2026-08-29 实测把这 4 格全读成了雷）。
+     白描边把符号从底色里拎出来，语义回到中性的「不知道是哪一格」。 */
+  .cell.cluerange .mk::before{content:'❓'; color:#1b1526; text-shadow:none; font-size:.62em;
+    -webkit-text-stroke:.05em rgba(255,255,255,.9);}
+  @media (prefers-reduced-motion:reduce){ .cell.cluestep{animation:none;} }
+  /* 聚光灯：讲解途中把不相干的格子整体压暗，只留这一行亮着。
+     为什么要走到这一步——半透明提亮（.17→.27）和 3px 贯通白边都试过，计算样式实测
+     确实渲染了，但三位独立判读者都「看不到那一行」：在高饱和棋盘上，任何加法都会被
+     周围颜色吃掉。减法才管用。只在讲解步开，结论步恢复全亮。 */
+  /* 压暗要克制：.42/.5 实测把暗区不同颜色泥成一片，观感像「面板失效」而不是「聚焦」，
+     而这游戏的颜色本身就是信息（要靠它认色块）—— 同一条纪律，上次栽在已排除格，这次栽在暗区。
+     结论目标格与「这一步的依据雷」不参与压暗：前者是预告，后者是理由的前提，都得看得见。 */
+  .board.spotlight .cell:not(.clueline):not(.cluespot):not(.cluecause):not(.cluerange){filter:brightness(.62) saturate(.85);}
+  /* 范围步用更狠的聚光：候选格的底色是色块自己的颜色（可能正好跟旁边一大片同色），
+     只靠紫描边压不住 —— 独立视觉评审两轮都把这几格读错了。把其余整盘压暗，
+     高亮才真的是高亮。 */
+  .board.rangelit .cell:not(.cluerange){filter:brightness(.5) saturate(.7);}
+  /* 「第 9 行里已经有雷了」——那颗雷就是这一步的前提，得指出来。绿虚线：与当前步的
+     绿实线同系（同属这一步），虚线表示它是依据而非结论。 */
+  /* 光有虚线不够：格子小，虚线段会糊成实线，压在暖色底上绿意也认不出来（评审实测）。
+     补一圈柔和绿光——比当前步弱一档，「亮度分级」不依赖颜色对比就能读出主次。 */
+  .cell.cluecause{outline:3px dashed #5fe0a6; outline-offset:-2px; z-index:2;
+    box-shadow:0 0 0 3px rgba(95,224,166,.32), 0 0 13px 3px rgba(95,224,166,.4);}
+  .cell.cluepend{outline:2px solid rgba(139,123,255,.9); outline-offset:-2px; z-index:2;}
+  .cell.cluepend .mk::before{content:'?'; color:#d9d3ff; font-weight:900; -webkit-text-stroke:.03em rgba(60,50,120,.9);}
   @keyframes cluepulse{50%{box-shadow:0 0 0 7px rgba(255,180,84,.22), 0 0 26px 9px rgba(255,180,84,.42);}}
   @media (prefers-reduced-motion:reduce){ .cell.cluespot{animation:none;} }
   .cluebar{display:flex; align-items:flex-start; gap:9px; border-radius:13px; padding:10px 12px;
@@ -76,8 +141,10 @@
   .cluebar.deep .tx b{color:#c3b8ff;}
   /* 理由这一行原来用 --ink-3(#6b7a8d)，在深底上对比度不够（视觉评审 2026-08-27 实测扣分）：
      提一档到 --ink-2；落子动作单独一行，别跟理由挤在一起被折行折断。 */
-  .cluebar .tx span{display:block; font-size:11px; color:var(--ink-2); margin-top:2px;}
+  .cluebar .tx span{display:block; font-size:12px; color:var(--ink-2); margin-top:2px;}
   .cluebar .tx span.act{color:var(--accent); font-weight:700; margin-top:3px;}
+  .cluebar .tx span.stp{font-size:10.5px; font-weight:800; letter-spacing:.04em; margin:0 0 2px;
+    color:var(--ink-3); text-transform:uppercase;}
   .cluebar.deep .tx span.act{color:#c3b8ff;}
   .cluebar .ok{flex:none; border:0; border-radius:9px; padding:7px 11px; font:inherit; font-size:12px;
     font-weight:800; background:var(--accent); color:#20160a; cursor:pointer;}
@@ -217,6 +284,15 @@
   .bagrow .bagqty{flex:0 0 auto; font-size:16px; font-weight:800; color:var(--accent);}
   .bagrow.empty .bagqty{color:var(--ink-3);}
   .bagempty{font-size:12px; color:var(--ink-3); line-height:1.6;}
+  /* 剧情图鉴的行：解锁的是按钮（整行可点重播），没解锁的是死行 + 一把锁。
+     弱化态不靠 opacity（会把整行连图标一起洗淡、也糊掉锁的辨识度），
+     只把标题降到次级色 —— 锁本身就是「不可点」的最强信号。 */
+  .cgrow{width:100%; font:inherit; margin:0;}
+  button.cgrow{cursor:pointer;}
+  button.cgrow:hover{border-color:var(--accent);}
+  .cgrow.locked{cursor:default;}
+  .cgrow.locked .baginfo b{color:var(--ink-3);}
+  .cgrow .cgplay{flex:0 0 auto; font-size:12px; font-weight:700; color:var(--accent);}
   .bigbtn{border:0; border-radius:14px; padding:16px; font-size:17px; font-weight:800; cursor:pointer;
     background:var(--accent); color:#20160a;}
   .bigbtn small{display:block; font-weight:600; font-size:12px; margin-top:4px; opacity:.9;}
@@ -276,8 +352,24 @@
   .idbadge.warn::after{content:'!';}
   .langrow{display:flex; align-items:center; justify-content:space-between; background:var(--surface);
     border:1px solid var(--edge); border-radius:12px; padding:10px 12px; font-size:13px; color:var(--ink-2);}
-  .sfxbtn{border:1px solid var(--edge); background:transparent; color:var(--ink); border-radius:8px;
-    padding:4px 14px; cursor:pointer; font-size:13px;}
+  /* 开/关两态必须一眼可辨：原来两态同底同框、只差一个字，视觉评审实测「状态识别靠单字」。
+     开 = 橙底（与全局 CTA 同一套语义），关 = 中性描边；点击区顺带提到 44px 拇指线。
+     这一条同时改善音效开关（同一套样式），只影响彩雷（water 有自己的副本）。 */
+  /* 两态都必须长得像「控件」，且不能跟橙色主按钮撞色（两轮视觉评审分别栽在这两点上：
+     纯文字的关态被当成说明文字；橙底的开态被当成第二个主行动按钮）。
+     定型：开 = 绿底（通用「已开启」语义，与橙色 CTA 完全分开），关 = 浅底 + 描边；
+     两态同尺寸同圆角，行高不再因状态而跳。点击区 44px 拇指线。 */
+  /* 设置行的标签区：名词 + 一行副说明（说清「关掉会少什么」），右侧控件不受影响 */
+  /* text-align 必须显式写 left：弹窗容器是居中排版的，包一层之后 label 从 flex item
+     变成块级子元素，就跟着继承了居中 —— 于是这一行的标题居中、另两行左对齐（视觉评审
+     实测「比行高差异更伤」）。 */
+  .langrow .rowlb{display:flex; flex-direction:column; align-items:flex-start; text-align:left;
+    gap:2px; min-width:0; flex:1; padding-right:10px;}
+  .langrow .rowhint{font-size:11px; line-height:1.4; color:var(--ink-3); font-weight:400;}
+  .sfxbtn{border:1px solid var(--edge-strong); background:rgba(255,255,255,.08); color:var(--ink);
+    border-radius:9px; padding:0 18px; min-height:44px; min-width:64px; cursor:pointer;
+    font-size:13px; font-weight:800;}
+  .sfxbtn[aria-pressed="true"]{background:var(--ok); color:#06281a; border-color:transparent;}
   .langrow select{appearance:none; -webkit-appearance:none; color-scheme:dark; border:1px solid var(--edge);
     background-color:#151d29; color:var(--ink); border-radius:8px; padding:6px 30px 6px 10px;
     font:inherit; cursor:pointer;
@@ -310,7 +402,7 @@
     <div class="box"><span class="k" id="hudTimeK"></span><b class="v" id="hudTime">--:--</b></div>
   </div>
 
-  <div class="cluebar" id="clueBar" hidden><span class="ic" id="clueIc">🔍</span><span class="tx"><b id="clueTitle"></b><span id="clueWhy"></span><span class="act" id="clueAct"></span></span><button class="ok" id="clueOk" type="button"></button></div>
+  <div class="cluebar" id="clueBar" hidden><span class="ic" id="clueIc">🔍</span><span class="tx"><span class="stp" id="clueStep"></span><b id="clueTitle"></b><span id="clueWhy"></span><span class="act" id="clueAct"></span></span><button class="ok" id="clueOk" type="button"></button></div>
   <div class="boardwrap"><div class="board" id="board" aria-label="扫雷棋盘"></div></div>
 
   <div class="tools">
@@ -367,7 +459,7 @@
   <pre id="stOut">点上面的按钮开始。结果可长按复制。</pre>
 </div>
 
-<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny","capping":{"maxPerDay":20}},"fail-revive":{"format":"rewarded","onFail":"retry","capping":{"maxPerDay":20}},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}},"streak-keep":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":20}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}},"play":{"sources":[{"type":"telegram","env":"telegram"},{"type":"monetag","zoneId":"11440777","env":"telegram"},{"type":"directlink","url":"https://omg10.com/4/11622862","env":"web"},{"type":"house"}],"houseSeconds":5,"timeoutMs":20000},"verification":{"monetag":"2f9e3e08b43a9d525e226b36d0a22368","site":"play-color-mines.run.ceo"},"passive":{"multitag":{"src":"https://quge5.com/88/tag.min.js","zone":"271963","env":"web","screens":["home"]}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"zh","locales":{"en":{"langName":"English","title":"Color Mines","logoMain":"Color Mines","logoSub":"COLOR MINES","start":"Play Level","startCost":"Costs {cost} energy · exactly one mine per color / row / column","homeProgress":"Current level","homeClears":"Total clears","homeTools":"Tools","profileLabel":"Player name","player":"Player","profileSource":"This browser","accountLabel":"run.ceo account","sfxLabel":"Sound","sfxOn":"On","sfxOff":"Off","langLabel":"Language","homeHint1":"Click = mark safe · drag = mark multiple · double-click = dig","homeHint2":"Mines never touch; reason before you move","back":"‹ Back","hudLevel":"Level","hudMines":"Mines left","hudTime":"Time","boardAria":"Minesweeper board","toolMine":"Find one mine","toolSafe":"Find a clue","gameHint":"Click = mark safe ✕ (click again to cancel) · drag = mark/unmark · double-click = dig · exactly one mine per color / row / column; mines never touch","energyFull":"Energy full","energyRefill":"+1 energy in {seconds}s","levelFailed":"Could not generate this level","notMine":"Not a mine! {lives} lives left","allMinesFound":"All mines have been found","noSafeCell":"No safe cell left to hint","safeHint":"This cell is not a mine","toolEmptyTitle":"No tools left","toolEmptyBody":"Watch an ad to add {count} “{name}”.","watchAd":"Watch ad +{count}","toolRefilled":"Tool added","cancel":"Cancel","winTitle":"🎉 Level {level} cleared!","winBody":"You found all {count} mines.","nextLevel":"Next level","home":"Home","deadTitle":"💥 No lives left","deadBody":"Watch an ad to revive with 1 life and keep progress, or restart this level.","revive":"Watch ad to revive","restart":"Restart level","timeUpTitle":"⏰ Time's up","timeUpBody":"Watch an ad for +{seconds}s, or restart this level.","watchAdSeconds":"Watch ad +{seconds}s","energyLowTitle":"Not enough energy","energyLowBody":"You have {energy} energy; entering costs {cost}. Watch an ad for +{bonus} energy.","energyAdded":"Energy added","promptName":"Player name (saved on this device only)","exitTitle":"Leave this level?","exitBody":"Progress in this level will be lost. Next time you will restart Level {level}.","exit":"Leave","continue":"Keep playing","authExpired":"Login expired; progress stays on this device","localSave":"Local save","connecting":"Connecting…","loggedIn":"Signed in · cloud sync on","loggedInNamed":"{name} · cloud sync on","loggedOut":"Not signed in · progress stays on this device","login":"Sign in","logout":"Sign out","cloudPromptTitle":"Save progress to the cloud?","cloudPromptBody":"You have cleared {clears} boards. Sign in to run.ceo to sync progress, tools and energy across devices.","later":"Later","platformConnecting":"Connecting to platform…","localOnly":"Cloud save is unavailable here; progress stays on this device","logoutTitle":"Sign out?","logoutBody":"Progress stays on this device and cloud saves are not deleted.","loggedOutToast":"Signed out; progress now stays on this device","me":"Player","idSrcLocal":"This browser","idSrcTemp":"Temporary","idSrcCloud":"run.ceo","idSrcPending":"Checking…","idSubAnon":"Progress stays in this browser","idSubPending":"Checking platform status…","idSubCloud":"Cloud sync on · name and leaderboards match everywhere","idSubCloudTemp":"Cloud sync on · set a real name on run.ceo","idSubExpired":"Session expired · new progress kept in this browser","idSubUnsupported":"Cloud sync unavailable · progress stays in this browser","idActLogin":"Sign in","idActRelogin":"Sign in again","idActRename":"Rename","idPanelTitle":"Account","idPanelSource":"Name source","idPanelSourceCloud":"run.ceo · synced","idPanelSourceLocal":"This browser","idPanelCooldown":"Rename limit","idPanelCooldownVal":"Once every 7 days","idPanelRename":"Rename on run.ceo","idPanelLogout":"Sign out","idRenameNoSlug":"Cannot open the rename page right now. Please try again later.","idRenameApplied":"Rename saved: {name}","idRenameStale":"Rename result unknown · re-open the game to refresh","idRenameUnknown":"Rename result unknown · please try again later","idRenameDegraded":"Rename keeps not taking effect · sign out and sign in again","docTitle":"Color Mines","toolMineBtn":"🎯 Reveal a mine","toolSafeBtn":"🔍 Find a clue","tipLine1":"Tap = mark \"no mine\" ✕ (tap again to undo) · Drag = mark in bulk · Double-tap = dig","tipLine2":"No two mines touch — reason it out before you dig","statLevel":"Progress","statClears":"Cleared","statTools":"Items","statCoins":"Coins","on":"On","off":"Off","startBtn":"Start level {n}","startSub":"Costs {n} energy · exactly one mine per color / row / column","energyRegen":"+1 energy in {n}s","levelGenFail":"Could not generate the level","cellNotMine":"No mine in this cell","noHintLeft":"Nothing left to hint","itemToolMineName":"Reveal a mine","itemToolMineDesc":"Instantly reveal one mine you have not found","itemToolSafeName":"Find a clue","itemToolSafeDesc":"Points at the next mine you can pin down — and shows the reasoning","itemCoinsName":"Coins","itemCoinsDesc":"Earned by clearing levels — spend them on items","notEnoughCoins":"Not enough coins","boughtWithCoins":"Bought \"{name}\" for {n} coins","buyWithCoins":"Buy for {n} coins","adGrant":"Watch ad · +{n}","toolEmptyBuy":"Spend {price} coins for {amount}× \"{name}\" — no ad needed. You have {balance} coins.","toolEmptyAd":"Watch an ad for {n}× \"{name}\".","toolEmptySave":"You have {balance} coins. Reach {price} to buy items without watching ads.","winCoins":"+{n} coins — {total} total.","toHome":"Back to home","adRevive":"Watch ad · revive","quitTitle":"Quit this level?","quitBody":"Progress in this level is lost — you will restart from level {n}.","quit":"Quit","keepPlaying":"Keep playing","energyRefilled":"Energy refilled","bagTitle":"🎒 My items","bagBody":"Tap an item button during a level to use it.","bagEmpty":"No items yet.","gotIt":"Got it","defaultPlayer":"Me","playerPrefix":"Player","srcCloud":"run.ceo cloud","srcLocal":"local name","idConnecting":"Connecting to run.ceo — progress kept on this device","idAnon":"Not signed in — progress stays on this device","idSynced":"Signed in — progress syncs across your devices","idSyncedNoName":"Signed in and syncing; no name set on the platform yet","idExpired":"Session expired — new progress kept on this device","idUnsupported":"Cloud save is unavailable here — progress stays on this device","reLogin":"Sign in again","goRename":"Change name","accountEntry":"Account ›","accountTitle":"run.ceo account","accountBody":"Signed in — progress syncs across all your devices. Renaming changes your cloud name for this game only, applies everywhere, once every 7 days.","goRenameCloud":"Change name on run.ceo","loginExpiredToast":"Session expired — progress kept on this device","noGameId":"Game id unavailable right now, please retry","renamePageFail":"Could not open the rename page, please retry","nameUpdated":"Name updated","nameUnchanged":"The platform still returns your previous name","noUsableName":"The platform returned no usable name","renameSubmitted":"Rename submitted — it applies next time you open the game","wkEntry":"Weekly event","wkEntrySub":"Collect shards for rewards","wkTitle":"Weekly Event","wkBack":"‹ Back","wkFragLab":"Shards this week","wkGoal":"Goal {n}","wkCarry":"Carried over +{n}","wkCd":"Resets in {d}d {h}h","wkNote":"+{n} shards per level cleared","wkAd":"Watch ad · +{n} shards","wkAdBtn":"Watch ad for shards","wkLocked":"{n} more shards","wkClaimable":"Ready","wkClaimed":"Claimed","wkClaim":"Claim","wkGrand":"Grand prize","wkGrandLocked":"Unlock at {n} shards","wkGrandClaim":"Claim grand prize","wkUnlockToast":"\"{pic}\" unlocked — reward ready","wkGrandToast":"Grand prize unlocked!","wkGot":"Got {text}","wkFragGot":"+{n} shards","rwCoins":"{n} coins","rwToolMine":"{n}× Reveal a mine","rwToolSafe":"{n}× Find a clue","adTitle":"Advertisement","adWatching":"Ad playing… {n}s","adSkip":"Skip (no reward)","adClose":"Close","adReward":"Watch to earn your reward","adFailed":"Ad not finished — no reward given","adNone":"No ad available right now, try again later","adCapped":"You have claimed this reward enough today — come back tomorrow","close":"Close","boardLabel":"Minesweeper board","wsLabel":"win streak · no cap","wsCycLabel":"Last {n} wins","wsClaimBtn":"🎁 Watch ad · claim","wsKeepTitle":"🔥 Your {n}-win streak broke!","wsKeepBody":"Watch a short ad to keep your {n}-win streak, or give it up and restart from 0.","wsKeepAd":"Watch ad · keep streak","wsKeepDrop":"Give up & continue","wsKept":"🔥 Streak kept: {n}","wsDropped":"Streak reset","wsTicketToast":"🔥 {n} wins in a row! Watch an ad to claim your reward","wsClaimGot":"🎁 Claimed {r}","tabHome":"Home","tabRules":"How to play","tabSet":"Settings","tabStreak":"Streak","tabEvent":"Event","streakTitle":"Win streak","wsCurHint":"If it breaks, watch an ad to keep it — otherwise it restarts from 0","clueMineTitle":"This one must be a mine","clueGotIt":"Got it","clueRowLast":"Every other cell in row {n} is ruled out, so this row’s mine can only be here","clueColLast":"Every other cell in column {n} is ruled out, so this column’s mine can only be here","clueRegionLast":"Every other cell in this colour block is ruled out, so its mine can only be here","clueDeep":"This one is certain, but it takes combining several rows and columns","clueRegionOnly":"This colour block is a single cell, so its mine must be here","clueMarkWrongTitle":"That ✕ is wrong","clueMarkWrong":"You crossed this cell out, but it is a mine — that ✕ throws off everything you deduce next","clueAction":"Double-tap this cell to dig it","clueRowClear":"Every other cell left in row {n} shares a column or block with a found mine, or touches one — so this row’s mine can only be here","clueColClear":"Every other cell left in column {n} shares a row or block with a found mine, or touches one — so this column’s mine can only be here","clueRegionClear":"Every other cell left in this colour block is ruled out by the mines you already found — its mine can only be here","clueConfine":"{a}’s mine has to sit inside {b}, so that is {b}’s mine too — follow that through and only this cell is left","clueSqueeze":"The mine on the neighbouring line is stuck in a narrow span, and no two mines touch — rule out the cells it hugs and only this one is left","clueStillOn":"Your last clue is still waiting — dig that one first","gRow":"row {n}","gCol":"column {n}","gRegion":"this colour block"},"zh":{"langName":"简体中文","title":"彩色扫雷 · Color Mines","logoMain":"彩色扫雷","logoSub":"COLOR MINES","start":"开始 第","startCost":"消耗 {cost} 体力 · 每种颜色 / 每行 / 每列恰好一颗雷","homeProgress":"当前进度","homeClears":"累计通关","homeTools":"道具","profileLabel":"玩家名称","player":"玩家","profileSource":"网页本地","accountLabel":"run.ceo 账号","sfxLabel":"音效","sfxOn":"开","sfxOff":"关","langLabel":"语言","homeHint1":"单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","homeHint2":"雷与雷互不相邻，先推理再动手","back":"‹ 返回","hudLevel":"关卡","hudMines":"剩余雷","hudTime":"时间","boardAria":"扫雷棋盘","toolMine":"找一个雷","toolSafe":"找线索","gameHint":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开 · 每种颜色 / 每行 / 每列恰好一颗雷，雷与雷互不相邻","energyFull":"体力已满","energyRefill":"+1 体力 {seconds} 秒后","levelFailed":"关卡生成失败","notMine":"不是雷！剩余 {lives} 条命","allMinesFound":"雷已经全部找到了","noSafeCell":"没有可提示的格子了","safeHint":"这个格子不是雷","toolEmptyTitle":"道具用完了","toolEmptyBody":"看一段广告，补 {count} 个「{name}」道具。","watchAd":"看广告 +{count}","toolRefilled":"已补充道具","cancel":"取消","winTitle":"🎉 第 {level} 关通过！","winBody":"全部 {count} 颗雷都找到了。","nextLevel":"下一关","home":"返回首页","deadTitle":"💥 没有生命了","deadBody":"看一段广告复活（恢复 1 条命，进度保留），或重开本关。","revive":"看广告复活","restart":"重开本关","timeUpTitle":"⏰ 时间到","timeUpBody":"看一段广告 +{seconds} 秒继续，或重开本关。","watchAdSeconds":"看广告 +{seconds}s","energyLowTitle":"体力不足","energyLowBody":"当前体力 {energy}，进关需要 {cost}。看一段广告补 {bonus} 体力。","energyAdded":"已补充体力","promptName":"玩家名称（仅保存在本机）","exitTitle":"退出本关？","exitBody":"本关进度不保留，下次从第 {level} 关重新开始。","exit":"退出","continue":"继续玩","authExpired":"登录已过期，进度暂存本机","localSave":"本地存档","connecting":"连接中…","loggedIn":"已登录 · 进度云同步","loggedInNamed":"{name} · 进度云同步","loggedOut":"未登录 · 进度仅存本机","login":"登录","logout":"退出","cloudPromptTitle":"进度存到云端？","cloudPromptBody":"你已通关 {clears} 盘。登录 run.ceo 账号后，进度、道具、体力跨设备同步。","later":"稍后","platformConnecting":"平台连接中…","localOnly":"当前环境不支持云存档，进度保存在本机","logoutTitle":"退出登录？","logoutBody":"本机继续保留当前进度，云端存档不受影响。","loggedOutToast":"已退出，进度改存本机","me":"玩家","idSrcLocal":"网页本地","idSrcTemp":"临时","idSrcCloud":"run.ceo","idSrcPending":"检查中…","idSubAnon":"进度只存这个浏览器","idSubPending":"正在检查平台状态…","idSubCloud":"云同步已开 · 名字与排行榜全设备一致","idSubCloudTemp":"云同步已开 · 现在是临时名，去 run.ceo 设置正式名","idSubExpired":"登录已过期 · 新进度暂存在这个浏览器","idSubUnsupported":"不支持云同步 · 进度存在这个浏览器","idActLogin":"登录","idActRelogin":"重新登录","idActRename":"改名","idPanelTitle":"账号","idPanelSource":"名称来源","idPanelSourceCloud":"run.ceo · 云端","idPanelSourceLocal":"本浏览器","idPanelCooldown":"改名限制","idPanelCooldownVal":"7 天一次","idPanelRename":"去 run.ceo 改名","idPanelLogout":"退出登录","idRenameNoSlug":"暂时无法打开改名页，请稍后再试。","idRenameApplied":"改名已更新为：{name}","idRenameStale":"改名结果未知 · 请重新进入游戏查看","idRenameUnknown":"改名结果未知 · 请稍后再试","idRenameDegraded":"改名多次未生效 · 请退出重新登录后再试","docTitle":"彩色扫雷 · Color Mines","toolMineBtn":"🎯 找一个雷","toolSafeBtn":"🔍 找线索","tipLine1":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开","tipLine2":"每行/每列/每种颜色恰好一颗雷，雷与雷不相邻 —— 推出来再挖","statLevel":"当前进度","statClears":"累计通关","statTools":"道具","statCoins":"金币","on":"开","off":"关","startBtn":"开始 第 {n}","startSub":"消耗 {n} 体力 · 每种颜色 / 每行 / 每列恰好一颗雷","energyRegen":"+1 体力 {n} 秒后","levelGenFail":"关卡生成失败","cellNotMine":"这个格子不是雷","noHintLeft":"没有可提示的格子了","itemToolMineName":"找一个雷","itemToolMineDesc":"直接点出一颗还没找到的雷","itemToolSafeName":"找线索","itemToolSafeDesc":"指出下一颗能被推出来的雷，并讲清是怎么推出来的","itemCoinsName":"金币","itemCoinsDesc":"通关累积，可直接兑换道具","notEnoughCoins":"金币不够","boughtWithCoins":"已用 {n} 金币购买「{name}」","buyWithCoins":"用 {n} 金币购买","adGrant":"看广告 +{n}","toolEmptyBuy":"用 {price} 金币直接补 {amount} 个「{name}」，不用看广告。当前金币 {balance} 枚。","toolEmptyAd":"看一段广告，补 {n} 个「{name}」道具。","toolEmptySave":"当前金币 {balance} 枚，攒到 {price} 就能直接买、不用看广告。","winCoins":"金币 +{n}，共 {total} 枚。","toHome":"返回首页","adRevive":"看广告复活","quitTitle":"退出本关？","quitBody":"本关进度不保留，下次从第 {n} 关重新开始。","quit":"退出","keepPlaying":"继续玩","energyRefilled":"已补充体力","bagTitle":"🎒 我的道具","bagBody":"关卡里点道具按钮即可使用。","bagEmpty":"还没有任何道具。","gotIt":"知道了","defaultPlayer":"我","playerPrefix":"玩家","srcCloud":"run.ceo 云端","srcLocal":"本机临时名","idConnecting":"正在连接 run.ceo，进度暂存本机","idAnon":"未登录，进度仅保存在本机","idSynced":"已登录，进度在所有设备云同步","idSyncedNoName":"已登录，进度已云同步；平台尚未设置名称","idExpired":"登录已过期，新进度暂存本机","idUnsupported":"当前环境不支持云存档，进度保存在本机","reLogin":"重新登录","goRename":"去改名","accountEntry":"账号 ›","accountTitle":"run.ceo 账号","accountBody":"已登录，当前进度会在所有设备同步。改名只修改本游戏的云端名称，所有设备生效，7 天一次。","goRenameCloud":"去 run.ceo 改名","loginExpiredToast":"登录已过期，进度暂存本机","noGameId":"暂时拿不到本游戏标识，请稍后重试","renamePageFail":"暂时无法打开改名页，请稍后重试","nameUpdated":"名字已更新","nameUnchanged":"平台仍返回改名前的名字","noUsableName":"平台没有返回可用名字","renameSubmitted":"改名已提交，重新进入游戏后生效","wkEntry":"每周活动","wkEntrySub":"集碎片换奖励","wkTitle":"每周活动","wkBack":"‹ 返回","wkFragLab":"本周碎片","wkGoal":"目标 {n}","wkCarry":"上周结转 +{n}","wkCd":"{d}天{h}小时后重置","wkNote":"每通关一盘 +{n} 碎片","wkAd":"看广告 +{n} 碎片","wkAdBtn":"看广告领碎片","wkLocked":"还需 {n} 碎片","wkClaimable":"可领取","wkClaimed":"已领取","wkClaim":"领取","wkGrand":"大奖","wkGrandLocked":"集满 {n} 碎片解锁","wkGrandClaim":"领取大奖","wkUnlockToast":"解锁「{pic}」，可以领奖了","wkGrandToast":"大奖已解锁，快去领取","wkGot":"获得 {text}","wkFragGot":"+{n} 碎片","rwCoins":"{n} 金币","rwToolMine":"{n} 个「找一个雷」","rwToolSafe":"{n} 个「找线索」","adTitle":"广告","adWatching":"广告播放中… {n} 秒","adSkip":"跳过（不领奖励）","adClose":"关闭","adReward":"看完可得奖励","adFailed":"广告没看完，奖励未发放","adNone":"暂时没有可播的广告，请稍后再试","adCapped":"这个奖励今天看得够多了，明天再来","close":"关闭","boardLabel":"扫雷棋盘","wsLabel":"连胜 · 无上限","wsCycLabel":"最近 {n} 盘","wsClaimBtn":"🎁 看广告领取","wsKeepTitle":"🔥 {n} 连胜断了!","wsKeepBody":"看一段广告保持 {n} 连胜;放弃则从 0 重新累积。","wsKeepAd":"看广告保持连胜","wsKeepDrop":"放弃连胜并继续","wsKept":"🔥 连胜已保持:{n}","wsDropped":"连胜已清零","wsTicketToast":"🔥 {n} 连胜达成!看广告领奖励","wsClaimGot":"🎁 已领取 {r}","tabHome":"首页","tabRules":"玩法","tabSet":"设置","tabStreak":"连胜","tabEvent":"活动","streakTitle":"连胜","wsCurHint":"断了看一段广告可保住，否则从 0 重新累计","clueMineTitle":"这一格必定是雷","clueGotIt":"明白了","clueRowLast":"第 {n} 行其它格都排除了，这行的雷只能在这里","clueColLast":"第 {n} 列其它格都排除了，这列的雷只能在这里","clueRegionLast":"这个色块其它格都排除了，它的雷只能在这里","clueDeep":"这一格可以确定，但要跨行列联立才能推出来","clueRegionOnly":"这个色块只有这一格，它的雷必然在这里","clueMarkWrongTitle":"这个 ✕ 标错了","clueMarkWrong":"你在这一格打了 ✕，它其实是雷 —— 这个 ✕ 会把后面的推理全带偏","clueAction":"双击这一格把它挖出来","clueRowClear":"第 {n} 行剩下的格子，要么和已找到的雷同列同色块，要么紧贴着雷 —— 排掉之后这行的雷只能在这里","clueColClear":"第 {n} 列剩下的格子，要么和已找到的雷同行同色块，要么紧贴着雷 —— 排掉之后这列的雷只能在这里","clueRegionClear":"这个色块剩下的格子都能被已找到的雷排掉 —— 它的雷只能在这里","clueConfine":"{a} 的雷只可能落在 {b} 里，那 {b} 的雷就是它 —— 顺着这一步排下去，这里就只剩这一格了","clueSqueeze":"旁边那条线上的雷只能落在很窄的一段里，而雷与雷不相邻 —— 把被贴住的格子排掉后就只剩这一格","clueStillOn":"上一条线索还没落子，先把它挖了","gRow":"第 {n} 行","gCol":"第 {n} 列","gRegion":"这个色块"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"hud-bar","props":{"items":[{"type":"identity-chip","props":{"initial":"P"}},{"type":"energy-chip","props":{"icon":"⚡"}},{"type":"coins-chip","props":{"id":"homeCoins","icon":"💰","action":"shop","initial":0}}]}},{"type":"hero-level","props":{"badge":"COLOR MINES","art":"tiles","artColors":["#e2574c","#f0a63c","#4fb7e8","#6fc86f","#b06fe0"],"kicker":"Next level","desc":"No two mines touch","progress":false}},{"type":"side-rail","props":{"side":"left","items":[{"id":"btnBag","icon":"🎒","label":"Items","action":"bag"},{"id":"dkRules","icon":"📖","label":"Rules","action":"rules"},{"id":"dkSet","icon":"⚙️","label":"Settings","action":"settings"}]}},{"type":"side-rail","props":{"side":"right","items":[{"id":"btnStreak","icon":"🔥","label":"Streak","action":"streak","badgeId":"wsRailBadge"},{"id":"btnWeekly","icon":"✦","label":"Event","action":"weekly","badgeId":"wkBadge"}]}},{"type":"play-cta","props":{"label":"Play Level","small":"Costs 15 energy · exactly one mine per color / row / column"}}]},"streak":{"modules":[{"type":"streak-duo","props":{"icon":"🔥","ticketIcon":"🎟","layout":"stack"}}]},"settings":{"modules":[{"type":"sound-toggle","props":{"label":"Sound"}},{"type":"lang-select","props":{"label":"Language"}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"level":{"col":"level","merge":"max"},"clears":{"col":"clears","merge":"max"},"toolMine":{"col":"tool_mine","merge":"newest"},"toolSafe":{"col":"tool_safe","merge":"newest"},"toolMineGranted":{"col":"tool_mine_granted","merge":"max"},"toolMineSpent":{"col":"tool_mine_spent","merge":"max"},"toolSafeGranted":{"col":"tool_safe_granted","merge":"max"},"toolSafeSpent":{"col":"tool_safe_spent","merge":"max"},"coinsEarned":{"col":"coins_earned","merge":"max"},"coinsSpent":{"col":"coins_spent","merge":"max"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"},"wsCur":{"col":"ws_cur","merge":"newest"},"wsPend":{"col":"ws_pend","merge":"newest"},"wsCyc":{"col":"ws_cyc","merge":"newest"},"wsEarned":{"col":"ws_earned","merge":"max"},"wsClaimed":{"col":"ws_claimed","merge":"max"}}},"stock":{"items":{"coins":{"granted":"coinsEarned","spent":"coinsSpent","initial":0,"icon":"💰","name":"金币","desc":"通关累积，可直接兑换道具","nameKey":"itemCoinsName","descKey":"itemCoinsDesc"},"toolMine":{"granted":"toolMineGranted","spent":"toolMineSpent","legacy":"toolMine","initial":2,"icon":"🎯","name":"找一个雷","desc":"直接点出一颗还没找到的雷","nameKey":"itemToolMineName","descKey":"itemToolMineDesc"},"toolSafe":{"granted":"toolSafeGranted","spent":"toolSafeSpent","legacy":"toolSafe","initial":2,"icon":"🔍","name":"找线索","desc":"按当前盘面推出一格，并告诉你为什么","nameKey":"itemToolSafeName","descKey":"itemToolSafeDesc"}}},"weekly":{"enabled":true,"thresholds":[60,150,300],"goal":300,"frags":{"win":20,"ad":15},"grand":{"coins":500,"toolMine":2,"toolSafe":2},"rewardPool":[{"type":"coins","min":50,"max":200,"weight":3},{"type":"toolMine","min":1,"max":2,"weight":1},{"type":"toolSafe","min":1,"max":2,"weight":1}]},"winstreak":{"enabled":true,"keepMinPrompt":3,"every":10,"rewards":{"energy":60,"coins":10,"frags":10}},"theme":{"accent":"#ffb454","accentInk":"#20160a","accentShadow":"#b96c1c","heroFrom":"#33406b","heroMid":"#1d2740","heroTo":"#161d2c"}}</script>
+<script id="gameConfig" type="application/json">{"id":"mine","reward":{"eMax":120,"eCost":15,"eTickMs":60000,"eAd":60},"settle":{"mode":"fixed","base":10,"firstClearMult":3,"adBonus":{"enabled":true,"multiplier":2,"dailyCap":10,"cooldownMs":60000}},"powerups":[{"id":"toolMine","grantOn":[{"trigger":"levelClear","qty":1}]},{"id":"toolSafe","grantOn":[{"trigger":"dailyLogin","qty":1}]}],"ads":{"interstitial":{"enabled":true,"everyN":5,"minGapSec":60},"geo":{"CN":{"rewarded":false,"interstitial":false}},"placements":{"tool-refill":{"format":"rewarded","onFail":"deny","capping":{"maxPerDay":20}},"fail-revive":{"format":"rewarded","onFail":"retry","capping":{"maxPerDay":20}},"time-bonus":{"format":"rewarded","onFail":"deny","capping":{"maxPerSession":3}},"streak-keep":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":20}},"streak-claim":{"format":"rewarded","onFail":"grant","capping":{"maxPerDay":3}}},"play":{"sources":[{"type":"telegram","env":"telegram"},{"type":"monetag","zoneId":"11440777","env":"telegram"},{"type":"directlink","url":"https://omg10.com/4/11622862","env":"web"},{"type":"house"}],"houseSeconds":5,"timeoutMs":20000},"verification":{"monetag":"2f9e3e08b43a9d525e226b36d0a22368","site":"play-color-mines.run.ceo"},"passive":{"multitag":{"src":"https://quge5.com/88/tag.min.js","zone":"271963","env":"web","screens":["home"]}}},"lifetimeStats":[{"key":"mines_found","event":"mine_found","agg":"count","label":"找到多少雷"},{"key":"total_clears","event":"level_cleared","agg":"count","label":"通关数"},{"key":"best_level","event":"level_cleared","agg":"max","field":"level","label":"最高关卡"}],"leaderboards":[{"id":"top_level","metric":"best_level","order":"desc","operator":"best","period":"none"}],"i18n":{"default":"zh","locales":{"en":{"langName":"English","title":"Color Mines","logoMain":"Color Mines","logoSub":"COLOR MINES","start":"Play Level","startCost":"Costs {cost} energy · exactly one mine per color / row / column","homeProgress":"Current level","homeClears":"Total clears","homeTools":"Tools","profileLabel":"Player name","player":"Player","profileSource":"This browser","accountLabel":"run.ceo account","sfxLabel":"Sound","sfxOn":"On","sfxOff":"Off","langLabel":"Language","homeHint1":"Click = mark safe · drag = mark multiple · double-click = dig","homeHint2":"Mines never touch; reason before you move","back":"‹ Back","hudLevel":"Level","hudMines":"Mines left","hudTime":"Time","boardAria":"Minesweeper board","toolMine":"Find one mine","toolSafe":"Find a clue","gameHint":"Click = mark safe ✕ (click again to cancel) · drag = mark/unmark · double-click = dig · exactly one mine per color / row / column; mines never touch","energyFull":"Energy full","energyRefill":"+1 energy in {seconds}s","levelFailed":"Could not generate this level","notMine":"Not a mine! {lives} lives left","allMinesFound":"All mines have been found","noSafeCell":"No safe cell left to hint","safeHint":"This cell is not a mine","toolEmptyTitle":"No tools left","toolEmptyBody":"Watch an ad to add {count} “{name}”.","watchAd":"Watch ad +{count}","toolRefilled":"Tool added","cancel":"Cancel","winTitle":"🎉 Level {level} cleared!","winBody":"You found all {count} mines.","nextLevel":"Next level","home":"Home","deadTitle":"💥 No lives left","deadBody":"Watch an ad to revive with 1 life and keep progress, or restart this level.","revive":"Watch ad to revive","restart":"Restart level","timeUpTitle":"⏰ Time's up","timeUpBody":"Watch an ad for +{seconds}s, or restart this level.","watchAdSeconds":"Watch ad +{seconds}s","energyLowTitle":"Not enough energy","energyLowBody":"You have {energy} energy; entering costs {cost}. Watch an ad for +{bonus} energy.","energyAdded":"Energy added","promptName":"Player name (saved on this device only)","exitTitle":"Leave this level?","exitBody":"Progress in this level will be lost. Next time you will restart Level {level}.","exit":"Leave","continue":"Keep playing","authExpired":"Login expired; progress stays on this device","localSave":"Local save","connecting":"Connecting…","loggedIn":"Signed in · cloud sync on","loggedInNamed":"{name} · cloud sync on","loggedOut":"Not signed in · progress stays on this device","login":"Sign in","logout":"Sign out","cloudPromptTitle":"Save progress to the cloud?","cloudPromptBody":"You have cleared {clears} boards. Sign in to run.ceo to sync progress, tools and energy across devices.","later":"Later","platformConnecting":"Connecting to platform…","localOnly":"Cloud save is unavailable here; progress stays on this device","logoutTitle":"Sign out?","logoutBody":"Progress stays on this device and cloud saves are not deleted.","loggedOutToast":"Signed out; progress now stays on this device","me":"Player","idSrcLocal":"This browser","idSrcTemp":"Temporary","idSrcCloud":"run.ceo","idSrcPending":"Checking…","idSubAnon":"Progress stays in this browser","idSubPending":"Checking platform status…","idSubCloud":"Cloud sync on · name and leaderboards match everywhere","idSubCloudTemp":"Cloud sync on · set a real name on run.ceo","idSubExpired":"Session expired · new progress kept in this browser","idSubUnsupported":"Cloud sync unavailable · progress stays in this browser","idActLogin":"Sign in","idActRelogin":"Sign in again","idActRename":"Rename","idPanelTitle":"Account","idPanelSource":"Name source","idPanelSourceCloud":"run.ceo · synced","idPanelSourceLocal":"This browser","idPanelCooldown":"Rename limit","idPanelCooldownVal":"Once every 7 days","idPanelRename":"Rename on run.ceo","idPanelLogout":"Sign out","idRenameNoSlug":"Cannot open the rename page right now. Please try again later.","idRenameApplied":"Rename saved: {name}","idRenameStale":"Rename result unknown · re-open the game to refresh","idRenameUnknown":"Rename result unknown · please try again later","idRenameDegraded":"Rename keeps not taking effect · sign out and sign in again","docTitle":"Color Mines","toolMineBtn":"🎯 Reveal a mine","toolSafeBtn":"🔍 Find a clue","tipLine1":"Tap = mark \"no mine\" ✕ (tap again to undo) · Drag = mark in bulk · Double-tap = dig","tipLine2":"No two mines touch — reason it out before you dig","statLevel":"Progress","statClears":"Cleared","statTools":"Items","statCoins":"Coins","on":"On","off":"Off","startBtn":"Start level {n}","startSub":"Costs {n} energy · exactly one mine per color / row / column","energyRegen":"+1 energy in {n}s","levelGenFail":"Could not generate the level","cellNotMine":"No mine in this cell","noHintLeft":"Nothing left to hint","itemToolMineName":"Reveal a mine","itemToolMineDesc":"Instantly reveal one mine you have not found","itemToolSafeName":"Find a clue","itemToolSafeDesc":"Points at the next mine you can pin down — and shows the reasoning","itemCoinsName":"Coins","itemCoinsDesc":"Earned by clearing levels — spend them on items","notEnoughCoins":"Not enough coins","boughtWithCoins":"Bought \"{name}\" for {n} coins","buyWithCoins":"Buy for {n} coins","adGrant":"Watch ad · +{n}","toolEmptyBuy":"Spend {price} coins for {amount}× \"{name}\" — no ad needed. You have {balance} coins.","toolEmptyAd":"Watch an ad for {n}× \"{name}\".","toolEmptySave":"You have {balance} coins. Reach {price} to buy items without watching ads.","winCoins":"+{n} coins — {total} total.","toHome":"Back to home","adRevive":"Watch ad · revive","quitTitle":"Quit this level?","quitBody":"Progress in this level is lost — you will restart from level {n}.","quit":"Quit","keepPlaying":"Keep playing","energyRefilled":"Energy refilled","bagTitle":"🎒 My items","bagBody":"Tap an item button during a level to use it.","bagEmpty":"No items yet.","gotIt":"Got it","defaultPlayer":"Me","playerPrefix":"Player","srcCloud":"run.ceo cloud","srcLocal":"local name","idConnecting":"Connecting to run.ceo — progress kept on this device","idAnon":"Not signed in — progress stays on this device","idSynced":"Signed in — progress syncs across your devices","idSyncedNoName":"Signed in and syncing; no name set on the platform yet","idExpired":"Session expired — new progress kept on this device","idUnsupported":"Cloud save is unavailable here — progress stays on this device","reLogin":"Sign in again","goRename":"Change name","accountEntry":"Account ›","accountTitle":"run.ceo account","accountBody":"Signed in — progress syncs across all your devices. Renaming changes your cloud name for this game only, applies everywhere, once every 7 days.","goRenameCloud":"Change name on run.ceo","loginExpiredToast":"Session expired — progress kept on this device","noGameId":"Game id unavailable right now, please retry","renamePageFail":"Could not open the rename page, please retry","nameUpdated":"Name updated","nameUnchanged":"The platform still returns your previous name","noUsableName":"The platform returned no usable name","renameSubmitted":"Rename submitted — it applies next time you open the game","wkEntry":"Weekly event","wkEntrySub":"Collect shards for rewards","wkTitle":"Weekly Event","wkBack":"‹ Back","wkFragLab":"Shards this week","wkGoal":"Goal {n}","wkCarry":"Carried over +{n}","wkCd":"Resets in {d}d {h}h","wkNote":"+{n} shards per level cleared","wkAd":"Watch ad · +{n} shards","wkAdBtn":"Watch ad for shards","wkLocked":"{n} more shards","wkClaimable":"Ready","wkClaimed":"Claimed","wkClaim":"Claim","wkGrand":"Grand prize","wkGrandLocked":"Unlock at {n} shards","wkGrandClaim":"Claim grand prize","wkUnlockToast":"\"{pic}\" unlocked — reward ready","wkGrandToast":"Grand prize unlocked!","wkGot":"Got {text}","wkFragGot":"+{n} shards","rwCoins":"{n} coins","rwToolMine":"{n}× Reveal a mine","rwToolSafe":"{n}× Find a clue","adTitle":"Advertisement","adWatching":"Ad playing… {n}s","adSkip":"Skip (no reward)","adClose":"Close","adReward":"Watch to earn your reward","adFailed":"Ad not finished — no reward given","adNone":"No ad available right now, try again later","adCapped":"You have claimed this reward enough today — come back tomorrow","close":"Close","boardLabel":"Minesweeper board","wsLabel":"win streak · no cap","wsCycLabel":"Last {n} wins","wsClaimBtn":"🎁 Watch ad · claim","wsKeepTitle":"🔥 Your {n}-win streak broke!","wsKeepBody":"Watch a short ad to keep your {n}-win streak, or give it up and restart from 0.","wsKeepAd":"Watch ad · keep streak","wsKeepDrop":"Give up & continue","wsKept":"🔥 Streak kept: {n}","wsDropped":"Streak reset","wsTicketToast":"🔥 {n} wins in a row! Watch an ad to claim your reward","wsClaimGot":"🎁 Claimed {r}","tabHome":"Home","tabRules":"How to play","tabSet":"Settings","tabStreak":"Streak","tabEvent":"Event","streakTitle":"Win streak","wsCurHint":"If it breaks, watch an ad to keep it — otherwise it restarts from 0","clueMineTitle":"This one must be a mine","clueGotIt":"Got it","clueRowLast":"Every other cell in this row is ruled out, so its mine can only be here","clueColLast":"Every other cell in this column is ruled out, so its mine can only be here","clueRegionLast":"Every other cell in this colour block is ruled out, so its mine can only be here","clueRuledCover":"The mines of {a} can only sit inside {b} — one each, filling them exactly, so the other {k} cells there are not mines","clueRuledRefute":"Suppose this cell were a mine — follow it through and {bad}. That is a contradiction, so it is not a mine","clueRefuteEmpty":"{g} would have no cell left to put its mine in","clueRefuteAdj":"two mines would end up touching each other","clueRangeTitle":"Narrowing it down first","clueRange":"This one cannot be explained step by step — it needs several rows and columns at once. Exactly one of these {k} cells is a mine, the rest are safe — tap on the right to see which.","clueReveal":"Just tell me","gJoin":", ","clueDeep":"This one is certain, but it takes combining several rows and columns","clueRegionOnly":"This colour block is a single cell, so its mine must be here","clueAction":"Double-tap this cell to dig it","clueStepOf":"Step {i} of {n}","clueRuledTitle":"These {k} cells are ruled out","clueRuledGroupMine":"{g} already has its mine — every row, column and colour block holds exactly one, so these {k} cells are all safe","clueRuledTouchMine":"These {k} cells sit right next to a mine you already found — no two mines ever touch, so none of them can be one","clueRuledConfine":"{a}’s mine can only sit inside {b} — so {b}’s mine is that same one, which clears the other {k} cells of {b}","clueRuledSqueeze":"{a}’s mine is stuck in a narrow span, and no two mines touch — the {k} cells that span hugs are all safe","cluePendTitle":"This step needs combining","cluePending":"{k} cells here cannot be ruled out in one step — this cell really is a mine, but seeing why takes combining several rows and columns","clueNextStep":"Next","clueStillOn":"Your last clue is still waiting — dig that one first","gRow":"row {n}","gCol":"column {n}","gRegion":"this colour block","gThisRow":"this row","gThisCol":"this column","gThisRegion":"this colour block","cgLabel":"Story scenes","cgHint":"Cutscenes at the start and every 100 levels","tabStory":"Story","storyTitle":"🎬 Story gallery","storyBody":"Tap any unlocked scene to watch it again.","storyPrologue":"Prologue","storyChapter":"Chapter {n}","storyLockedStart":"Unlocks when you start level 1","storyLockedAt":"Unlocks after you clear level {n}","storyReplay":"Replay","storyEmpty":"No story scenes yet."},"zh":{"langName":"简体中文","title":"彩色扫雷 · Color Mines","logoMain":"彩色扫雷","logoSub":"COLOR MINES","start":"开始 第","startCost":"消耗 {cost} 体力 · 每种颜色 / 每行 / 每列恰好一颗雷","homeProgress":"当前进度","homeClears":"累计通关","homeTools":"道具","profileLabel":"玩家名称","player":"玩家","profileSource":"网页本地","accountLabel":"run.ceo 账号","sfxLabel":"音效","sfxOn":"开","sfxOff":"关","langLabel":"语言","homeHint1":"单击 = 标记「不是雷」· 按住拖动 = 批量标记 · 快速双击 = 挖开","homeHint2":"雷与雷互不相邻，先推理再动手","back":"‹ 返回","hudLevel":"关卡","hudMines":"剩余雷","hudTime":"时间","boardAria":"扫雷棋盘","toolMine":"找一个雷","toolSafe":"找线索","gameHint":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开 · 每种颜色 / 每行 / 每列恰好一颗雷，雷与雷互不相邻","energyFull":"体力已满","energyRefill":"+1 体力 {seconds} 秒后","levelFailed":"关卡生成失败","notMine":"不是雷！剩余 {lives} 条命","allMinesFound":"雷已经全部找到了","noSafeCell":"没有可提示的格子了","safeHint":"这个格子不是雷","toolEmptyTitle":"道具用完了","toolEmptyBody":"看一段广告，补 {count} 个「{name}」道具。","watchAd":"看广告 +{count}","toolRefilled":"已补充道具","cancel":"取消","winTitle":"🎉 第 {level} 关通过！","winBody":"全部 {count} 颗雷都找到了。","nextLevel":"下一关","home":"返回首页","deadTitle":"💥 没有生命了","deadBody":"看一段广告复活（恢复 1 条命，进度保留），或重开本关。","revive":"看广告复活","restart":"重开本关","timeUpTitle":"⏰ 时间到","timeUpBody":"看一段广告 +{seconds} 秒继续，或重开本关。","watchAdSeconds":"看广告 +{seconds}s","energyLowTitle":"体力不足","energyLowBody":"当前体力 {energy}，进关需要 {cost}。看一段广告补 {bonus} 体力。","energyAdded":"已补充体力","promptName":"玩家名称（仅保存在本机）","exitTitle":"退出本关？","exitBody":"本关进度不保留，下次从第 {level} 关重新开始。","exit":"退出","continue":"继续玩","authExpired":"登录已过期，进度暂存本机","localSave":"本地存档","connecting":"连接中…","loggedIn":"已登录 · 进度云同步","loggedInNamed":"{name} · 进度云同步","loggedOut":"未登录 · 进度仅存本机","login":"登录","logout":"退出","cloudPromptTitle":"进度存到云端？","cloudPromptBody":"你已通关 {clears} 盘。登录 run.ceo 账号后，进度、道具、体力跨设备同步。","later":"稍后","platformConnecting":"平台连接中…","localOnly":"当前环境不支持云存档，进度保存在本机","logoutTitle":"退出登录？","logoutBody":"本机继续保留当前进度，云端存档不受影响。","loggedOutToast":"已退出，进度改存本机","me":"玩家","idSrcLocal":"网页本地","idSrcTemp":"临时","idSrcCloud":"run.ceo","idSrcPending":"检查中…","idSubAnon":"进度只存这个浏览器","idSubPending":"正在检查平台状态…","idSubCloud":"云同步已开 · 名字与排行榜全设备一致","idSubCloudTemp":"云同步已开 · 现在是临时名，去 run.ceo 设置正式名","idSubExpired":"登录已过期 · 新进度暂存在这个浏览器","idSubUnsupported":"不支持云同步 · 进度存在这个浏览器","idActLogin":"登录","idActRelogin":"重新登录","idActRename":"改名","idPanelTitle":"账号","idPanelSource":"名称来源","idPanelSourceCloud":"run.ceo · 云端","idPanelSourceLocal":"本浏览器","idPanelCooldown":"改名限制","idPanelCooldownVal":"7 天一次","idPanelRename":"去 run.ceo 改名","idPanelLogout":"退出登录","idRenameNoSlug":"暂时无法打开改名页，请稍后再试。","idRenameApplied":"改名已更新为：{name}","idRenameStale":"改名结果未知 · 请重新进入游戏查看","idRenameUnknown":"改名结果未知 · 请稍后再试","idRenameDegraded":"改名多次未生效 · 请退出重新登录后再试","docTitle":"彩色扫雷 · Color Mines","toolMineBtn":"🎯 找一个雷","toolSafeBtn":"🔍 找线索","tipLine1":"单击 = 标记「不是雷」✕（再点取消）· 按住拖动 = 批量标记/取消 · 快速双击 = 挖开","tipLine2":"每行/每列/每种颜色恰好一颗雷，雷与雷不相邻 —— 推出来再挖","statLevel":"当前进度","statClears":"累计通关","statTools":"道具","statCoins":"金币","on":"开","off":"关","startBtn":"开始 第 {n}","startSub":"消耗 {n} 体力 · 每种颜色 / 每行 / 每列恰好一颗雷","energyRegen":"+1 体力 {n} 秒后","levelGenFail":"关卡生成失败","cellNotMine":"这个格子不是雷","noHintLeft":"没有可提示的格子了","itemToolMineName":"找一个雷","itemToolMineDesc":"直接点出一颗还没找到的雷","itemToolSafeName":"找线索","itemToolSafeDesc":"指出下一颗能被推出来的雷，并讲清是怎么推出来的","itemCoinsName":"金币","itemCoinsDesc":"通关累积，可直接兑换道具","notEnoughCoins":"金币不够","boughtWithCoins":"已用 {n} 金币购买「{name}」","buyWithCoins":"用 {n} 金币购买","adGrant":"看广告 +{n}","toolEmptyBuy":"用 {price} 金币直接补 {amount} 个「{name}」，不用看广告。当前金币 {balance} 枚。","toolEmptyAd":"看一段广告，补 {n} 个「{name}」道具。","toolEmptySave":"当前金币 {balance} 枚，攒到 {price} 就能直接买、不用看广告。","winCoins":"金币 +{n}，共 {total} 枚。","toHome":"返回首页","adRevive":"看广告复活","quitTitle":"退出本关？","quitBody":"本关进度不保留，下次从第 {n} 关重新开始。","quit":"退出","keepPlaying":"继续玩","energyRefilled":"已补充体力","bagTitle":"🎒 我的道具","bagBody":"关卡里点道具按钮即可使用。","bagEmpty":"还没有任何道具。","gotIt":"知道了","defaultPlayer":"我","playerPrefix":"玩家","srcCloud":"run.ceo 云端","srcLocal":"本机临时名","idConnecting":"正在连接 run.ceo，进度暂存本机","idAnon":"未登录，进度仅保存在本机","idSynced":"已登录，进度在所有设备云同步","idSyncedNoName":"已登录，进度已云同步；平台尚未设置名称","idExpired":"登录已过期，新进度暂存本机","idUnsupported":"当前环境不支持云存档，进度保存在本机","reLogin":"重新登录","goRename":"去改名","accountEntry":"账号 ›","accountTitle":"run.ceo 账号","accountBody":"已登录，当前进度会在所有设备同步。改名只修改本游戏的云端名称，所有设备生效，7 天一次。","goRenameCloud":"去 run.ceo 改名","loginExpiredToast":"登录已过期，进度暂存本机","noGameId":"暂时拿不到本游戏标识，请稍后重试","renamePageFail":"暂时无法打开改名页，请稍后重试","nameUpdated":"名字已更新","nameUnchanged":"平台仍返回改名前的名字","noUsableName":"平台没有返回可用名字","renameSubmitted":"改名已提交，重新进入游戏后生效","wkEntry":"每周活动","wkEntrySub":"集碎片换奖励","wkTitle":"每周活动","wkBack":"‹ 返回","wkFragLab":"本周碎片","wkGoal":"目标 {n}","wkCarry":"上周结转 +{n}","wkCd":"{d}天{h}小时后重置","wkNote":"每通关一盘 +{n} 碎片","wkAd":"看广告 +{n} 碎片","wkAdBtn":"看广告领碎片","wkLocked":"还需 {n} 碎片","wkClaimable":"可领取","wkClaimed":"已领取","wkClaim":"领取","wkGrand":"大奖","wkGrandLocked":"集满 {n} 碎片解锁","wkGrandClaim":"领取大奖","wkUnlockToast":"解锁「{pic}」，可以领奖了","wkGrandToast":"大奖已解锁，快去领取","wkGot":"获得 {text}","wkFragGot":"+{n} 碎片","rwCoins":"{n} 金币","rwToolMine":"{n} 个「找一个雷」","rwToolSafe":"{n} 个「找线索」","adTitle":"广告","adWatching":"广告播放中… {n} 秒","adSkip":"跳过（不领奖励）","adClose":"关闭","adReward":"看完可得奖励","adFailed":"广告没看完，奖励未发放","adNone":"暂时没有可播的广告，请稍后再试","adCapped":"这个奖励今天看得够多了，明天再来","close":"关闭","boardLabel":"扫雷棋盘","wsLabel":"连胜 · 无上限","wsCycLabel":"最近 {n} 盘","wsClaimBtn":"🎁 看广告领取","wsKeepTitle":"🔥 {n} 连胜断了!","wsKeepBody":"看一段广告保持 {n} 连胜;放弃则从 0 重新累积。","wsKeepAd":"看广告保持连胜","wsKeepDrop":"放弃连胜并继续","wsKept":"🔥 连胜已保持:{n}","wsDropped":"连胜已清零","wsTicketToast":"🔥 {n} 连胜达成!看广告领奖励","wsClaimGot":"🎁 已领取 {r}","tabHome":"首页","tabRules":"玩法","tabSet":"设置","tabStreak":"连胜","tabEvent":"活动","streakTitle":"连胜","wsCurHint":"断了看一段广告可保住，否则从 0 重新累计","clueMineTitle":"这一格必定是雷","clueGotIt":"明白了","clueRowLast":"这一行其它格都排除了，它的雷只能在这里","clueColLast":"这一列其它格都排除了，它的雷只能在这里","clueRegionLast":"这个色块其它格都排除了，它的雷只能在这里","clueRuledCover":"{a} 的雷只能落在 {b} 里 —— 各占一颗正好占满，所以那边其它 {k} 格都不是雷","clueRuledRefute":"假设这一格是雷，顺着推下去{bad} —— 自相矛盾，所以它不是雷","clueRefuteEmpty":"{g}就一个能放雷的格都不剩了","clueRefuteAdj":"会出现两颗雷贴在一起","clueRangeTitle":"先给范围","clueRange":"这一步没法一步步讲清，要跨行列一起看。这 {k} 格里只有一格是雷，其余都是安全的 —— 想知道是哪一格就点右边","clueReveal":"直接告诉我","gJoin":"、","clueDeep":"这一格可以确定，但要跨行列联立才能推出来","clueRegionOnly":"这个色块只有这一格，它的雷必然在这里","clueAction":"双击这一格把它挖出来","clueStepOf":"第 {i}/{n} 步","clueRuledTitle":"这 {k} 格可以排掉","clueRuledGroupMine":"{g}里已经有雷了 —— 每行、每列、每个色块都只有一颗雷，所以这 {k} 格都不是雷","clueRuledTouchMine":"这 {k} 格紧贴着你已经找到的雷 —— 两颗雷永远不相邻，所以都不是雷","clueRuledConfine":"{a} 的雷只可能落在 {b} 里 —— 那 {b} 的雷就是它，于是 {b} 里另外这 {k} 格都不是雷","clueRuledSqueeze":"{a} 的雷被压在很窄的一段里，而两颗雷不相邻 —— 被这一段整段贴住的这 {k} 格都不是雷","cluePendTitle":"这一步要联立","cluePending":"这里还有 {k} 格没法一步排掉 —— 这一格确实是雷，但要跨行列一起看才推得出来","clueNextStep":"下一步","clueStillOn":"上一条线索还没落子，先把它挖了","gRow":"第 {n} 行","gCol":"第 {n} 列","gRegion":"这个色块","gThisRow":"这一行","gThisCol":"这一列","gThisRegion":"这个色块","cgLabel":"剧情动画","cgHint":"开局与每 100 关的过场动画","tabStory":"剧情","storyTitle":"🎬 剧情回顾","storyBody":"已解锁的过场动画，点一下就能重看。","storyPrologue":"序章","storyChapter":"第 {n} 章","storyLockedStart":"开始第 1 关后解锁","storyLockedAt":"通关第 {n} 关后解锁","storyReplay":"重播","storyEmpty":"还没有任何剧情动画。"}}},"geoAccess":{"mode":"all"},"screens":{"home":{"modules":[{"type":"hud-bar","props":{"items":[{"type":"identity-chip","props":{"initial":"P"}},{"type":"energy-chip","props":{"icon":"⚡"}},{"type":"coins-chip","props":{"id":"homeCoins","icon":"💰","action":"shop","initial":0}}]}},{"type":"hero-level","props":{"badge":"COLOR MINES","art":"tiles","artColors":["#e2574c","#f0a63c","#4fb7e8","#6fc86f","#b06fe0"],"kicker":"Next level","desc":"No two mines touch","progress":false}},{"type":"side-rail","props":{"side":"left","items":[{"id":"btnBag","icon":"🎒","label":"Items","action":"bag"},{"id":"dkRules","icon":"📖","label":"Rules","action":"rules"},{"id":"dkSet","icon":"⚙️","label":"Settings","action":"settings"},{"id":"dkStory","icon":"🎬","label":"Story","action":"story"}]}},{"type":"side-rail","props":{"side":"right","items":[{"id":"btnStreak","icon":"🔥","label":"Streak","action":"streak","badgeId":"wsRailBadge"},{"id":"btnWeekly","icon":"✦","label":"Event","action":"weekly","badgeId":"wkBadge"}]}},{"type":"play-cta","props":{"label":"Play Level","small":"Costs 15 energy · exactly one mine per color / row / column"}}]},"streak":{"modules":[{"type":"streak-duo","props":{"icon":"🔥","ticketIcon":"🎟","layout":"stack"}}]},"settings":{"modules":[{"type":"sound-toggle","props":{"label":"Sound"}},{"type":"switch-row","props":{"id":"cgToggle","label":"Story scenes","hint":"Cutscenes at the start and every 100 levels"}},{"type":"lang-select","props":{"label":"Language"}}]}},"host":{"storagePrefix":"mine:"},"save":{"version":1},"platform":{"entity":"Save","loginPromptAfterClears":3,"fields":{"level":{"col":"level","merge":"max"},"clears":{"col":"clears","merge":"max"},"toolMine":{"col":"tool_mine","merge":"newest"},"toolSafe":{"col":"tool_safe","merge":"newest"},"toolMineGranted":{"col":"tool_mine_granted","merge":"max"},"toolMineSpent":{"col":"tool_mine_spent","merge":"max"},"toolSafeGranted":{"col":"tool_safe_granted","merge":"max"},"toolSafeSpent":{"col":"tool_safe_spent","merge":"max"},"coinsEarned":{"col":"coins_earned","merge":"max"},"coinsSpent":{"col":"coins_spent","merge":"max"},"energy":{"col":"energy","merge":"newest"},"lastTs":{"col":"energy_ts","merge":"newest"},"alias":{"col":"alias","merge":"newest"},"sfx":{"col":"sfx","merge":"newest"},"wsCur":{"col":"ws_cur","merge":"newest"},"wsPend":{"col":"ws_pend","merge":"newest"},"wsCyc":{"col":"ws_cyc","merge":"newest"},"wsEarned":{"col":"ws_earned","merge":"max"},"wsClaimed":{"col":"ws_claimed","merge":"max"}}},"stock":{"items":{"coins":{"granted":"coinsEarned","spent":"coinsSpent","initial":0,"icon":"💰","name":"金币","desc":"通关累积，可直接兑换道具","nameKey":"itemCoinsName","descKey":"itemCoinsDesc"},"toolMine":{"granted":"toolMineGranted","spent":"toolMineSpent","legacy":"toolMine","initial":2,"icon":"🎯","name":"找一个雷","desc":"直接点出一颗还没找到的雷","nameKey":"itemToolMineName","descKey":"itemToolMineDesc"},"toolSafe":{"granted":"toolSafeGranted","spent":"toolSafeSpent","legacy":"toolSafe","initial":2,"icon":"🔍","name":"找线索","desc":"按当前盘面推出一格，并告诉你为什么","nameKey":"itemToolSafeName","descKey":"itemToolSafeDesc"}}},"weekly":{"enabled":true,"thresholds":[60,150,300],"goal":300,"frags":{"win":20,"ad":15},"grand":{"coins":500,"toolMine":2,"toolSafe":2},"rewardPool":[{"type":"coins","min":50,"max":200,"weight":3},{"type":"toolMine","min":1,"max":2,"weight":1},{"type":"toolSafe","min":1,"max":2,"weight":1}]},"winstreak":{"enabled":true,"keepMinPrompt":3,"every":10,"rewards":{"energy":60,"coins":10,"frags":10}},"theme":{"accent":"#ffb454","accentInk":"#20160a","accentShadow":"#b96c1c","heroFrom":"#33406b","heroMid":"#1d2740","heroTo":"#161d2c"}}</script>
 <script src="./core/shell.js"></script>
 <script src="./core/home.js"></script>
 <script src="./core/identity.js"></script>
@@ -384,6 +476,7 @@
 <script src="./core/placements.js"></script>
 <script src="./core/adplay.js"></script>
 <script src="./core/winstreak.js"></script>
+<script src="./mine-story.js"></script>
 <script>
 (function () {
   'use strict';
@@ -412,7 +505,7 @@
   var CFG = JSON.parse(document.getElementById('gameConfig').textContent);
   var Reward = RewardCore.create(CFG.reward);
   var save = Object.assign({ level: 1, clears: 0,
-    energy: Reward.E_MAX, lastTs: Date.now(), alias: '', sfx: true }, load() || {});
+    energy: Reward.E_MAX, lastTs: Date.now(), alias: '', sfx: true, cg: true }, load() || {});
   /* 道具库存走单调账本（core/stock.js）：只存 granted/spent 两个只增计数，库存 = granted - spent。
      旧做法是存「库存数」+ 按 updatedMs 取新合并，而 updatedMs 会被体力恢复/昵称/音效等无关写入刷新，
      于是任一端拿着默认库存做一次无关保存就把已消耗的道具复活——正是「用了道具，重新登录又变回默认 4 个」的根因。 */
@@ -901,37 +994,215 @@
 
   /* 道具「找线索」（2026-08-26 改造，owner 选定方案 A）：
      不再随机给一个安全格——按当前盘面的真实线索推出一格，高亮线索来源并讲清理由，
-     落子仍由玩家自己点。事实只喂 S.opened(已挖开=非雷) 与 S.found(已确认的雷)；
-     **S.marks 是玩家自己打的 ✕ 猜测，绝不能当事实**，他标错了会让提示跟着错。 */
+     落子仍由玩家自己点。事实喂 S.opened(已挖开=非雷)、S.found(已确认的雷) 与 S.marks；
+     marks 是玩家自己的记号（可能表示「排除」，也可能表示「我怀疑这儿有雷」），
+     引擎只采信其中确实不是雷的那些，**不拿它去判玩家标错**。 */
   function clearClue() {
     if (!S || !S.clue) return;
     var el;
-    (S.clue.group || []).forEach(function (i) {
-      el = cellEl(i); if (el) el.classList.remove('cluegroup');
+    (S.clue.paint || []).forEach(function (i) {
+      el = cellEl(i);
+      if (el) el.classList.remove('cluegroup', 'clueruled', 'cluestep', 'cluepend', 'cluerange',
+        'clueline', 'clueline-row', 'clueline-col', 'cluecause');
     });
     el = cellEl(S.clue.idx); if (el) el.classList.remove('cluespot');
+    $('board').classList.remove('spotlight', 'rangelit');
     S.clue = null;
     $('clueBar').hidden = true;
   }
 
-  function showClue(hint) {
+  /* 一条线索拆成 N 步：前面每一步讲「这几格为什么不是雷」（引擎的 ruled 记账），
+     最后一步才是结论。修的正是用户实报的「按提示其实有多个选择，但只解释了正确的那个」——
+     组里每一格欠的理由，现在逐格还清；实在还不清的（enum 层）走 pending 明说。 */
+  function clueSteps(hint) {
+    var steps = (hint.ruled || []).map(function (r) { return { kind: 'ruled', r: r }; });
+    /* 兜底层（enum）讲不出理由：这时先插一步**只给范围**，答案要玩家自己点「直接告诉我」才揭晓。
+       用户实报「这个提示无端端就给出了最终答案，不理解」——「无端端」的要害不是答案不对，
+       而是**替玩家做了揭晓这个决定**。讲得清的层不插这一步（它本来就在讲理）。 */
+    if (hint.why === 'enum' && (hint.shortlist || []).length > 1) steps.push({ kind: 'range' });
+    steps.push({ kind: 'final' });
+    return steps;
+  }
+
+  /* 这一步的理由指的是哪一整条线（行/列）？没有就返回 null（如「紧贴着雷」是邻域，不是线）。 */
+  function stepLine(step, hint) {
+    /* 'range' 步没有 r（它讲的不是某条排除规则，而是「范围就在这一组里」），
+       所以跟结论步一样按 hint.group 取线；不加这一档会踩 step.r 为 undefined 直接崩。 */
+    if (step.kind === 'final' || step.kind === 'range') {
+      var g = hint.group;
+      return g && (g.kind === 'row' || g.kind === 'col') ? { kind: g.kind, at: g.at } : null;
+    }
+    var r = step.r;
+    if (r.rule === 'group-mine' && r.group) return { kind: r.group.kind, at: r.group.at };
+    if (r.rule === 'confine' && r.from) return { kind: r.from.kind, at: r.from.at };
+    if (r.rule === 'squeeze') return { kind: r.lineKind, at: r.from };
+    return null;
+  }
+
+  function lineCells(ref) {
+    var out = [], size = S.size, i;
+    if (!ref || (ref.kind !== 'row' && ref.kind !== 'col')) return out;
+    for (i = 0; i < size; i++) out.push(ref.kind === 'row' ? ref.at * size + i : i * size + ref.at);
+    return out;
+  }
+
+  function showClue(hint, step) {
+    var steps = clueSteps(hint);
+    var i = Math.max(0, Math.min(step || 0, steps.length - 1));
+    var cur = steps[i], last = i === steps.length - 1;
+    var groupCells = (hint.group && hint.group.cells ? hint.group.cells : [])
+      .filter(function (c) { return c !== hint.idx; });
+    var ruled = hint.ruled || [], pending = hint.pending || [];
+
     clearClue();
-    var group = (hint.group && hint.group.cells ? hint.group.cells : []).filter(function (i) { return i !== hint.idx; });
-    S.clue = { idx: hint.idx, group: group, hint: hint };
-    group.forEach(function (i) { var el = cellEl(i); if (el) el.classList.add('cluegroup'); });
-    var spot = cellEl(hint.idx);
-    if (spot) spot.classList.add('cluespot');
-    var deep = hint.depth === 'deep';
+    var marked = groupCells.slice();
+    ruled.forEach(function (r) { r.cells.forEach(function (c) { if (marked.indexOf(c) < 0) marked.push(c); }); });
+    pending.forEach(function (c) { if (marked.indexOf(c) < 0) marked.push(c); });
+    /* 整条线只是「看这儿」的背景带，不该跟着吃组框；paint 只是清理用的并集。 */
+    var line = lineCells(stepLine(cur, hint));
+    var paint = marked.slice();
+    line.forEach(function (c) { if (paint.indexOf(c) < 0) paint.push(c); });
+    S.clue = { idx: hint.idx, paint: paint, hint: hint, step: i };
+
+    var lineRef = stepLine(cur, hint);
+    var lineDir = lineRef && lineRef.kind === 'col' ? 'clueline-col' : 'clueline-row';
+    line.forEach(function (c) {
+      var el = cellEl(c);
+      if (el) el.classList.add('clueline', lineDir);
+    });
+    /* 这一步的依据（「第 N 行已经有雷了」里的那颗雷 / 「紧贴着雷」里那颗雷）要指出来，
+       否则玩家得自己在亮行里找「哪儿已经有雷了」。 */
+    if (!last && cur.r && Number.isInteger(cur.r.at)) {
+      var causeEl = cellEl(cur.r.at);
+      if (causeEl) causeEl.classList.add('cluecause');
+      if (paint.indexOf(cur.r.at) < 0) paint.push(cur.r.at);
+    }
+    /* k 组覆盖的依据是「这几个组的雷只能落在这些格里」——那些候选格必须点出来，
+       否则玩家无从验算，这条理由就退化成又一句空话。 */
+    if (!last && cur.r && cur.r.cand) {
+      cur.r.cand.forEach(function (c) {
+        var el = cellEl(c);
+        if (el) el.classList.add('cluecause');
+        if (paint.indexOf(c) < 0) paint.push(c);
+      });
+    }
+    /* **讲过的排除要落成玩家自己的 ✕，不能随线索一起消失**（用户实报 2026-08-29：
+       「推理过程标记不是雷的都需要保留下来，现在推理过程结束了，所有标记都自动消失了」）。
+       线索的高亮是临时态，clearClue 会全清；真正留下来的是 S.marks + .safe。
+       逐步落：讲到第几步就落到第几步 —— 中途关掉，已经讲明白的那部分照样留在盘面上。
+       落下来还有个连带好处：下一次用道具时它们已是既有事实，链会更短。 */
+    ruled.forEach(function (r, ri) {
+      if (ri > i) return;
+      r.cells.forEach(function (c) {
+        if (S.found.has(c) || S.opened.has(c) || S.marks.has(c)) return;
+        S.marks.add(c);
+        var el = cellEl(c);
+        if (el) el.classList.add('safe');
+      });
+    });
+
+    /* 讲解途中开聚光灯，把这一行以外的格子压暗；结论步恢复全亮（那时要看整个色块） */
+    $('board').classList.toggle('spotlight', !last && cur.kind !== 'range' && line.length > 0);
+    $('board').classList.toggle('rangelit', cur.kind === 'range');
+    /* 组的橙框只在**结论步**铺：讲解途中焦点必须唯一，否则一大片橙色会压过
+       当前这一步的绿色高亮，玩家的视线被引到不该看的地方（视觉评审实测的层次反转）。 */
+    /* 橙框 = 「这一组」。**只能套在结论组的格上**：v6 起 marked 里还混着整条推理链
+       沿途排掉的格（散落全盘），给它们套橙框等于谎称它们属于这一组（2026-08-29 截图逮到）。 */
+    if (last) groupCells.forEach(function (c) { var el = cellEl(c); if (el) el.classList.add('cluegroup'); });
+    /* v6 起 ruled 是**整条推理链**，沿途排掉的格可能散落全盘、颜色各异。
+       讲解途中要把它们画出来（那是路径），但**结论步只画结论组**：
+       结论那句话说的是「这个色块其它格都排除了」，画面上若混进别的颜色，
+       文案与画面当场自相矛盾（真页面门禁 2026-08-28 立的规矩，2026-08-29 差点被链改破坏）。 */
+    var groupSet = {};
+    (hint.group && hint.group.cells ? hint.group.cells : []).forEach(function (c) { groupSet[c] = 1; });
+    ruled.forEach(function (r, ri) {
+      if (ri > i && !last) return;                       // 还没讲到的步骤先不剧透
+      var cls = (!last && ri === i) ? 'cluestep' : 'clueruled';
+      r.cells.forEach(function (c) {
+        if (last && !groupSet[c]) return;
+        var el = cellEl(c);
+        if (el) { el.classList.remove('cluegroup'); el.classList.add(cls); }
+      });
+    });
+    if (last) pending.forEach(function (c) {
+      var el = cellEl(c);
+      if (el) { el.classList.remove('cluegroup'); el.classList.add('cluepend'); }
+    });
+    /* 范围步：把候选整片点亮，但**绝不点亮答案格** —— 这一步的全部意义就是先不揭晓 */
+    if (cur.kind === 'range') {
+      (hint.shortlist || []).forEach(function (c) {
+        var el = cellEl(c);
+        if (el) { el.classList.remove('cluegroup', 'clueruled'); el.classList.add('cluerange'); }
+        if (paint.indexOf(c) < 0) paint.push(c);
+      });
+    } else {
+      var spot = cellEl(hint.idx);
+      if (spot) spot.classList.add('cluespot');
+    }
+
     var bar = $('clueBar');
     bar.hidden = false;
-    bar.classList.toggle('deep', deep);
-    $('clueIc').textContent = hint.why === 'markwrong' ? '⚠️' : '💣';
-    $('clueTitle').textContent = t(hint.why === 'markwrong' ? 'clueMarkWrongTitle' : 'clueMineTitle');
-    /* 理由 + 落子动作：光指位置不够，得告诉他「双击才算挖雷」——
-       单击是打 ✕，玩家照着提示单击等于把雷 ✕ 掉，比不提示还糟。 */
-    $('clueWhy').textContent = clueWhyText(hint);
-    $('clueAct').textContent = '👉 ' + t('clueAction');
-    $('clueOk').textContent = t('clueGotIt');
+    bar.classList.toggle('deep', last && pending.length > 0);
+    /* 进度光靠「第 i/N 步」几个字看不出来，补一排点阵（纯符号，不进字典） */
+    var dots = '';
+    for (var d = 0; d < steps.length; d++) dots += (d <= i ? '●' : '○');
+    $('clueStep').textContent = steps.length > 1
+      ? t('clueStepOf', { i: i + 1, n: steps.length }) + '  ' + dots : '';
+    if (cur.kind === 'ruled') {
+      $('clueIc').textContent = '🔎';        // 🚫 是全卡最扎眼的红，且与「排掉」语义重复
+      $('clueTitle').textContent = t('clueRuledTitle', { k: cur.r.cells.length });
+      $('clueWhy').textContent = clueRuledText(cur.r);
+      $('clueAct').textContent = '';
+      $('clueOk').textContent = t('clueNextStep');
+    } else if (cur.kind === 'range') {
+      /* 只给范围那一步：按钮从「下一步」换成「直接告诉我」，揭晓这个动作交回玩家手里 */
+      $('clueIc').textContent = '🔦';
+      $('clueTitle').textContent = t('clueRangeTitle');
+      $('clueWhy').textContent = t('clueRange', { k: (hint.shortlist || []).length });
+      $('clueAct').textContent = '';
+      $('clueOk').textContent = t('clueReveal');
+    } else {
+      $('clueIc').textContent = pending.length ? '🧩' : '💣';
+      $('clueTitle').textContent = t(pending.length ? 'cluePendTitle' : 'clueMineTitle');
+      /* 理由 + 落子动作：光指位置不够，得告诉他「双击才算挖雷」——
+         单击是打 ✕，玩家照着提示单击等于把雷 ✕ 掉，比不提示还糟。 */
+      $('clueWhy').textContent = clueWhyText(hint);
+      $('clueAct').textContent = '👉 ' + t('clueAction');
+      $('clueOk').textContent = t('clueGotIt');
+    }
+  }
+
+  /* 每一步「排掉这几格」的理由：规则 + 依据（哪一组 / 哪颗雷 / 哪两条线），
+     全部来自引擎的 ruled 记账，不在 UI 层自己编。 */
+  /* 指示词而不是行号：画面已经把那一整条点亮了，文字再说「第 9 行」等于请玩家
+     从上往下数一遍去核对 —— 六轮视觉评审反复卡在这一句上，根因是文案在用文字
+     重复画面已经做到的事。画面负责定位，文案只负责讲理。 */
+  function groupDeixis(g) {
+    if (g && g.kind === 'row') return t('gThisRow');
+    if (g && g.kind === 'col') return t('gThisCol');
+    return t('gThisRegion');
+  }
+
+  function clueRuledText(r) {
+    var k = r.cells.length;
+    if (r.rule === 'group-mine') return t('clueRuledGroupMine', { g: groupDeixis(r.group), k: k });
+    if (r.rule === 'touch-mine') return t('clueRuledTouchMine', { k: k });
+    /* confine 牵扯两组，两边都用指示词就分不清谁是谁：被点亮的那一组用指示词，另一组具名。 */
+    if (r.rule === 'confine') return t('clueRuledConfine', { a: groupDeixis(r.from), b: groupLabel(r.into), k: k });
+    /* k 组覆盖：两边都是一串组名，必须都具名（指示词只够指一个「这」） */
+    if (r.rule === 'cover') return t('clueRuledCover', { a: groupList(r.from), b: groupList(r.into), k: k });
+    /* 反证（v6）：这一步没有「一眼可见」的理由，必须把矛盾说出来，否则又变成天降结论 */
+    if (r.rule === 'refute') {
+      var bad = r.bad === 'adjacent' ? t('clueRefuteAdj')
+        : t('clueRefuteEmpty', { g: r.badGroup ? groupLabel(r.badGroup) : t('gRegion') });
+      return t('clueRuledRefute', { bad: bad });
+    }
+    return t('clueRuledSqueeze', { a: groupDeixis({ kind: r.lineKind }), k: k });
+  }
+
+  /* 一串组名（k 组覆盖要一口气念两三个组） */
+  function groupList(gs) {
+    return (gs || []).map(groupLabel).join(t('gJoin'));
   }
 
   /* 组名（讲理由时要指得出是哪一行/哪一列/哪个色块） */
@@ -947,20 +1218,22 @@
   function clueWhyText(hint) {
     var g = hint.group || {};
     var n = (g.at || 0) + 1;
-    if (hint.why === 'markwrong') return t('clueMarkWrong');
-    if (hint.why === 'row-last') return t('clueRowLast', { n: n });
-    if (hint.why === 'col-last') return t('clueColLast', { n: n });
-    if (hint.why === 'region-last') return t('clueRegionLast');
+    /* 还有格子排不掉就必须明说，绝不能再讲「其它格都排除了」——
+       这句话只有在 pending 为空时才是真的（RCA 2026-08-27 的核心症状）。 */
+    if ((hint.pending || []).length) return t('cluePending', { k: hint.pending.length });
     if (hint.why === 'region-only') return t('clueRegionOnly');
-    if (hint.why === 'row-clear') return t('clueRowClear', { n: n });
-    if (hint.why === 'col-clear') return t('clueColClear', { n: n });
-    if (hint.why === 'region-clear') return t('clueRegionClear');
-    if (hint.why === 'confine') return t('clueConfine', { a: groupLabel(hint.from), b: groupLabel(hint.into) });
-    if (hint.why === 'squeeze') return t('clueSqueeze');
+    if (g.kind === 'row') return t('clueRowLast');
+    if (g.kind === 'col') return t('clueColLast');
+    if (g.kind === 'region') return t('clueRegionLast');
     return t('clueDeep');
   }
 
-  $('clueOk').addEventListener('click', clearClue);
+  $('clueOk').addEventListener('click', function () {
+    if (!S || !S.clue) return clearClue();
+    var hint = S.clue.hint, next = (S.clue.step || 0) + 1;
+    if (next < clueSteps(hint).length) { showClue(hint, next); return; }
+    clearClue();
+  });
 
   $('toolSafe').addEventListener('click', function () {
     if (S.done) return;
@@ -972,8 +1245,8 @@
     }
     if (Stock.stock(save, 'toolSafe') <= 0) return offerAdTool('toolSafe', t('itemToolSafeName'));
     /* v2：marks（玩家自己打的 ✕）一并喂给引擎——它是玩家进度的**唯一**记录，
-       丢掉它引擎就只能反复讲「这格安全」。引擎内部只采信其中确实不是雷的那些，
-       打错的 ✕ 反而会被当成最高优先级的线索指出来。 */
+       丢掉它引擎就只能反复讲「这格安全」。引擎内部只采信其中确实不是雷的那些；
+       打在真雷上的记号直接忽略（那可能是「我怀疑这儿有雷」，不是标错）。 */
     var hint = MineEngine.clueNext(S.board, {
       opened: Array.from(S.opened), found: Array.from(S.found), marks: Array.from(S.marks),
     });
@@ -1027,10 +1300,17 @@
     if (coinPatch) Object.assign(save, coinPatch);
     wsOnWin();   // 双连胜:A+1,B 周期推进/出票(2026-08-24)
     persist();
-    dialog(t('winTitle', { level: S.lv }), t('winBody', { count: S.size })
-      + (coinPatch ? t('winCoins', { n: Coins.earnPerClear, total: Coins.balance(save) }) : ''),
-      t('nextLevel'), function () { startLevel(save.level); }, t('toHome'), showHome,
-      showHome);                      // 关掉这个窗（✕/点外部/Esc）= 回首页，不把人留在已结束的棋盘上
+    var winDialog = function () {
+      dialog(t('winTitle', { level: S.lv }), t('winBody', { count: S.size })
+        + (coinPatch ? t('winCoins', { n: Coins.earnPerClear, total: Coins.balance(save) }) : ''),
+        t('nextLevel'), function () { startLevel(save.level); }, t('toHome'), showHome,
+        showHome);                    // 关掉这个窗（✕/点外部/Esc）= 回首页，不把人留在已结束的棋盘上
+    };
+    /* 章节 CG：逢 100 关通关 ⇒ 先放 CG 再弹结算窗（用户拍板 2026-08-28）。
+       触发判据的唯一权威在 mine-story.js 的 maybePlay（at>0 = 通关第 at 关结算后）；
+       无 CG / 已看过 / 资源缺失 / 取证 lane 一律立刻回调，这里不加第二份判断。 */
+    if (S.lv % 100 === 0) maybeStory(S.lv, winDialog);
+    else winDialog();
   }
   function onDead() {
     resetGestureState();
@@ -1522,7 +1802,15 @@
        「这次线索指哪、理由是什么」，只给 found 的话自动化只能靠截图猜。 */
     state: function () { return S && { lv: S.lv, size: S.size, found: Array.from(S.found),
       marks: Array.from(S.marks), mines: Array.from(S.mines),
-      clue: S.clue ? { idx: S.clue.idx, why: S.clue.hint && S.clue.hint.why, depth: S.clue.hint && S.clue.hint.depth } : null,
+      /* ruled/pending/step 也要露出来：分步讲解的验收要看的正是「这一步在讲哪几格、
+         还剩几格没排掉、现在讲到第几步」，只给 idx 的话自动化只能靠截图猜。 */
+      clue: S.clue ? { idx: S.clue.idx, why: S.clue.hint && S.clue.hint.why, depth: S.clue.hint && S.clue.hint.depth,
+        step: S.clue.step, steps: clueSteps(S.clue.hint).length,
+        ruled: (S.clue.hint && S.clue.hint.ruled || []).map(function (r) { return { rule: r.rule, cells: r.cells.slice() }; }),
+        /* 结论组的格子也要露出来：v6 起 ruled 是整条推理链（会跨出这一组），
+           验收「结论步只画结论组」必须拿得到这条 ground truth，不然只能靠数颜色猜。 */
+        groupCells: (S.clue.hint && S.clue.hint.group && S.clue.hint.group.cells || []).slice(),
+        pending: (S.clue.hint && S.clue.hint.pending || []).slice() } : null,
       lives: S.lives, remain: S.remain, done: S.done }; },
     dig: dig, mark: toggleMark,
     solve: function () { S.mines.forEach(function (i) { if (!S.found.has(i)) dig(i); }); },
@@ -1603,7 +1891,7 @@
     setText('heroChapter', t('statClears'));
     // Dock / 侧边图标的文字都在 <span class="lb"> 里（图标那个 span 不能碰，否则图标被文案盖掉）
     var tabs = { dkHome: 'tabHome', btnBag: 'statTools', dkRules: 'tabRules', dkSet: 'tabSet',
-      btnStreak: 'tabStreak', btnWeekly: 'tabEvent' };
+      dkStory: 'tabStory', btnStreak: 'tabStreak', btnWeekly: 'tabEvent' };
     Object.keys(tabs).forEach(function (id) {
       var el = $(id); if (!el) return;
       var lb = el.querySelector('.lb');
@@ -1705,6 +1993,16 @@
     renderHome();
     maybePromptLogin();
   }
+  /* 剧情 CG 的唯一入口：设置里关掉「剧情动画」⇒ 整条不播（save.cg）。
+     其余判据（无对应 CG / 已看过 / 资源缺失 / 取证 lane）全在 mine-story.js，这里不加第二份。
+     setLang 每次都同步一遍：切过语言后字幕要跟着走，只在初始化设一次会留在旧语言。 */
+  function maybeStory(at, done) {
+    var fin = done || function () {};
+    if (!window.MineStory || !save.cg) { fin(); return; }
+    try { window.MineStory.setLang(LANG); } catch (e) {}
+    window.MineStory.maybePlay(at, fin);
+  }
+
   function startGame() {
     // 双连胜(2026-08-24):断链未决时先问「看广告保持」;普通开局零打扰
     if (WinStreak.enabled && wsGet().pend) { wsKeepDialog(wsGet(), startGame); return; }
@@ -1721,8 +2019,15 @@
     save.energy -= Reward.E_COST;
     if (save.energy + Reward.E_COST >= Reward.E_MAX) save.lastTs = Date.now();
     persist();
-    $('home').hidden = true; $('game').hidden = false;
-    startLevel(save.level);
+    var enter = function () {
+      $('home').hidden = true; $('game').hidden = false;
+      startLevel(save.level);
+    };
+    /* 首个 CG 挂在「开始第 1 关」这一下（用户拍板 2026-08-28）。
+       原来它挂在首页装配之后：玩家还什么都没点就被一段全屏动画盖住，而且它会抢走
+       首次点击（那一下被用来解除静音）—— 观感就成了「点开始就进全屏」。 */
+    if (save.level === 1) maybeStory(0, enter);
+    else enter();
   }
   /* 首页按钮绑定收进一个函数：切换语言时首页 DOM 会整块重建（innerHTML），
      旧节点上的监听器随之失效，必须重新绑一遍——否则切完语言按钮全成死的。 */
@@ -1735,7 +2040,7 @@
     /* 游戏化首页：Dock 每格与金币「+」都靠 data-action 找处理函数。
        白名单在这里，config 里写了没实现的 action 会立刻报错——不许出现点了没反应的按钮。 */
     var ACTIONS = { home: showHome, bag: openBag, shop: openBag, rules: openRules,
-      settings: openSettings, streak: openStreak, weekly: showWeekly };
+      settings: openSettings, streak: openStreak, weekly: showWeekly, story: openStory };
     var acted = $('home').querySelectorAll('[data-action]');
     for (var i = 0; i < acted.length; i++) {
       var name = acted[i].getAttribute('data-action');
@@ -1812,6 +2117,16 @@
       $('sfxToggle').setAttribute('aria-pressed', String(!!save.sfx));
     };
     $('sfxLabel').textContent = t('sfxLabel');
+    /* 剧情动画开关（用户拍板 2026-08-28）：关掉后所有 CG 都不再播（含逢 100 关的章节 CG）。
+       配置只声明 id + 英文 fallback，中文文案在这里按 i18n 回填 —— 与音效行同一套路。 */
+    var syncCg = function () {
+      $('cgToggle').textContent = save.cg ? t('on') : t('off');
+      $('cgToggle').setAttribute('aria-pressed', String(!!save.cg));
+    };
+    $('cgToggleLabel').textContent = t('cgLabel');
+    if ($('cgToggleHint')) $('cgToggleHint').textContent = t('cgHint');
+    syncCg();
+    $('cgToggle').addEventListener('click', function () { save.cg = !save.cg; persist(); syncCg(); });
     $('langLabel').textContent = t('langLabel');
     $('langSel').setAttribute('aria-label', t('langLabel'));
     syncSfx();
@@ -1819,6 +2134,53 @@
     fillLangOptions();
     // 切语言会重建首页 DOM，弹窗留在屏上会指向已被替换的节点，所以先关窗再切
     $('langSel').addEventListener('change', function (e) { var v = e.target.value; hideDialog(); setLang(v); });
+  }
+
+  /* 剧情图鉴（用户拍板 2026-08-29）：首页设置图标下面那个 🎬 入口。
+     一次列全所有 CG —— 没解锁的挂一把锁并写清「通关第 N 关后解锁」（给个盼头，
+     同时不剧透字幕），已解锁的整行是按钮，点了就重播那一段。
+     解锁判定的权威在 mine-story.js 的 list()，这里只负责画。
+     与设置里的「剧情动画」开关是两码事：那个管的是自动播放，图鉴是玩家主动点的，
+     所以关掉开关的玩家照样能进来补看。 */
+  function openStory() {
+    var Story = window.MineStory;
+    /* 先同步语言再取数据：条目说明用的是 CG 自己的字幕（活在 mine-story.js 的 SUBS 里，
+       不在页面字典里），它按 MineStory 内部的 lang 取值，默认 zh。
+       漏掉这一行的后果是英文玩家在图鉴里看到中文字幕 —— 用户实报过（2026-08-29）。
+       而门禁当时没抓到：扫描用的是全新存档（第 1 关全锁），锁着的行压根不渲染字幕。 */
+    try { if (Story) Story.setLang(LANG); } catch (err) {}
+    var rows = (Story && Story.list) ? Story.list(save.level) : [];
+    var html = rows.length === 0
+      ? '<p class="bagempty">' + escHtml(t('storyEmpty')) + '</p>'
+      : rows.map(function (r, i) {
+          var name = r.at === 0 ? t('storyPrologue') : t('storyChapter', { n: i });
+          if (!r.unlocked) {
+            var lock = r.at === 0 ? t('storyLockedStart') : t('storyLockedAt', { n: r.at });
+            return '<div class="bagrow cgrow locked">' +
+              '<span class="bagicon" aria-hidden="true">🔒</span>' +
+              '<span class="baginfo"><b>' + escHtml(name) + '</b><span>' + escHtml(lock) + '</span></span>' +
+              '</div>';
+          }
+          return '<button type="button" class="bagrow cgrow" data-cg="' + escHtml(r.id) + '">' +
+            '<span class="bagicon" aria-hidden="true">▶</span>' +
+            '<span class="baginfo"><b>' + escHtml(name) + '</b><span>' + escHtml(r.caption) + '</span></span>' +
+            '<span class="cgplay">' + escHtml(t('storyReplay')) + '</span>' +
+            '</button>';
+        }).join('');
+    dialog(t('storyTitle'), t('storyBody'), t('gotIt'), null, null, null, null);
+    var list = $('dlgList');
+    list.innerHTML = html;
+    list.hidden = false;
+    var btns = list.querySelectorAll('[data-cg]');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', function (e) {
+        // currentTarget 才是绑事件的那个按钮：点在里面的 span 上 target 会是 span
+        var id = e.currentTarget.getAttribute('data-cg');
+        hideDialog();                       // CG 是全屏遮罩层，不能压在弹窗上播
+        try { Story.setLang(LANG); } catch (err) {}
+        Story.replay(id, function () {});
+      });
+    }
   }
 
   /* 背包窗口：首页道具格是个图标按钮，点开这里看「有哪些道具、各剩几个、干什么用」。
@@ -2074,6 +2436,9 @@
   bindHome();            // 首页事件绑定（与 setLang 里重建后调用的是同一份，避免两处漂移）
   applyStaticI18n();     // 静态文案按当前语言灌一遍（必须在 DOM 装配之后）
   showHome();
+  /* 首启剧情 CG 已从这里挪到「点开始第 1 关」那一下（用户拍板 2026-08-28）：
+     挂在首页装配之后，等于玩家还没点任何东西就被全屏动画盖住，而且它会吃掉首次点击。
+     现在唯一入口是 maybeStory()，触发点写在 startGame 里。 */
 })();
 </script>
 </body>

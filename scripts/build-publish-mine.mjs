@@ -12,7 +12,7 @@
      → /tmp/cm-publish-dist（目录产物，publish_game 用这个）
      → /tmp/cm-publish-payload.json（文本 payload，旧通道兼容；不含封面）
    规则：改 core 后默认只发 color-mines，其它游戏需用户特别指定。 */
-import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
@@ -129,6 +129,40 @@ for (const [rel, content] of Object.entries(files)) {
 }
 writeFileSync(join(DIST, 'cover.webp'), coverBuf);
 writeFileSync(join(DIST, 'game.meta.json'), metaRaw);
+
+/* 剧情 CG 素材（color-mines/cg/*）：只进目录产物 —— JSON payload 是 utf8 文本 map，装不下二进制。
+   缺资源不是故障：mine-story.js 的播放机对缺键静默跳过（不变量 1「任何分支都有出口」），
+   所以 payload/checkpoint 那条路没有 CG 时游戏照常可玩，只是不放 CG。
+   逐件回读校验 + 合计体积上限，防静默截断与产物膨胀。 */
+const CG_SRC = join(ROOT, 'color-mines/cg');
+/* 只发成品：cgN.mp4 / bgmN.opus。中间件（cg0a/cg0b 拼接源、*-raw.mp4 原始素材）一律不进产物。
+   白名单而非黑名单——新加一种中间件不会因为忘了排除就被静默打包进去。 */
+const CG_SHIPPED = /^(cg\d+\.mp4|bgm\d+\.opus)$/;
+/* 单件上限才是体验相关的（CG 按关卡懒加载，一次只播一段、只拉一段）；
+   总量给一个防失控的宽上限即可。 */
+/* 384KB ≈ 开场 CG（双镜头 10 秒）的实际大小；章节 CG 单镜 5 秒普遍在 80–280KB。
+   这个数字管的是「玩家一次要等多久」，不是总盘子大小。 */
+const CG_FILE_CAP = 384 * 1024;
+const CG_BUDGET = 4 * 1048576;
+const cgNames = existsSync(CG_SRC)
+  ? readdirSync(CG_SRC).filter((f) => CG_SHIPPED.test(f)).sort()
+  : [];
+let cgBytes = 0;
+for (const name of cgNames) {
+  const buf = readFileSync(join(CG_SRC, name));
+  if (buf.byteLength > CG_FILE_CAP) {
+    throw new Error(`cg/${name} ${(buf.byteLength / 1024).toFixed(0)}KB 超单件上限 ${CG_FILE_CAP / 1024}KB`);
+  }
+  const dest = join(DIST, 'cg', name);
+  mkdirSync(dirname(dest), { recursive: true });
+  writeFileSync(dest, buf);
+  if (!readFileSync(dest).equals(buf)) throw new Error(`产物 cg/${name} 与源文件不一致（写入被污染）`);
+  cgBytes += buf.byteLength;
+}
+if (cgBytes > CG_BUDGET) {
+  throw new Error(`CG 素材合计 ${(cgBytes / 1048576).toFixed(2)} MiB 超 ${(CG_BUDGET / 1048576).toFixed(0)} MiB 预算`);
+}
+console.log(`  CG 素材 ${cgNames.length} 件 ${(cgBytes / 1048576).toFixed(2)} MiB（单件上限 ${CG_FILE_CAP / 1024}KB）`);
 
 // 回读校验：写进产物的封面必须与源逐字节一致（防静默截断/编码污染）
 const coverBack = readFileSync(join(DIST, 'cover.webp'));

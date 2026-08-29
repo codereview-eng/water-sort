@@ -1,3 +1,7 @@
 node_modules/
 .DS_Store
 .worktrees/
+# 剧情 CG 的视频/音频素材（含 -raw 母版与 .bak）共 100+ MB，不进 git：
+# 发布时由 scripts/build-publish-mine.mjs 从本地 color-mines/cg/ 直接打进产物目录。
+# 只有 .md 设计文档跟版本走。
+color-mines/cg/

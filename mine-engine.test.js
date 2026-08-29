@@ -269,14 +269,61 @@ test('clueNext：每一条线索都指向一个还没找到的真雷（安全格
   }
 });
 
-test('clueNext：打错的 ✕ 是最高优先级线索（错误信念会毒化玩家后面全部推理）', () => {
-  const spec = Levels.get(9);
-  const mines = E.mineIndexes(spec.board);
-  const st = playerFixpoint(spec);
-  const hint = E.clueNext(spec.board, { opened: [], found: [], marks: st.marks.concat([mines[2]]) });
-  assert.strictEqual(hint.why, 'markwrong');
-  assert.strictEqual(hint.idx, mines[2]);
-  assert.strictEqual(hint.kind, 'mine');
+/* owner 拍板 2026-08-29：标记对玩家是多义的——打在真雷上的 ✕ 很可能是
+   「我怀疑这儿有雷」的记号，不是一个错误结论。线索不许再去判玩家标错，
+   只许继续指下一颗雷；同时也不能把这种记号当成「这格安全」的事实。 */
+test('clueNext：标记打在真雷上不算标错，线索照常推雷（不指责玩家）', () => {
+  for (const lv of [9, 12, 20]) {
+    const spec = Levels.get(lv);
+    const mines = E.mineIndexes(spec.board);
+    const real = new Set(mines);
+    const st = playerFixpoint(spec);
+    const hint = E.clueNext(spec.board, { opened: [], found: [], marks: st.marks.concat([mines[2]]) });
+    assert.ok(hint, `lv${lv} 还有雷没找到就不该空手`);
+    assert.notStrictEqual(hint.why, 'markwrong', '不许再有「你标错了」这一层');
+    assert.strictEqual(hint.kind, 'mine');
+    assert.ok(real.has(hint.idx), `lv${lv} 指的必须是真雷`);
+  }
+});
+
+test('clueNext：真雷上的标记绝不被当成安全格（错误前提会推出错误结论）', () => {
+  for (const lv of [9, 12, 20]) {
+    const spec = Levels.get(lv);
+    const mines = E.mineIndexes(spec.board);
+    const real = new Set(mines);
+    const st = playerFixpoint(spec);
+    // 把所有真雷都「标记」一遍：若引擎误当安全格，就会推出一个非雷的结论
+    const hint = E.clueNext(spec.board, { opened: [], found: [], marks: st.marks.concat(mines) });
+    assert.ok(hint && real.has(hint.idx), `lv${lv} 结论必须仍是真雷`);
+  }
+});
+
+/* 用户实报 2026-08-29（第 11 关截图）：「这个提示无端端就给出了最终答案，不理解」。
+   讲不出理由的兜底层不许直接揭晓，必须先交出**范围**，由 UI 让玩家自己决定要不要看答案。 */
+test('clueNext：讲不出理由的兜底层必须给范围，且范围里全是玩家还没排掉的格', () => {
+  let sawEnum = 0;
+  for (let lv = 1; lv <= 40; lv++) {
+    const spec = Levels.get(lv);
+    const real = new Set(E.mineIndexes(spec.board));
+    const st = playerFixpoint(spec);
+    for (let k = 0; k < 8 && st.found.length < spec.size; k++) {
+      const hint = E.clueNext(spec.board, { opened: [], found: st.found, marks: st.marks });
+      if (!hint) break;
+      if (hint.why === 'enum') {
+        sawEnum++;
+        assert.ok(Array.isArray(hint.shortlist) && hint.shortlist.length >= 1, `lv${lv} 兜底层没给范围`);
+        assert.ok(hint.shortlist.includes(hint.idx), `lv${lv} 范围里没有结论格`);
+        assert.strictEqual(new Set(hint.shortlist).size, hint.shortlist.length, `lv${lv} 范围有重复格`);
+        for (const c of hint.shortlist) {
+          assert.ok(!st.found.includes(c), `lv${lv} 范围里混进了已找到的雷`);
+          assert.ok(!st.marks.includes(c), `lv${lv} 范围里混进了玩家已排掉的格`);
+        }
+        assert.ok(hint.shortlist.filter((c) => real.has(c)).length === 1, `lv${lv} 范围里应当恰有一颗雷`);
+      }
+      st.found.push(hint.idx);
+    }
+  }
+  assert.ok(sawEnum > 0, '这批关卡应当还存在讲不出理由的兜底提示，否则这条门禁没在验东西');
 });
 
 test('clueNext：全部雷都找到了就返回 null，不硬造线索', () => {
@@ -296,7 +343,9 @@ test('propagateSafe / 限区 / 夹逼：任何一步都不许把真雷判成安�
       for (const i of f.found) st[i] = 2;
       E.propagateSafe(size, spec.board.region, st);
       for (let hop = 0; hop < 12; hop++) {
-        if (!E.confineOnce(size, spec.board.region, st) && !E.squeezeOnce(size, spec.board.region, st)) break;
+        /* k 组覆盖也在这条不可逆红线内：它一次能排掉一大片，判错就是把真雷标成安全 */
+        if (!E.confineOnce(size, spec.board.region, st) && !E.squeezeOnce(size, spec.board.region, st)
+          && !E.coverOnce(size, spec.board.region, st, 2) && !E.coverOnce(size, spec.board.region, st, 3)) break;
         E.propagateSafe(size, spec.board.region, st);
       }
       for (const m of real) assert.notStrictEqual(st[m], 1, `lv${lv} 把真雷 ${m} 判成了安全`);

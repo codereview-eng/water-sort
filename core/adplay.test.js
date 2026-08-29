@@ -552,3 +552,49 @@ test('directlink：起手页面已经是 hidden（标签页先切走了）也要
   assert.deepStrictEqual(await p, { ok: true, source: 'directlink', zone: null, ms: 3000,
     detail: { rewardEventType: 'unknown' } });
 });
+
+/* ---- 反向阈值告警（issue #1 · 广告奖励可信度 4/4）----
+   为什么需要它：降级分支「HTTP 200、无异常、功能消失」，常规告警一条都不会响。
+   判据只有一个 —— 如果这条降级从明天起 100% 触发，我们多久会知道？ */
+test('health：样本不够就不下结论（开局两次失败不该吓人）', () => {
+  const s = { attempts: 3, failed: 3, reasons: { 'directlink:no-leave': 3 }, reward: {} };
+  assert.deepStrictEqual(AdPlay.health(s), { ok: true, samples: 3, alerts: [] });
+});
+
+test('health：某个 webview 压根不触发 visibilitychange → no-leave 独占，必须报', () => {
+  const s = { attempts: 20, ok: 0, failed: 20, reasons: { 'directlink:no-leave': 20 }, reward: {} };
+  const h = AdPlay.health(s);
+  assert.strictEqual(h.ok, false);
+  const codes = h.alerts.map((a) => a.code).sort();
+  assert.deepStrictEqual(codes, ['fail-rate', 'reason-dominant']);
+  assert.strictEqual(h.alerts.find((a) => a.code === 'reason-dominant').reason, 'directlink:no-leave');
+});
+
+test('health：奖励照发但广告商几乎都判 not_valued → 白发奖没赚钱，也要报', () => {
+  const s = { attempts: 30, ok: 30, failed: 0, reasons: {}, reward: { valued: 0, not_valued: 30, unknown: 0 } };
+  const h = AdPlay.health(s);
+  assert.strictEqual(h.ok, false);
+  assert.deepStrictEqual(h.alerts.map((a) => a.code), ['valued-rate']);
+});
+
+test('health：正常运行不报警；阈值可由 config 调', () => {
+  const s = { attempts: 40, ok: 34, failed: 6, reasons: { 'monetag:no-fill': 6 },
+    reward: { valued: 30, not_valued: 4, unknown: 0 } };
+  assert.strictEqual(AdPlay.health(s).ok, true);
+  // 把单一原因的阈值收到 0.1 → 同一份数据就该报
+  assert.strictEqual(AdPlay.health(s, { maxReasonRate: 0.1 }).ok, false);
+});
+
+test('mergeStats：跨会话累计，单次会话回答不了"最近是不是一直这样"', () => {
+  const a = { attempts: 5, ok: 5, failed: 0, reasons: {}, reward: { valued: 5 }, bySource: { monetag: { ok: 5, failed: 0 } } };
+  const b = { attempts: 7, ok: 2, failed: 5, reasons: { 'directlink:too-short:0.3s': 5 },
+    reward: { valued: 1, unknown: 1 }, bySource: { directlink: { ok: 2, failed: 5 } } };
+  const m = AdPlay.mergeStats(a, b);
+  assert.strictEqual(m.attempts, 12);
+  assert.strictEqual(m.failed, 5);
+  assert.strictEqual(m.reasons['directlink:too-short:0.3s'], 5);
+  assert.strictEqual(m.reward.valued, 6);
+  assert.deepStrictEqual(m.bySource, { monetag: { ok: 5, failed: 0 }, directlink: { ok: 2, failed: 5 } });
+  // 脏数据不能把累计搞崩
+  assert.strictEqual(AdPlay.mergeStats(null, undefined).attempts, 0);
+});

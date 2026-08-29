@@ -38,6 +38,12 @@
     }
   ],
   "ads": {
+    "health": {
+      "minSamples": 10,
+      "maxFailRate": 0.8,
+      "maxReasonRate": 0.5,
+      "minValuedRate": 0.05
+    },
     "interstitial": {
       "enabled": true,
       "everyN": 5,

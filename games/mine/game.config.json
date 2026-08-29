@@ -1063,6 +1063,14 @@
     }
   },
   "stock": {
+    "ceiling": {
+      "safety": 3,
+      "perDay": {
+        "coins": 2000,
+        "toolMine": 60,
+        "toolSafe": 60
+      }
+    },
     "items": {
       "coins": {
         "granted": "coinsEarned",

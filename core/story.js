@@ -149,7 +149,10 @@
         + '<div id="cgSub" style="position:absolute;left:6%;right:6%;bottom:9%;text-align:center;'
         + 'color:#f4ecd8;font-size:15px;line-height:1.5;text-shadow:0 2px 8px rgba(0,0,0,.9);'
         + 'opacity:0;transition:opacity .5s ease"></div>'
-        + '<button id="cgSkip" type="button" style="position:absolute;right:14px;top:14px;z-index:2;'
+        // 跳过键贴在右上角：页面开了 viewport-fit=cover 后那里正是刘海/挖孔与圆角，
+        // 必须按安全区让位，否则在部分手机上被切掉一半（没开 cover 的页 env() 为 0，位置不变）。
+        + '<button id="cgSkip" type="button" style="position:absolute;'
+        + 'right:calc(14px + env(safe-area-inset-right, 0px));top:calc(14px + env(safe-area-inset-top, 0px));z-index:2;'
         + 'font-size:12px;padding:6px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.35);'
         + 'background:rgba(0,0,0,.45);color:#f0e6d2;cursor:pointer"></button>';
       rootWin.document.body.appendChild(ov);
@@ -215,15 +218,28 @@
       }, 55);
     }
 
+    /* 起播 BGM。幂等：已经在播就直接返回，可被 go() / 每次手势重复调用。
+       被自动播放策略挡掉时**必须把 st.bgm 清回 null** —— 否则「挡掉过一次」
+       会被后面的幂等判定当成「已经在播」，玩家再怎么点也补不回声音。 */
     function startBgm(seg) {
-      if (!seg.m || !st || st.muted) return;
+      if (!seg || !seg.m || !st || st.muted || st.bgm) return;
       try {
         var a = new rootWin.Audio(res(seg.m));
         a.volume = 0.75;
         st.bgm = a;
-        // BGM 不参与完成门（它是背景，不是内容）——出错静默，绝不阻塞 CG
-        a.play()['catch'](function () { note('blocked'); });
-      } catch (e) { note('error'); }
+        // BGM 不参与完成门（它是背景，不是内容）——出错不阻塞 CG，但要留下降级原因
+        a.play()['catch'](function (err) {
+          if (st && st.bgm === a) st.bgm = null;   // 让下一次手势能再试一次
+          note('blocked');
+          try {
+            console.warn('[story] bgm blocked err_name=' + ((err && err.name) || 'unknown')
+              + ' err_msg=' + String((err && err.message) || err).slice(0, 200));
+          } catch (e2) {}
+        });
+      } catch (e) {
+        if (st) st.bgm = null;
+        note('error');
+      }
     }
 
     /* 收口：幂等（不变量 2）*/
@@ -234,6 +250,7 @@
       stopBgm(true);
       if (st.wd) { rootWin.clearTimeout(st.wd); st.wd = null; }
       if (st.goT) { rootWin.clearTimeout(st.goT); st.goT = null; }
+      unbindUnlock();
       try {
         dom.vid.pause();
         dom.vid.removeAttribute('src');
@@ -260,26 +277,46 @@
 
     function unmute() {
       if (!st || st.done) return false;
-      if (!st.muted) return true;
-      st.muted = false;
-      try {
-        dom.vid.muted = false;
-        dom.vid.defaultMuted = false;
-        dom.vid.volume = 1;
-      } catch (e) {}
-      startBgm(st.seg);   // 补上被静音策略挡掉的 BGM
+      if (st.muted) {
+        st.muted = false;
+        try {
+          dom.vid.muted = false;
+          dom.vid.defaultMuted = false;
+          dom.vid.volume = 1;
+        } catch (e) {}
+      }
+      startBgm(st.seg);   // 补上被静音策略挡掉的 BGM（幂等，可重复调）
       return true;
     }
-    function unlock() {
-      if (unmute()) {
+    /* 手势兜底：整段 CG 期间一直挂着，不因为「已经解过一次静音」就摘掉 ——
+       BGM 起播可能被策略挡掉（异步 reject），摘早了玩家就再也补不回声音。
+       监听器统一由 end() 摘除（曾经只在这里摘 ⇒ 未触发手势的 CG 会留下泄漏）。 */
+    function unlock() { unmute(); }
+    function bindUnlock() {
+      rootWin.document.addEventListener('pointerdown', unlock);
+      rootWin.document.addEventListener('keydown', unlock);
+    }
+    function unbindUnlock() {
+      try {
         rootWin.document.removeEventListener('pointerdown', unlock);
         rootWin.document.removeEventListener('keydown', unlock);
-      }
+      } catch (e) {}
+    }
+    /* 页面是否已经拿到过用户激活（sticky activation）。拿到过就可以直接有声起播：
+       重播/通关触发都发生在一次真实点击之后，再等「下一次手势」等于永远静音。 */
+    function hasUserActivation() {
+      try {
+        var ua = rootWin.navigator && rootWin.navigator.userActivation;
+        return !!(ua && ua.hasBeenActive);
+      } catch (e) { return false; }
     }
 
-    function play(seg, done) {
+    function play(seg, done, opt) {
       var d = ensureDom();
-      st = { seg: seg, done: false, done_cb: done, muted: true, pend: null, bgm: null, wd: null, goT: null };
+      /* 有声起播的条件：调用方明确说「这次由用户手势直接触发」（图鉴重播），
+         或页面已经拿到过用户激活。被策略挡掉也不丢 CG —— 下面会退回静音起播。 */
+      var canSound = !!(opt && opt.gesture) || hasUserActivation();
+      st = { seg: seg, done: false, done_cb: done, muted: !canSound, pend: null, bgm: null, wd: null, goT: null };
 
       d.skip.textContent = tx(UI, 'skip');
       d.skip.onclick = function () { end('skip'); };
@@ -290,8 +327,7 @@
       d.load.style.display = 'flex';
       d.vid.style.visibility = 'hidden';
 
-      rootWin.document.addEventListener('pointerdown', unlock);
-      rootWin.document.addEventListener('keydown', unlock);
+      bindUnlock();
 
       var keys = [seg.v];
       if (seg.m) keys.push(seg.m);
@@ -349,10 +385,29 @@
         }, WATCHDOG_MS);
 
         try {
-          d.vid.muted = true;          // 静音起播，绕开自动播放策略
+          // 有用户激活就直接有声起播；没有才静音起播绕开自动播放策略
+          d.vid.muted = st.muted;
+          d.vid.defaultMuted = st.muted;
+          if (!st.muted) { try { d.vid.volume = 1; } catch (e2) {} }
           d.vid.src = res(seg.v);
           var p = d.vid.play();
-          if (p && p['catch']) p['catch'](function () { end('blocked'); });
+          if (p && p['catch']) p['catch'](function (err) {
+            if (!st || st.done) return;
+            if (!st.muted) {
+              // 有声起播被策略挡掉 ⇒ 退回静音起播 + 留着手势兜底，别丢整段 CG
+              st.muted = true;
+              note('blocked');
+              try {
+                console.warn('[story] unmuted start blocked err_name=' + ((err && err.name) || 'unknown')
+                  + ' err_msg=' + String((err && err.message) || err).slice(0, 200));
+              } catch (e3) {}
+              try { d.vid.muted = true; d.vid.defaultMuted = true; } catch (e4) {}
+              var p2 = d.vid.play();
+              if (p2 && p2['catch']) p2['catch'](function () { end('blocked'); });
+              return;
+            }
+            end('blocked');
+          });
         } catch (e) { end('error'); }
       });
     }
@@ -488,12 +543,15 @@
         var seen = seenList();
         return CG.filter(function (c) { return seen.indexOf(c.id) >= 0; });
       },
-      /** 强制重播（图鉴用），无视 seen。 */
+      /** 强制重播（图鉴用），无视 seen。
+          图鉴重播必然由玩家点击触发 ⇒ gesture:true 直接有声起播。
+          （历史坑：点击的 pointerdown 早于播放机注册的手势监听器，
+            再等「下一次手势」等于整段重播全程静音。） */
       replay: function (id, done) {
         var seg = null;
         CG.forEach(function (c) { if (c.id === id) seg = c; });
         if (!seg) { if (done) done(); return; }
-        play(seg, done);
+        play(seg, done, { gesture: true });
       },
       /**
        * 触发判定（唯一权威）：at===0 首启；at>0 = 通关第 at 关结算后。

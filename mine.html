@@ -2,7 +2,17 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- viewport-fit=cover 是「底部黑边」的解药，不是可选装饰：
+     不带它时页面视口被系统 inset 在安全区以内，底部那条 home indicator / 手势条
+     不归页面画，由宿主 WebView 填色（嵌入式 webview 默认多为黑）→ 玩家看到「下面一片黑」。
+     带上它之后页面才铺到物理屏边缘（html 的 --bg 把整屏画满），
+     同时 env(safe-area-inset-*) 才会返回真实值（没有 cover 时它恒为 0，
+     下面那些 calc(... + env(...)) 全是死代码）。
+     env() 的值在 play 面上由平台 safe-area 运行时改写成 --solo-env-safe-*，
+     两条通道共用同一套写法，不要改成裸数字。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- 宿主 chrome（状态栏/地址栏/安全区）跟着页面底色走，避免深色页配白/黑条 -->
+<meta name="theme-color" content="#141a24">
 <!-- Monetag 站点所有权验证。必须留在原始 HTML 的 <head> 里：验证器抓页面源码、不执行 JS，
      且 Monetag 要求验证通过后不要移除（用于持续确认所有权）。
      注册的站点应是本游戏自己的子域 play-color-mines.run.ceo —— 不是 run.ceo
@@ -14,6 +24,9 @@
     --bg:#141a24; --surface:#1e2735; --ink:#f2f5f9; --ink-2:#9fb0c3; --ink-3:#6b7a8d;
     --edge:rgba(255,255,255,.09); --accent:#ffb454; --ok:#43d17c; --bad:#ff5d5d;
     --cell-gap:3px;
+    /* 明确声明深色：告诉内核这页本来就是暗的，别再用 Android WebView 的
+       algorithmic darkening（force-dark）反色一遍，也让 UA 默认画布跟着变暗。 */
+    color-scheme:dark;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
@@ -21,7 +34,12 @@
     height:100%; overflow-x:hidden; touch-action:manipulation; user-select:none; -webkit-user-select:none;}
   body{display:flex; flex-direction:column; align-items:center; min-height:100%;
     background:radial-gradient(circle at 50% -10%, #22304a 0%, #141a24 62%);}
-  .wrap{width:100%; max-width:560px; padding:10px 12px calc(18px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:10px;}
+  /* 四边都让位：有了 viewport-fit=cover，页面画到物理屏边缘，
+     内容必须自己躲开刘海/挖孔（top）、曲面边与横屏挖孔（left/right）、手势条（bottom）。 */
+  .wrap{width:100%; max-width:560px;
+    padding:calc(10px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+            calc(18px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+    display:flex; flex-direction:column; gap:10px;}
 
   /* ---------- HUD ---------- */
   .topbar{display:flex; align-items:center; justify-content:space-between; gap:8px;}
@@ -172,14 +190,17 @@
 
   /* ---------- 弹窗 / toast ---------- */
   .overlay{position:fixed; inset:0; background:rgba(8,12,18,.66); display:none;
-    align-items:center; justify-content:center; z-index:30; padding:20px;}
+    align-items:center; justify-content:center; z-index:30;
+    padding:calc(20px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px))
+            calc(20px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));}
   .overlay.show{display:flex;}
   /* 高度上限 + 列表自己滚（2026-08-29）：原来弹窗没有任何高度约束，内容多高窗就多高，
      超过视口后底部按钮被顶到屏幕外、且没有任何东西可滚（剧情图鉴 11 行就撞线）。
      标题与按钮留在弹窗上，中间的列表区独立滚动 —— 所有弹窗一起受益。 */
   .dialog{position:relative; background:var(--surface); border:1px solid var(--edge); border-radius:16px;
     padding:20px; width:100%; max-width:320px; display:flex; flex-direction:column; gap:12px; text-align:center;
-    max-height:calc(100vh - 40px); max-height:calc(100dvh - 40px);}
+    max-height:calc(100vh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    max-height:calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));}
   #dlgList{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
   /* 关闭入口：任何弹窗都必须能退出（硬规则：禁止出现用户无法返回的窗口） */
   .dlgx{position:absolute; top:6px; right:8px; width:32px; height:32px; padding:0; border:0;
@@ -191,7 +212,7 @@
   .dialog .btn{border:0; border-radius:10px; padding:11px; font-size:14px; font-weight:800; cursor:pointer;}
   .btn.primary{background:var(--accent); color:#20160a;}
   .btn.ghost{background:transparent; color:var(--ink-2); border:1px solid var(--edge);}
-  .toast{position:fixed; left:50%; bottom:80px; transform:translateX(-50%) translateY(8px);
+  .toast{position:fixed; left:50%; bottom:calc(80px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%) translateY(8px);
     background:#0d1420; border:1px solid var(--edge); color:var(--ink); border-radius:10px;
     padding:8px 14px; font-size:13px; opacity:0; transition:.25s; pointer-events:none; z-index:40; white-space:nowrap;}
   .toast.show{opacity:1; transform:translateX(-50%);}
@@ -199,7 +220,9 @@
   /* 兜底广告卡（house 源）：没有第三方广告可放时也要真的"看"一段，
      否则「看广告拿奖励」就退化成白送 —— 这正是本次 RCA 的问题所在。 */
   .admask{position:fixed; inset:0; z-index:60; background:rgba(4,8,14,.92);
-    display:flex; align-items:center; justify-content:center; padding:22px;}
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(22px + env(safe-area-inset-top, 0px)) calc(22px + env(safe-area-inset-right, 0px))
+            calc(22px + env(safe-area-inset-bottom, 0px)) calc(22px + env(safe-area-inset-left, 0px));}
   .adbox{width:100%; max-width:340px; background:var(--surface); border:1px solid var(--edge);
     border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:12px; text-align:center;}
   .adbox .adlab{font-size:11px; color:var(--ink-3); letter-spacing:.12em; text-transform:uppercase;}
@@ -257,7 +280,8 @@
   .wknote{font-size:11px; color:var(--ink-3); line-height:1.7; text-align:center;}
 
   /* 隐藏工具面板（仅 URL 带 #selftest 时显示，普通玩家看不到） */
-  .selftest{position:fixed; left:10px; right:10px; bottom:10px; z-index:50; background:#0d1420;
+  .selftest{position:fixed; left:calc(10px + env(safe-area-inset-left, 0px)); right:calc(10px + env(safe-area-inset-right, 0px));
+    bottom:calc(10px + env(safe-area-inset-bottom, 0px)); z-index:50; background:#0d1420;
     border:1px solid var(--edge); border-radius:12px; padding:10px; display:flex;
     flex-direction:column; gap:8px;}
   .selftest pre{margin:0; font-size:11px; line-height:1.55; color:var(--ink-2); white-space:pre-wrap;

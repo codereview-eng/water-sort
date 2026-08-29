@@ -166,12 +166,15 @@
     if (!Array.isArray(available) || available.length === 0) fail('resolveLang: available 必须是非空数组');
     if (available.indexOf(def) === -1) fail('resolveLang: 默认语言 "' + def + '" 不在 available 里');
     var q = /[?&]lang=([A-Za-z-]+)/.exec(inputs.search || '');
-    /* 顺序要紧（2026-08-29 改）：**玩家手动选的语言压过 URL 参数**。
-       原来 ?lang= 排在最前，本意是调试参数；但宿主（内嵌 webview / 壳页面）
-       每次按固定地址装载游戏时会把它一并带上，于是玩家每次改完语言、重进又被顶回去——
-       表现就是「怎么改都不生效」。调试用途不受影响：干净环境里本来就没有已保存的选择。
-       hash 排在 local 之前：它是每次手动切换都会刷新的那一份，且本地存储被清掉时它还在。 */
-    var chain = [hashLang(inputs.hash), inputs.saved, q && q[1], inputs.tgLanguageCode, inputs.navigatorLanguage];
+    /* 顺序（owner 拍板 2026-08-29）：**云端 > 本地存储 > URL**。
+       云端那份不在本函数里——它是登录后异步拿到的，由页面在云档回来时覆盖当前语言（权威）；
+       本函数只负责首屏这一刻的本地决策，因此这里的链首是本地存储，其次才是 URL。
+       为什么 URL 垫底：?lang= 本意是调试参数，但宿主（内嵌 webview / 壳页面）
+       按固定地址装载游戏时会把它一并带上，排在前面就会把玩家的选择每次顶掉——
+       表现就是「改完重进又变回去」（2026-08-29 headless 复现确证）。
+       调试用途不受影响：干净环境里本来就没有已保存的选择。
+       hash 垫在本地存储之后、URL 参数之前：它是本地存储被清掉时的兜底镜像。 */
+    var chain = [inputs.saved, hashLang(inputs.hash), q && q[1], inputs.tgLanguageCode, inputs.navigatorLanguage];
     for (var i = 0; i < chain.length; i++) {
       var hit = matchLang(chain[i], available);
       if (hit) return hit;

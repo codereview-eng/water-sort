@@ -205,3 +205,62 @@ test('reconcile：磁盘为空/首次写盘时安全返回空补丁', () => {
   assert.deepStrictEqual(S.reconcile({ coinsSpent: 5 }, null), {});
   assert.deepStrictEqual(S.reconcile({ coinsSpent: 5 }, {}), {}, '磁盘无账本字段时不回退');
 });
+
+/* ---- 物理上限 audit（issue #1 · 广告奖励可信度 3/4）----
+   背景：只增账本 + max 合并让**被篡改的数字不可回收**。实测把 toolMineGranted 改成
+   99999 再同步一次，正常值就再也顶不回去了。audit 不是"检测作弊"（客户端做不到），
+   是限损：削平到按游戏规则物理上可能的量，并留下可查的异常记录。 */
+const ceilCfg = {
+  ceiling: { safety: 3, perDay: { toolMine: 60 } },
+  items: {
+    toolMine: { granted: 'g', spent: 's', initial: 2 },
+    toolSafe: { granted: 'g2', spent: 's2', initial: 2 }
+  }
+};
+
+test('audit：没配 ceiling 的游戏行为完全不变（向后兼容）', () => {
+  const S = Stock.create({ items: { a: { granted: 'ag', spent: 'as' } } });
+  assert.deepStrictEqual(S.audit({ ag: 999999 }, 1), { patch: {}, anomalies: [], unknownAge: false });
+  assert.strictEqual(S.ceiling('a', 5), null);
+});
+
+test('audit：正常玩家一个字段都不动', () => {
+  const S = Stock.create(ceilCfg);
+  assert.deepStrictEqual(S.audit({ g: 7, s: 3 }, 3), { patch: {}, anomalies: [], unknownAge: false });
+});
+
+test('audit：新账号第 0 天也有整整一天的额度，不能把首日正常获得判成异常', () => {
+  const S = Stock.create(ceilCfg);
+  assert.strictEqual(S.ceiling('toolMine', 0), 2 + 1 * 60 * 3);
+  assert.deepStrictEqual(S.audit({ g: 100 }, 0).anomalies, []);
+});
+
+test('audit：控制台改出来的 99999 被削平，并留下能追查的明细', () => {
+  const S = Stock.create(ceilCfg);
+  const r = S.audit({ g: 99999, s: 3 }, 3);
+  const cap = 2 + 4 * 60 * 3;
+  assert.deepStrictEqual(r.patch, { g: cap });
+  assert.deepStrictEqual(r.anomalies, [{ key: 'toolMine', field: 'g', claimed: 99999, cap: cap, ageDays: 3 }]);
+});
+
+test('audit：天数不可信时不 clamp，但要把这条路走了多少次标出来', () => {
+  const S = Stock.create(ceilCfg);
+  /* 本地时钟是玩家的，拿它当证据等于自欺欺人；宁可不削，也不能凭假证据削真玩家。 */
+  assert.deepStrictEqual(S.audit({ g: 99999 }, null), { patch: {}, anomalies: [], unknownAge: true });
+  assert.strictEqual(S.audit({ g: 99999 }, undefined).unknownAge, true);
+});
+
+test('audit：没配上限的道具不受影响（只削声明过的）', () => {
+  const S = Stock.create(ceilCfg);
+  assert.deepStrictEqual(S.audit({ g2: 99999 }, 3).patch, {});
+});
+
+test('ceiling 配置 fail-fast', () => {
+  assert.throws(() => Stock.create({ ceiling: { perDay: { nope: 1 } }, items: { a: { granted: 'g', spent: 's' } } }),
+    /不是已声明的道具/);
+  assert.throws(() => Stock.create({ ceiling: { perDay: { a: -1 } }, items: { a: { granted: 'g', spent: 's' } } }),
+    /必须是非负数/);
+  assert.throws(() => Stock.create({ ceiling: { perDay: { a: 1 }, safety: 0.5 }, items: { a: { granted: 'g', spent: 's' } } }),
+    /safety/);
+  assert.throws(() => Stock.create({ ceiling: {}, items: { a: { granted: 'g', spent: 's' } } }), /perDay/);
+});

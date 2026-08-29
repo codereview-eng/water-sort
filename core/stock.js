@@ -98,6 +98,70 @@
       return patch;
     }
 
+    /* ---- 物理上限（issue #1 · 广告奖励可信度）----
+       只增账本 + max 合并有一个副作用：**被篡改的数字不可回收**。
+       实测（.spike/spike-ledger.mjs）：控制台把 toolMineGranted 改成 99999 再触发一次同步，
+       max 合并让这个假数字赢，换设备、清缓存都还在，正常值再也顶不回去。
+
+       对策不是"检测作弊"（客户端做不到），而是**限损**：给累计获得量算一个
+       「按游戏规则物理上最多能拿多少」的上限，超过就削平并记一条异常。
+       上限 = initial + (开档天数 + 1) × perDay × safety
+       safety 默认 3 倍冗余：宁可让作弊者停在 180 个/天，也绝不能误伤真玩家。
+
+       ⚠️ 这是启发式，不是安全判定：
+       - 上限本身依赖「开档天数」，本地时钟不可信 —— 所以宿主应当传服务端盖的
+         created_date 换算出的天数；拿不到可信天数时**不 clamp**（返回 unknownAge），
+         而不是拿本地时钟凑一个假证据出来。
+       - 会改存档的人也能改天数。它挡的是"数字大到离谱且永久固化"，不是定向作弊。 */
+    var ceilingCfg = cfg.ceiling === undefined ? null : cfg.ceiling;
+    if (ceilingCfg !== null) {
+      if (typeof ceilingCfg !== 'object' || Array.isArray(ceilingCfg)) fail('ceiling 必须是对象或省略');
+      if (typeof ceilingCfg.perDay !== 'object' || ceilingCfg.perDay === null || Array.isArray(ceilingCfg.perDay)) {
+        fail('ceiling.perDay 必须是对象（道具 key → 每天物理上限）');
+      }
+      Object.keys(ceilingCfg.perDay).forEach(function (k) {
+        if (keys.indexOf(k) === -1) fail('ceiling.perDay 里的 "' + k + '" 不是已声明的道具');
+        var v = ceilingCfg.perDay[k];
+        if (typeof v !== 'number' || !isFinite(v) || v < 0) fail('ceiling.perDay.' + k + ' 必须是非负数');
+      });
+      if (ceilingCfg.safety !== undefined &&
+        (typeof ceilingCfg.safety !== 'number' || !isFinite(ceilingCfg.safety) || ceilingCfg.safety < 1)) {
+        fail('ceiling.safety 必须是 >= 1 的数字');
+      }
+    }
+    var safety = ceilingCfg && ceilingCfg.safety !== undefined ? ceilingCfg.safety : 3;
+
+    /* 某道具在开档 ageDays 天后，累计获得量的物理上限；没配上限则返回 null（= 不设限） */
+    function ceiling(key, ageDays) {
+      var it = item(key);
+      if (!ceilingCfg || ceilingCfg.perDay[key] === undefined) return null;
+      var days = Math.max(0, num(ageDays));
+      return Math.round(num(it.initial) + (days + 1) * ceilingCfg.perDay[key] * safety);
+    }
+
+    /* 检查一份存档（通常是刚跟云端/别的标签页合并完的那份）里有没有离谱的累计值。
+       返回 { patch, anomalies }：patch 是要削平的字段（空对象 = 没问题），
+       anomalies 是给日志/告警用的明细。ageDays 传 null/undefined = 天数不可信，
+       此时不做任何 clamp，只把 unknownAge 标出来让上层能看见这条路走了多少次。 */
+    function audit(save, ageDays) {
+      var out = { patch: {}, anomalies: [], unknownAge: false };
+      if (!ceilingCfg) return out;
+      if (ageDays === null || ageDays === undefined || !isFinite(ageDays)) {
+        out.unknownAge = true;
+        return out;
+      }
+      keys.forEach(function (key) {
+        var cap = ceiling(key, ageDays);
+        if (cap === null) return;
+        var have = num(save && save[item(key).granted]);
+        if (have > cap) {
+          out.patch[item(key).granted] = cap;
+          out.anomalies.push({ key: key, field: item(key).granted, claimed: have, cap: cap, ageDays: ageDays });
+        }
+      });
+      return out;
+    }
+
     /* 发放 n 个（初始赠送 / 通关奖励 / 看广告补充）：granted 只增不减。 */
     function grant(save, key, n) {
       var it = item(key);
@@ -201,6 +265,8 @@
       migrate: migrate,
       legacyPatch: legacyPatch,
       reconcile: reconcile,
+      ceiling: ceiling,
+      audit: audit,
       meta: meta,
       list: list
     };

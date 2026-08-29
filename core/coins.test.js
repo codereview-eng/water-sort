@@ -32,8 +32,8 @@ test('每个游戏可自配：奖励与单个道具的价格/数量都能改', (
     shop: { toolMine: { price: 500, amount: 2 }, toolSafe: {} }   // toolSafe 省略 → 走默认
   }, stock);
   assert.strictEqual(coins.earnPerClear, 3);
-  assert.deepStrictEqual(coins.sku('toolMine'), { price: 500, amount: 2 });
-  assert.deepStrictEqual(coins.sku('toolSafe'), { price: 200, amount: 1 }, '条目内缺省字段也要兜底');
+  assert.deepStrictEqual(coins.sku('toolMine'), { price: 500, amount: 2, adAmount: 1 });
+  assert.deepStrictEqual(coins.sku('toolSafe'), { price: 200, amount: 1, adAmount: 1 }, '条目内缺省字段也要兜底');
 });
 
 test('配了 shop 就只卖列出来的：未列出的道具不可买', () => {
@@ -118,6 +118,30 @@ test('回归：花掉的金币不会被云端旧存档复活（max 合并）', (
   assert.strictEqual(stock.stock(merged, 'toolMine'), 3, '买到的道具也不能被抹掉');
 });
 
+/* 「看广告免费拿」与「金币买」共用同一张货架：不在货架上的道具两条路都没有入口，
+   页面据此决定要不要画「+」（避免页面另存一份可获取清单，加道具时两处漂移）。 */
+test('看广告获取：默认 +1，只发道具不动金币', () => {
+  const stock = mkStock();
+  const coins = Coins.create(undefined, stock);
+  const save = fresh(stock, { coinsEarned: 300 });
+  assert.strictEqual(coins.adAmountOf('toolMine'), 1, '缺省一次广告给 1 个');
+  Object.assign(save, coins.grantByAd(save, 'toolMine'));
+  assert.strictEqual(stock.stock(save, 'toolMine'), 3);
+  assert.strictEqual(coins.balance(save), 300, '广告路径不许动金币');
+});
+
+test('看广告发放量可配，货架外的道具没有获取入口', () => {
+  const stock = mkStock();
+  const coins = Coins.create({ shop: { toolSafe: { price: 120, amount: 2, adAmount: 3 } } }, stock);
+  const save = fresh(stock, {});
+  assert.strictEqual(coins.adAmountOf('toolSafe'), 3);
+  Object.assign(save, coins.grantByAd(save, 'toolSafe'));
+  assert.strictEqual(stock.stock(save, 'toolSafe'), 2 + 3);
+  assert.strictEqual(coins.adAmountOf('toolMine'), null, '没上架 = 没有获取入口');
+  assert.strictEqual(coins.priceOf('toolMine'), null);
+  assert.strictEqual(coins.grantByAd(save, 'toolMine'), null, '没上架就不能靠广告白拿');
+});
+
 test('配置写错就直接报错，不静默兜底', () => {
   const stock = mkStock();
   assert.throws(() => Coins.create({ earnPerClear: -1 }, stock), /earnPerClear/);
@@ -127,6 +151,7 @@ test('配置写错就直接报错，不静默兜底', () => {
   assert.throws(() => Coins.create({ shop: {} }, stock), /空对象/);
   assert.throws(() => Coins.create({ shop: { toolMine: { price: 0 } } }, stock), /price/);
   assert.throws(() => Coins.create({ shop: { toolMine: { amount: -2 } } }, stock), /amount/);
+  assert.throws(() => Coins.create({ shop: { toolMine: { adAmount: 0 } } }, stock), /adAmount/);
   assert.throws(() => Coins.create({ coinsKey: 'gold' }, stock), /不在 stock\.items/);
   assert.throws(() => Coins.create({}, null), /StockCore 实例/);
 });

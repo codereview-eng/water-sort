@@ -127,6 +127,36 @@ test('water：语言下拉改变时走 persistLang，首屏决策链吃 location
   assert.ok(windowAfter(water, 'Store.get(LANG_KEY, (v) => {', 300, 'water 对账').includes('savedLangRead.hash'));
 });
 
+/* 第三条通道：云存档（跟账号走，不依赖本机存储/URL）。
+   前两条都活在这台设备的这个页面里——内嵌 webview 换存储分区、宿主按原始 URL 重载，
+   两条可能一条都不剩；云端那份是唯一不受本机环境摆布的。与音效开关 sfx 同一条通道。 */
+test('mine：语言进云存档——schema 有列、config 有字段映射、合并策略是 newest', () => {
+  const schema = JSON.parse(readFileSync(join(ROOT, 'games/mine/schema.json'), 'utf8'));
+  assert.equal(schema.entities.Save.fields.lang, 'string', 'schema 缺 lang 列，云端存不下');
+  const cfg = JSON.parse(readFileSync(join(ROOT, 'games/mine/game.config.json'), 'utf8'));
+  assert.deepEqual(cfg.platform.fields.lang, { col: 'lang', merge: 'newest' },
+    '语言是「最后一次选的算数」，只能 newest；用 max 会把语言当数值比大小');
+  // 内嵌副本必须同步，否则线上跑的是旧配置（改 config 忘同步是本仓惯犯）
+  const embedded = JSON.parse(windowAfter(mine, '<script id="gameConfig" type="application/json">', 200000,
+    'mine 内嵌配置').replace(/^[^{]*/, '').replace(/<\/script>[\s\S]*$/, ''));
+  assert.deepEqual(embedded.platform.fields.lang, { col: 'lang', merge: 'newest' }, '内嵌 gameConfig 副本未同步');
+});
+
+test('mine：切语言写云档字段，云档回来按它切语言', () => {
+  const set = windowAfter(mine, 'function setLang(lang) {', 900, 'mine setLang');
+  assert.ok(set.includes('save.lang = LANG'), '切语言必须写进云档字段');
+  assert.ok(set.includes('persist()'), '写完必须 persist（persist 内含 platformSync）');
+  const cloud = windowAfter(mine, 'ensureTempName(); persist(); renderHome();', 400, 'mine 云档合并出口');
+  assert.ok(cloud.includes('setLang(save.lang)'), '云档合并后必须按云端语言切过去');
+  assert.ok(cloud.includes('lang=/.test(location.search)'), '?lang= 调试参数在场时云端不夺权');
+});
+
+test('mine：设置页显示构建标记（分辨设备拿到的是哪一版）', () => {
+  const s = windowAfter(mine, 'function openSettings() {', 2600, 'mine openSettings');
+  assert.ok(s.includes("getAttribute('data-build')"), '设置页要读 <html data-build>');
+  assert.ok(s.includes("'buildLine'"), '构建标记行缺 id，验收脚本抓不到');
+});
+
 test('mine：切语言走 persistLang，首屏决策链吃 location.hash', () => {
   assert.ok(windowAfter(mine, 'function setLang(lang) {', 500, 'mine setLang')
     .includes('LocaleCore.persistLang(window, LANG_KEY'), '切语言必须落 hash 通道');

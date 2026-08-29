@@ -1032,6 +1032,10 @@
         "col": "sfx",
         "merge": "newest"
       },
+      "lang": {
+        "col": "lang",
+        "merge": "newest"
+      },
       "wsCur": {
         "col": "ws_cur",
         "merge": "newest"

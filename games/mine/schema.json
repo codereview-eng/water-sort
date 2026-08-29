@@ -18,6 +18,7 @@
         "energy_ts": "number",
         "alias": "string",
         "sfx": "boolean",
+        "lang": "string",
         "updated_ms": "number",
         "ws_cur": "number",
         "ws_pend": "number",

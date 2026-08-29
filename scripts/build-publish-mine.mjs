@@ -162,7 +162,24 @@ for (const name of cgNames) {
 if (cgBytes > CG_BUDGET) {
   throw new Error(`CG 素材合计 ${(cgBytes / 1048576).toFixed(2)} MiB 超 ${(CG_BUDGET / 1048576).toFixed(0)} MiB 预算`);
 }
-console.log(`  CG 素材 ${cgNames.length} 件 ${(cgBytes / 1048576).toFixed(2)} MiB（单件上限 ${CG_FILE_CAP / 1024}KB）`);
+/* 齐全性 fail-close（2026-08-29 owner 定案：CG 素材不进 git，只活在本机 color-mines/cg/）。
+   既然版本库里没有素材，「发布时素材在不在」就只剩这一道防线：
+   照剧情表（mine-story.js 的 MEDIA 映射，唯一权威）逐件核对产物，缺一件就抛错。
+   否则在没有素材的检出上构建会**静默**产出一个零 CG 的包 —— 页面照常可玩、
+   播放机对缺资源静默跳过，玩家只是「再也看不到剧情」，没有任何人会发现。 */
+const storySrc = readFileSync(join(ROOT, 'mine-story.js'), 'utf8');
+const mediaBlock = storySrc.slice(storySrc.indexOf('var MEDIA = {'), storySrc.indexOf('/* ── ②'));
+const wanted = [...mediaBlock.matchAll(/'cg\/([^']+)'\s*:/g)].map((m) => m[1])
+  .filter((n) => CG_SHIPPED.test(n));
+const uniq = [...new Set(wanted)].sort();
+if (!uniq.length) throw new Error('没能从 mine-story.js 解析出 CG 素材清单，构建假设已失效');
+const missing = uniq.filter((n) => !cgNames.includes(n));
+if (missing.length) {
+  throw new Error(`CG 素材缺 ${missing.length}/${uniq.length} 件：${missing.join(', ')}\n`
+    + `  素材不进 git，只在本机 ${CG_SRC}/ —— 换机器/新克隆构建前先把该目录带过来。`);
+}
+console.log(`  CG 素材 ${cgNames.length} 件 ${(cgBytes / 1048576).toFixed(2)} MiB`
+  + `（剧情表要求 ${uniq.length} 件，齐；单件上限 ${CG_FILE_CAP / 1024}KB）`);
 
 // 回读校验：写进产物的封面必须与源逐字节一致（防静默截断/编码污染）
 const coverBack = readFileSync(join(DIST, 'cover.webp'));

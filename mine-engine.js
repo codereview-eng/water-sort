@@ -448,27 +448,57 @@
         （同行/同列/紧贴已知雷）。
 
      v2 的口径：**每一次提示都必须指向一个能被标成雷的落点**，并按「玩家自己验算得动的程度」
-     分层给理由。marks 参与推理，但只认**真的不是雷**的那些；打错的 ✕ 反而是最高优先级的线索。 */
+     分层给理由。marks 参与推理，但只认**真的不是雷**的那些；打在真雷上的记号只是不采信，
+     **不当成「玩家标错了」去纠正**（owner 拍板 2026-08-29，见 clueNext 头注）。 */
+
+  /* ---- 排除记账（2026-08-27）----
+     v2 的推理是「全传播 + 最多 12 跳限区」的多步过程，但每一步都只是就地把 st 改成
+     KNOWN_SAFE，改完就被下一步覆盖。于是玩家只拿到最后一句结论，组里那些他自己还没
+     ✕ 掉的格「为什么不是雷」一个字都没有 —— 用户实报的「线索不完整」就是这么来的。
+     解法：每次把一格判成安全，都把「凭哪条规则、依据哪颗雷/哪一组」记进 reason[idx]，
+     第一次记的那条为准（最早=最浅的理由最好讲）。reason 不传就完全不记，老调用方零影响。 */
+  function noteReason(reason, idx, info) {
+    if (!reason || reason[idx]) return;
+    reason[idx] = info;
+  }
+
+  /* 同一条规则、同一个依据排掉的格子要合并成一句话讲，别一格一句刷屏 */
+  function reasonKey(r) {
+    if (r.rule === 'group-mine') return 'group-mine|' + r.group.kind + '|' + r.group.at + '|' + r.at;
+    if (r.rule === 'touch-mine') return 'touch-mine|' + r.at;
+    if (r.rule === 'confine') return 'confine|' + r.from.kind + '|' + r.from.at + '|' + r.into.kind + '|' + r.into.at;
+    if (r.rule === 'cover') {
+      return 'cover|' + r.from.map(function (g) { return g.kind + g.at; }).join(',')
+        + '|' + r.into.map(function (g) { return g.kind + g.at; }).join(',');
+    }
+    return 'squeeze|' + r.lineKind + '|' + r.from + '|' + r.into;
+  }
 
   /* 只传播「安全」结论，绝不在这里派生新的雷 —— 限流仍然写在内核里：
      一次调用只吐一个雷。规则都是玩家肉眼可验的：组里已有雷 → 其余安全；紧贴雷 → 安全。 */
-  function propagateSafe(size, region, st) {
-    var gs = hintGroups(size, region), changed = true, gi, g, i, k, nb, hasMine;
+  function propagateSafe(size, region, st, reason) {
+    var gs = hintGroups(size, region), changed = true, gi, g, i, k, nb, hasMine, mineAt;
     while (changed) {
       changed = false;
       for (gi = 0; gi < gs.length; gi++) {
-        g = gs[gi]; hasMine = false;
-        for (i = 0; i < g.cells.length; i++) if (st[g.cells[i]] === KNOWN_MINE) { hasMine = true; break; }
+        g = gs[gi]; hasMine = false; mineAt = -1;
+        for (i = 0; i < g.cells.length; i++) if (st[g.cells[i]] === KNOWN_MINE) { hasMine = true; mineAt = g.cells[i]; break; }
         if (!hasMine) continue;
         for (i = 0; i < g.cells.length; i++) {
-          if (st[g.cells[i]] === UNKNOWN) { st[g.cells[i]] = KNOWN_SAFE; changed = true; }
+          if (st[g.cells[i]] === UNKNOWN) {
+            st[g.cells[i]] = KNOWN_SAFE; changed = true;
+            noteReason(reason, g.cells[i], { rule: 'group-mine', group: g, at: mineAt });
+          }
         }
       }
       for (i = 0; i < size * size; i++) {
         if (st[i] !== KNOWN_MINE) continue;
         nb = neighbors(size, i);
         for (k = 0; k < nb.length; k++) {
-          if (st[nb[k]] === UNKNOWN) { st[nb[k]] = KNOWN_SAFE; changed = true; }
+          if (st[nb[k]] === UNKNOWN) {
+            st[nb[k]] = KNOWN_SAFE; changed = true;
+            noteReason(reason, nb[k], { rule: 'touch-mine', at: i });
+          }
         }
       }
     }
@@ -479,7 +509,122 @@
      若 A 组还没排除的格子**全都落在** B 组里，则 B 的那颗雷必然就是 A 的那颗 ——
      于是 B 里在 A 之外的格子全部安全。玩家卡在局部不动点时，几乎只有这一步能继续，
      而它仍然是**讲得清、玩家自己能验算**的，不是「天降答案」。 */
-  function confineOnce(size, region, st) {
+  /* k 组覆盖（Star Battle 的 set counting / 数独 hidden pair 同构，k=1 即 confineOnce）：
+     取 k 个**同类型**（同为行 / 同为列 / 同为色块，因而两两不相交，雷必然互不相同）且还没有雷的组，
+     若它们的候选格全部落在另外 k 个还没有雷的组里，这 k 颗雷就把那 k 个组正好占满 ——
+     于是那 k 个组里落在候选之外的格子全部安全。
+
+     **为什么要加这一层**（2026-08-29，用户实报「无端端就给出了最终答案，不理解」）：
+     玩家卡住的时刻，confine/squeeze 也常常跑到不动点，引擎只能掉进 enum 兜底层直接查解表给答案。
+     实测（test/manual/mine-clue-cover-spike.mjs）兜底层占理性玩家提示的 36.9%；反证式讲解
+     （假设雷在这→矛盾）已被实测否掉：2 跳内只讲得清 30.6% 的候选，讲深了等于换个姿势给答案。
+     k 组覆盖是玩家能自己数一遍验算的规则，因而是「把答案换成推理」的正确杠杆。
+
+     CELL_CAP 限制候选面：讲解要短才有人看，铺开一大片就失去意义了。 */
+  function coverOnce(size, region, st, k, reason) {
+    var gs = hintGroups(size, region), info = [], gi, i, c, cells, hasMine, unk;
+    for (gi = 0; gi < gs.length; gi++) {
+      cells = gs[gi].cells; hasMine = false; unk = [];
+      for (i = 0; i < cells.length; i++) {
+        c = cells[i];
+        if (st[c] === KNOWN_MINE) { hasMine = true; break; }
+        if (st[c] === UNKNOWN) unk.push(c);
+      }
+      if (!hasMine && unk.length) info.push({ g: gs[gi], unk: unk });
+    }
+    var n = info.length, owners = {}, CELL_CAP = k * 4;
+    for (gi = 0; gi < n; gi++) {
+      for (i = 0; i < info[gi].unk.length; i++) {
+        c = info[gi].unk[i];
+        if (!owners[c]) owners[c] = [];
+        owners[c].push(gi);
+      }
+    }
+    function has(arr, v) { var j; for (j = 0; j < arr.length; j++) if (arr[j] === v) return true; return false; }
+
+    /* S 固定后找 T：每个还没被盖住的候选格只可能由「含它的组」来盖（≤3 个），
+       所以这是一棵很浅的精确覆盖搜索树，不会爆。 */
+    function findT(S, U) {
+      var T = [], covered = {}, found = null;
+      (function pick() {
+        if (found) return;
+        var next = -1, q;
+        for (q = 0; q < U.length; q++) if (!covered[U[q]]) { next = U[q]; break; }
+        if (next < 0) { if (T.length === k) found = T.slice(); return; }
+        if (T.length === k) return;
+        var os = owners[next] || [], oi, gidx, added, w, cc;
+        for (oi = 0; oi < os.length; oi++) {
+          gidx = os[oi];
+          if (has(S, gidx) || has(T, gidx)) continue;
+          T.push(gidx); added = [];
+          for (w = 0; w < info[gidx].unk.length; w++) {
+            cc = info[gidx].unk[w];
+            if (!covered[cc]) { covered[cc] = 1; added.push(cc); }
+          }
+          pick();
+          for (w = 0; w < added.length; w++) covered[added[w]] = 0;
+          T.pop();
+          if (found) return;
+        }
+      })();
+      return found;
+    }
+
+    var combo = [], out = null;
+    function walk(start) {
+      if (out) return;
+      if (combo.length === k) {
+        var U = [], j, m, cc;
+        for (j = 0; j < combo.length; j++) {
+          for (m = 0; m < info[combo[j]].unk.length; m++) {
+            cc = info[combo[j]].unk[m];
+            if (!has(U, cc)) U.push(cc);
+          }
+        }
+        if (U.length < k || U.length > CELL_CAP) return;
+        var T = findT(combo, U);
+        if (!T) return;
+        var cut = [], w, x;
+        for (j = 0; j < T.length; j++) {
+          for (w = 0; w < info[T[j]].unk.length; w++) {
+            x = info[T[j]].unk[w];
+            if (!has(U, x) && !has(cut, x)) cut.push(x);
+          }
+        }
+        if (!cut.length) return;
+        var from = [], into = [];
+        for (j = 0; j < combo.length; j++) from.push(info[combo[j]].g);
+        for (j = 0; j < T.length; j++) into.push(info[T[j]].g);
+        for (j = 0; j < cut.length; j++) {
+          st[cut[j]] = KNOWN_SAFE;
+          noteReason(reason, cut[j], { rule: 'cover', k: k, from: from, into: into, cand: U.slice() });
+        }
+        /* cand 必须一起交出来：讲这一步时要指出「这几组的雷只能落在这些格里」，
+           少了它玩家无从验算（门禁 mine-clue-complete 会红）。 */
+        out = { from: from, into: into, cut: cut, k: k, cand: U.slice() };
+        return;
+      }
+      var i2, j2, ok;
+      for (i2 = start; i2 < n; i2++) {
+        /* **候选格两两不相交**是鸽笼成立的前提：两个组若共用候选格，就可能共用同一颗雷，
+           k 个组就凑不出 k 颗互不相同的雷（混用行与列最容易踩这个坑）。
+           比「必须同类型」更宽，且同样成立：不相交的行 + 色块也能一起用。 */
+        ok = true;
+        for (j2 = 0; j2 < combo.length && ok; j2++) {
+          for (var w2 = 0; w2 < info[i2].unk.length && ok; w2++) {
+            if (has(info[combo[j2]].unk, info[i2].unk[w2])) ok = false;
+          }
+        }
+        if (!ok) continue;
+        combo.push(i2); walk(i2 + 1); combo.pop();
+        if (out) return;
+      }
+    }
+    walk(0);
+    return out;
+  }
+
+  function confineOnce(size, region, st, reason) {
     var gs = hintGroups(size, region), out = null, ai, bi, A, B, i;
     var unks = [], hasMine = [];
     for (ai = 0; ai < gs.length; ai++) {
@@ -505,7 +650,10 @@
         var cut = [];
         for (i = 0; i < unks[bi].length; i++) if (!mineOf[unks[bi][i]]) cut.push(unks[bi][i]);
         if (!cut.length) continue;
-        for (i = 0; i < cut.length; i++) st[cut[i]] = KNOWN_SAFE;
+        for (i = 0; i < cut.length; i++) {
+          st[cut[i]] = KNOWN_SAFE;
+          noteReason(reason, cut[i], { rule: 'confine', from: A, into: B });
+        }
         out = { from: A, into: B, cut: cut };
         return out;                                  // 一次只走一步，便于把理由讲给玩家
       }
@@ -516,7 +664,7 @@
   /* 邻行/邻列夹逼（「两颗雷不相邻」的推广版）：某一行的雷只可能落在很窄的一段列里时，
      相邻行里被这一段整段贴住的格子就不可能是雷 —— 无论那一行的雷落在这段的哪一格，
      都会和它相邻。已确认的雷只是这条规则里 S 只剩一格的特例。 */
-  function squeezeOnce(size, region, st) {
+  function squeezeOnce(size, region, st, reason) {
     var lines = [], a, b, i, j, k;
     for (a = 0; a < size; a++) {
       var rowU = [], colU = [], rowMine = false, colMine = false;
@@ -540,7 +688,10 @@
             if (all) cut.push(j * size + c);
           }
           if (cut.length) {
-            for (t = 0; t < cut.length; t++) st[cut[t]] = KNOWN_SAFE;
+            for (t = 0; t < cut.length; t++) {
+              st[cut[t]] = KNOWN_SAFE;
+              noteReason(reason, cut[t], { rule: 'squeeze', lineKind: 'row', from: i, into: j, span: src.length });
+            }
             return { kind: 'row', from: i, into: j, span: src.length, cut: cut };
           }
         }
@@ -553,7 +704,10 @@
             if (all2) cutC.push(r * size + j);
           }
           if (cutC.length) {
-            for (t2 = 0; t2 < cutC.length; t2++) st[cutC[t2]] = KNOWN_SAFE;
+            for (t2 = 0; t2 < cutC.length; t2++) {
+              st[cutC[t2]] = KNOWN_SAFE;
+              noteReason(reason, cutC[t2], { rule: 'squeeze', lineKind: 'col', from: i, into: j, span: srcC.length });
+            }
             return { kind: 'col', from: i, into: j, span: srcC.length, cut: cutC };
           }
         }
@@ -562,20 +716,45 @@
     return null;
   }
 
-  /* 在给定事实下找「这一组只剩一格没排除，且这组还没找到雷」→ 那一格必是雷 */
+  /* 在给定事实下找「这一组只剩一格没排除，且这组还没找到雷」→ 那一格必是雷。
+     **返回第一个**：只给 v1/老调用方与不关心挑哪颗的场合用。 */
   function soleMineIn(size, region, st) {
-    var gs = hintGroups(size, region), gi, g, i, unk, hasMine;
+    var all = allSolesIn(size, region, st);
+    return all.length ? all[0] : null;
+  }
+
+  /* 全部「推得出来」的雷，而不是扫到的第一颗。
+     Why（owner 拍板 2026-08-29）：hintGroups 的顺序是「先所有行、再所有列、最后色块」，
+     只取第一个就等于**按行列顺序**给下一颗雷 —— 玩家的原话是「应该找到能通过推理出来的
+     下一个雷，而不是按行或者列计算的下一个雷」。挑哪一颗必须由**讲解成本**决定，不由扫描顺序决定。 */
+  function allSolesIn(size, region, st) {
+    var gs = hintGroups(size, region), out = [], gi, g, i, unk, hasMine;
     for (gi = 0; gi < gs.length; gi++) {
       g = gs[gi]; hasMine = false; unk = [];
       for (i = 0; i < g.cells.length; i++) {
         if (st[g.cells[i]] === KNOWN_MINE) { hasMine = true; break; }
         if (st[g.cells[i]] === UNKNOWN) unk.push(g.cells[i]);
       }
-      if (!hasMine && unk.length === 1) {
-        return { idx: unk[0], group: g, only: g.cells.length === 1 };
-      }
+      if (!hasMine && unk.length === 1) out.push({ idx: unk[0], group: g, only: g.cells.length === 1 });
     }
-    return null;
+    return out;
+  }
+
+  /* 在同样「推得出来」的几颗雷里，挑**人最容易自己验算**的那颗：
+     组里还欠玩家理由的格子越少越好；讲得出理由的格算 1 步，讲不出的（会落进 pending）罚 3 步。
+     同分再按格号，保证同一盘面同一答案（提示必须可复现，否则玩家会觉得道具在乱指）。 */
+  function pickSole(soles, known, reason) {
+    var best = null, i, j, s, cost, cells, c;
+    for (i = 0; i < soles.length; i++) {
+      s = soles[i]; cells = s.group.cells; cost = 0;
+      for (j = 0; j < cells.length; j++) {
+        c = cells[j];
+        if (c === s.idx || (known && known[c])) continue;
+        cost += (reason && reason[c]) ? 1 : 3;
+      }
+      if (!best || cost < best.cost || (cost === best.cost && s.idx < best.s.idx)) best = { s: s, cost: cost };
+    }
+    return best ? best.s : null;
   }
 
   /* 「最接近被推出来」的那颗雷：所在行/列/色块里剩余未排除格最少的一颗。
@@ -604,12 +783,182 @@
     return best;
   }
 
-  /* 道具「找线索」v2 入口：facts = { opened, found, marks }
-     返回恒为 kind:'mine' 的一条结论（没有未找到的雷时返回 null），四层理由由强到弱：
-       ① markwrong —— 玩家的 ✕ 打在真雷上：这个错误信念正在毒化他后面所有推理，先纠正
-       ② *-last/-only —— 用玩家当下已知的事实，一步就能推出（他自己能验算）
-       ③ *-clear    —— 把已找到的雷顺手能排掉的格排掉之后，这一组只剩这一格
-       ④ enum       —— 都推不动，指最接近推出来的那颗，文案诚实说明要跨行列联立 */
+  /* ---- 反证（v5，2026-08-29，owner 口径：「道具就是把推理过程按顺序显示出来」）----
+     假设某格是雷，顺着规则往下推，撞出矛盾 ⇒ 它不是雷。人本来就会这么想，
+     而且**每次玩家卡住时它都给得出下一步**：实测 40 关 278 个卡点 278 次给得出
+     （test/manual/mine-clue-chain-spike.mjs），矛盾链中位 5 步、最长 13。
+     所以查表兜底那一层被它整个替掉了。
+
+     早前 mine-clue-refute-spike 曾判「反证只能讲清 30.6%」——那次把内层推理限死在 2 跳，
+     结论是错的。**内层必须放开到完整规则集**（基础三条 + 限区 + 夹逼 + 覆盖）。 */
+
+  /* 内层模拟：只用「组内只剩一格=雷 / 组内有雷=其余安全 / 雷的邻格安全」推到不动点，
+     同时检测两类矛盾：某组一格不剩、两雷相邻。返回 { bad, group, at, steps }。 */
+  function simulate(size, region, st) {
+    var gs = hintGroups(size, region), changed = true, steps = 0, gi, g, i, k, nb, hasMine, unk;
+    while (changed) {
+      changed = false;
+      for (gi = 0; gi < gs.length; gi++) {
+        g = gs[gi]; hasMine = false; unk = [];
+        for (i = 0; i < g.cells.length; i++) {
+          if (st[g.cells[i]] === KNOWN_MINE) hasMine = true;
+          else if (st[g.cells[i]] === UNKNOWN) unk.push(g.cells[i]);
+        }
+        if (!hasMine && unk.length === 0) return { bad: 'empty', group: g, steps: steps };
+        if (!hasMine && unk.length === 1) { st[unk[0]] = KNOWN_MINE; changed = true; steps++; continue; }
+        if (hasMine && unk.length) {
+          for (i = 0; i < unk.length; i++) st[unk[i]] = KNOWN_SAFE;
+          changed = true; steps++;
+        }
+      }
+      for (i = 0; i < size * size; i++) {
+        if (st[i] !== KNOWN_MINE) continue;
+        nb = neighbors(size, i);
+        for (k = 0; k < nb.length; k++) {
+          if (st[nb[k]] === KNOWN_MINE) return { bad: 'adjacent', at: i, steps: steps };
+        }
+        for (k = 0; k < nb.length; k++) {
+          if (st[nb[k]] === UNKNOWN) { st[nb[k]] = KNOWN_SAFE; changed = true; steps++; }
+        }
+      }
+    }
+    return { bad: null, steps: steps };
+  }
+
+  /* 找一格「假设它是雷就会矛盾」的格子。挑矛盾链最短的讲，人才跟得下来。
+     TRY_CAP / GOOD_ENOUGH 是手感闸门：道具是点一下就要出结果的，不能为了找最优解卡住。 */
+  function refuteOnce(size, region, st, known) {
+    var gs = hintGroups(size, region), cands = [], gi, g, i, hasMine, unk;
+    for (gi = 0; gi < gs.length; gi++) {
+      g = gs[gi]; hasMine = false; unk = [];
+      for (i = 0; i < g.cells.length; i++) {
+        if (st[g.cells[i]] === KNOWN_MINE) hasMine = true;
+        else if (st[g.cells[i]] === UNKNOWN) unk.push(g.cells[i]);
+      }
+      if (!hasMine && unk.length >= 2) cands.push({ g: g, unk: unk });
+    }
+    cands.sort(function (a, b) { return a.unk.length - b.unk.length; });
+
+    var TRY_CAP = 24, GOOD_ENOUGH = 4, tried = 0, best = null, ci, ui, c, sim, sc, hop;
+    for (ci = 0; ci < cands.length; ci++) {
+      for (ui = 0; ui < cands[ci].unk.length; ui++) {
+        if (tried >= TRY_CAP) break;
+        c = cands[ci].unk[ui];
+        if (known && known[c]) continue;
+        tried++;
+        sc = new Uint8Array(st); sc[c] = KNOWN_MINE;
+        var total = 0;
+        for (hop = 0; hop < 16; hop++) {
+          sim = simulate(size, region, sc);
+          total += sim.steps;
+          if (sim.bad) break;
+          if (!(confineOnce(size, region, sc) || squeezeOnce(size, region, sc)
+             || coverOnce(size, region, sc, 2) || coverOnce(size, region, sc, 3))) { sim = null; break; }
+          total++;
+        }
+        if (sim && sim.bad && (!best || total < best.chain)) {
+          best = { idx: c, chain: total, bad: sim.bad, group: sim.group || null, at: sim.at === undefined ? null : sim.at,
+                   inGroup: cands[ci].g };
+          if (total <= GOOD_ENOUGH) return best;
+        }
+      }
+      if (tried >= TRY_CAP) break;
+    }
+    return best;
+  }
+
+  /* ---- 推理链（v6，owner 口径 2026-08-29：「推理顺序需要达到找到雷。
+     一次道具需要有多个 step，而不仅仅是下一步」）----
+     从玩家当下的认知出发，按人会用的顺序一路推到**一颗雷**，把沿途每一步都记下来：
+       组内有雷→其余排除 / 贴着雷→排除 / 限区 / 夹逼 / 覆盖 / 反证 → … → 这一格是雷。
+     UI 把这条链做成「第 i/N 步」逐步讲，最后一步才是结论。 */
+
+  /* 一步基础排除：组里已有雷 → 其余排除；或贴着某颗雷 → 排除。返回一条，没有返回 null。 */
+  function basicElimOnce(size, region, st) {
+    var gs = hintGroups(size, region), gi, g, i, k, nb, at, unk;
+    for (gi = 0; gi < gs.length; gi++) {
+      g = gs[gi]; at = -1; unk = [];
+      for (i = 0; i < g.cells.length; i++) {
+        if (st[g.cells[i]] === KNOWN_MINE) at = g.cells[i];
+        else if (st[g.cells[i]] === UNKNOWN) unk.push(g.cells[i]);
+      }
+      if (at >= 0 && unk.length) {
+        for (i = 0; i < unk.length; i++) st[unk[i]] = KNOWN_SAFE;
+        return { rule: 'group-mine', group: g, at: at, cells: unk };
+      }
+    }
+    for (i = 0; i < size * size; i++) {
+      if (st[i] !== KNOWN_MINE) continue;
+      nb = neighbors(size, i); unk = [];
+      for (k = 0; k < nb.length; k++) if (st[nb[k]] === UNKNOWN) unk.push(nb[k]);
+      if (unk.length) {
+        for (k = 0; k < unk.length; k++) st[unk[k]] = KNOWN_SAFE;
+        return { rule: 'touch', at: i, cells: unk };
+      }
+    }
+    return null;
+  }
+
+  /* 一步高级排除：限区 → 夹逼 → k 组覆盖，取先命中的那条 */
+  function advancedElimOnce(size, region, st) {
+    var before = new Uint8Array(st), i, cut;
+    function diff() {
+      var out = [];
+      for (i = 0; i < size * size; i++) if (st[i] === KNOWN_SAFE && before[i] === UNKNOWN) out.push(i);
+      return out;
+    }
+    var cf = confineOnce(size, region, st);
+    if (cf) return { rule: 'confine', from: cf.from, into: cf.into, cells: cf.cut };
+    var sq = squeezeOnce(size, region, st);
+    if (sq) {
+      cut = sq.cut && sq.cut.length ? sq.cut : diff();
+      if (cut.length) return { rule: 'squeeze', lineKind: sq.kind || null, from: sq.from, into: sq.into, cells: cut };
+    }
+    var k2 = coverOnce(size, region, st, 2) || coverOnce(size, region, st, 3);
+    if (k2) return { rule: 'cover', k: k2.k, from: k2.from, into: k2.into, cand: k2.cand || null, cells: k2.cut };
+    return null;
+  }
+
+  /* 从玩家的认知推到下一颗雷，返回**有序**的整条链（最后一项 rule='mine'）。
+     推不到雷返回 null。MAX_STEPS 是可读性闸门：链太长玩家就不看了。 */
+  function chainToMine(size, region, st, known, maxSteps) {
+    var steps = [], guard = 0, cap = maxSteps || 14;
+    while (guard++ < cap) {
+      var sole = pickSole(allSolesIn(size, region, st), known, null);
+      if (sole) {
+        steps.push({ rule: 'mine', idx: sole.idx, group: sole.group, only: sole.only });
+        return steps;
+      }
+      var e = basicElimOnce(size, region, st);
+      if (e) { steps.push(e); continue; }
+      e = advancedElimOnce(size, region, st);
+      if (e) { steps.push(e); continue; }
+      var ref = refuteOnce(size, region, st, known);
+      if (ref) {
+        st[ref.idx] = KNOWN_SAFE;
+        steps.push({ rule: 'refute', cells: [ref.idx], bad: ref.bad, chain: ref.chain,
+                     badGroup: ref.group || null, badAt: ref.at === undefined ? null : ref.at });
+        continue;
+      }
+      return null;
+    }
+    return null;
+  }
+
+  /* 道具「找线索」入口：facts = { opened, found, marks }
+
+     **v5 口径（owner 2026-08-29）：道具 = 把推理过程按顺序显示出来。**
+     所以它返回的是**推理链上的下一步**，而不是「一定是一颗雷」：
+       ① *-last/-only  这一组只剩一格 → 是雷（玩家一步就能验算）
+       ② *-clear       把已找到的雷顺手排掉之后，这一组只剩这一格 → 是雷
+       ③ confine/squeeze/cover 走一步高级规则后又逼出一颗雷
+       ④ refute        推不出雷了 → 给下一步**排除**：假设这格是雷会撞矛盾，所以它不是雷
+       ⑤ enum          连反证都给不出（实测 0 次）才退回查表，且只给范围不直接揭晓
+     ①–④ 每一条都是玩家自己能验算的，④ 的结论 kind 是 'safe'（要玩家打 ✕，不是挖开）。
+
+     **不判「玩家标错了」**（owner 拍板 2026-08-29）：标记对玩家而言是多义的，
+     打在真雷上的 ✕ 完全可能是「我怀疑这儿有雷」的记号，而不是一个错误结论。
+     线索的职责是指出下一颗雷，不是审判玩家的记号。 */
   function clueNext(board, facts) {
     facts = facts || {};
     var size = board.size, region = board.region, i;
@@ -619,30 +968,78 @@
     for (i = 0; i < found.length; i++) foundSet[found[i]] = 1;
     var opened = facts.opened || [], marks = facts.marks || [];
 
-    for (i = 0; i < marks.length; i++) {
-      if (isMine[marks[i]] && !foundSet[marks[i]]) {
-        return { kind: 'mine', idx: marks[i], why: 'markwrong', depth: 'local' };
+    /* 玩家视角的「已排除」只有这三样，它们无需再解释；组里除此之外的每一格
+       都欠玩家一个理由 —— 这正是 reason 记账要补上的那部分。 */
+    var known = {};
+    for (i = 0; i < opened.length; i++) known[opened[i]] = 1;
+    for (i = 0; i < marks.length; i++) known[marks[i]] = 1;
+    for (i = 0; i < found.length; i++) known[found[i]] = 1;
+    var reason = new Array(size * size);
+
+    function explain(res, group) {
+      var ruled = [], pending = [], order = {}, c, r, k, j;
+      var cells = (group && group.cells) || [];
+      for (j = 0; j < cells.length; j++) {
+        c = cells[j];
+        if (c === res.idx || known[c]) continue;
+        r = reason[c];
+        if (!r) { pending.push(c); continue; }
+        k = reasonKey(r);
+        if (order[k] === undefined) {
+          order[k] = ruled.length;
+          ruled.push({ rule: r.rule, group: r.group || null, at: r.at === undefined ? null : r.at,
+                       from: r.from === undefined ? null : r.from,
+                       into: r.into === undefined ? null : r.into,
+                       lineKind: r.lineKind || null, cand: r.cand || null, cells: [] });
+        }
+        ruled[order[k]].cells.push(c);
       }
+      res.ruled = ruled;
+      res.pending = pending;
+      return res;
     }
 
     var st = new Uint8Array(size * size);
     for (i = 0; i < opened.length; i++) st[opened[i]] = KNOWN_SAFE;
-    /* marks 只认「确实不是雷」的那些：打错的上一步已经先纠正掉了，
-       所以这里过滤掉错标不会让提示跟着玩家的错误走。 */
+    /* marks 只认「确实不是雷」的那些：打在真雷上的标记直接不采信（既不当安全格，
+       也不当错误来指责玩家），所以提示永远不会跟着一个错误前提走。 */
     for (i = 0; i < marks.length; i++) if (!isMine[marks[i]]) st[marks[i]] = KNOWN_SAFE;
     for (i = 0; i < found.length; i++) st[found[i]] = KNOWN_MINE;
 
-    var sole = soleMineIn(size, region, st);
-    if (sole) {
-      return { kind: 'mine', idx: sole.idx, group: sole.group, depth: 'local',
-               why: sole.group.kind + (sole.only ? '-only' : '-last') };
+    /* v6：一次道具 = 一条**有序**推理链，一路推到一颗雷。
+       ruled 就是链上的中间步骤（按推理顺序，不是按格号顺序），最后一项是结论。 */
+    var work = new Uint8Array(st);
+    var chain = chainToMine(size, region, work, known, 30);
+    if (chain) {
+      var last = chain[chain.length - 1];
+      var ruledSteps = [], si, s;
+      for (si = 0; si < chain.length - 1; si++) {
+        s = chain[si];
+        ruledSteps.push({ rule: s.rule, group: s.group || null, at: s.at === undefined ? null : s.at,
+          from: s.from === undefined ? null : s.from, into: s.into === undefined ? null : s.into,
+          lineKind: s.lineKind || null, cand: s.cand || null, k: s.k || null,
+          bad: s.bad || null, chain: s.chain || null, badGroup: s.badGroup || null,
+          cells: s.cells.slice() });
+      }
+      /* 结论组里，玩家没排除、链上也没讲到的格 —— 正常应为空（链已经把路走完了） */
+      var told = {}, pend = [], ci, cc;
+      for (si = 0; si < ruledSteps.length; si++) {
+        for (ci = 0; ci < ruledSteps[si].cells.length; ci++) told[ruledSteps[si].cells[ci]] = 1;
+      }
+      for (ci = 0; ci < last.group.cells.length; ci++) {
+        cc = last.group.cells[ci];
+        if (cc !== last.idx && !known[cc] && !told[cc]) pend.push(cc);
+      }
+      return { kind: 'mine', idx: last.idx, group: last.group, depth: 'chain',
+               why: last.group.kind + (last.only ? '-only' : '-last'),
+               ruled: ruledSteps, pending: pend, steps: chain.length };
     }
 
-    var st2 = propagateSafe(size, region, new Uint8Array(st));
-    sole = soleMineIn(size, region, st2);
+    var st2 = propagateSafe(size, region, new Uint8Array(st), reason);
+    var sole = pickSole(allSolesIn(size, region, st2), known, reason);
     if (sole) {
-      return { kind: 'mine', idx: sole.idx, group: sole.group, depth: 'chain',
-               why: sole.group.kind + (sole.only ? '-only' : '-clear') };
+      return explain({ kind: 'mine', idx: sole.idx, group: sole.group, depth: 'chain',
+               why: sole.group.kind + (sole.only ? '-only' : '-clear') }, sole.group);
     }
 
     /* ④ 限区/限行：玩家卡在局部不动点时基本只有这一步能走，而它仍然讲得清。
@@ -650,28 +1047,55 @@
        理由越短、越好讲；走满了还推不出来就认账，走第 ⑤ 层。 */
     var CONFINE_STEPS = 12, hop;
     for (hop = 0; hop < CONFINE_STEPS; hop++) {
-      var cf = confineOnce(size, region, st2);
-      var why = 'confine', sq = null;
+      var cf = confineOnce(size, region, st2, reason);
+      var why = 'confine', sq = null, cov = null;
       if (!cf) {
-        sq = squeezeOnce(size, region, st2);
-        if (!sq) break;
+        sq = squeezeOnce(size, region, st2, reason);
         why = 'squeeze';
+        if (!sq) {
+          /* ④b k 组覆盖：confine/squeeze 都跑到不动点时，玩家就卡死了 ——
+             以前这里直接掉进 enum 查表给答案（实测占 36.9% 的提示，用户实报「不理解」）。
+             k 从小到大试：讲解条数越少越好懂。 */
+          /* k 只到 3：实测 k=4 只把兜底层再压 1 个百分点（29.8%→28.8%），
+             却把最坏耗时从 13ms 推到 71ms，讲解还要一口气念四个组 —— 不值。 */
+          cov = coverOnce(size, region, st2, 2, reason) || coverOnce(size, region, st2, 3, reason);
+          if (!cov) break;
+          why = 'cover';
+        }
       }
-      propagateSafe(size, region, st2);
-      sole = soleMineIn(size, region, st2);
+      propagateSafe(size, region, st2, reason);
+      sole = pickSole(allSolesIn(size, region, st2), known, reason);
       if (sole) {
-        return { kind: 'mine', idx: sole.idx, group: sole.group, depth: 'confine',
-                 why: why, from: cf ? cf.from : null, into: cf ? cf.into : null,
-                 line: sq || null, steps: hop + 1 };
+        return explain({ kind: 'mine', idx: sole.idx, group: sole.group, depth: 'confine',
+                 why: why, from: cf ? cf.from : (cov ? cov.from : null),
+                 into: cf ? cf.into : (cov ? cov.into : null),
+                 line: sq || null, coverK: cov ? cov.k : null, steps: hop + 1 }, sole.group);
       }
     }
 
     var unfound = [];
     for (i = 0; i < all.length; i++) if (!foundSet[all[i]]) unfound.push(all[i]);
     if (!unfound.length) return null;
+
+    /* 走到这里说明连「反证也推不到雷」（chainToMine 已经把反证算进链里试过了）。
+       实测 40 关跑不到这一层；留着只作 fail-safe，且仍然只给范围、不直接揭晓。 */
     var best = nearestMine(size, region, st2, unfound);
     if (!best) return null;
-    return { kind: 'mine', idx: best.idx, group: best.group || null, depth: 'deep', why: 'enum' };
+    /* 这一层是**查表**不是推理（nearestMine 直接读真雷表），所以结构上没有完整理由可讲。
+       但能讲的部分必须讲：ruled 里是已经排掉的格与依据，pending 里是「还得联立才能排除」
+       的格 —— UI 必须把 pending 明确标出来并诚实说明，不能再假装「其它格都排除了」。 */
+    /* 兜底层唯一还能给玩家的东西是**范围**：把结论所在那一组里还没排掉的格子一并交出来。
+       UI 拿它先只给范围、由玩家自己决定要不要看答案 —— 用户实报的「无端端就给出了最终答案」
+       治的正是这个「无端端」：讲不出理由时，至少不能替玩家做「揭晓」这个决定。 */
+    var shortlist = [best.idx];
+    if (best.group) {
+      for (i = 0; i < best.group.cells.length; i++) {
+        var sc = best.group.cells[i];
+        if (sc !== best.idx && st2[sc] === UNKNOWN && !known[sc]) shortlist.push(sc);
+      }
+    }
+    return explain({ kind: 'mine', idx: best.idx, group: best.group || null, depth: 'deep',
+             why: 'enum', shortlist: shortlist }, best.group || null);
   }
 
   /* 道具「找线索」v1 入口（保留：v2 的对照基线与老测试仍在用）：三层降级——
@@ -699,8 +1123,13 @@
     clueNext: clueNext,
     propagateSafe: propagateSafe,
     soleMineIn: soleMineIn,
+    allSolesIn: allSolesIn,
+    pickSole: pickSole,
     confineOnce: confineOnce,
+    coverOnce: coverOnce,
     squeezeOnce: squeezeOnce,
+    refuteOnce: refuteOnce,
+    simulate: simulate,
     nearestMine: nearestMine,
     placeMines: placeMines,
     growRegions: growRegions,

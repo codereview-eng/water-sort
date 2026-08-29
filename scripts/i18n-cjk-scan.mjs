@@ -135,6 +135,8 @@ async function scanGame(bws, game) {
       ['settings-dialog', `document.getElementById('dlgMain').click(); ` + click('#dkSet')],
       ['rules-dialog', `document.getElementById('dlgMain').click(); ` + click('#dkRules')],
       ['streak-dialog', `document.getElementById('dlgMain').click(); ` + click('#btnStreak')],
+      // 剧情图鉴（2026-08-29）：锁态说明与章节名都是新文案，不扫就是漏翻盲区
+      ['story-dialog', `document.getElementById('dlgMain').click(); ` + click('#dkStory')],
     ],
   };
   const FINGERPRINT = `(() => {

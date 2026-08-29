@@ -141,6 +141,24 @@
       '</div>';
   }
 
+  /* 通用开关行（2026-08-28）：设置里除音效外还会有别的开/关项（彩雷首个是「剧情动画」）。
+     不给每个开关各写一个组件——id 与文案由配置声明，运行时由游戏侧按 id 回填状态与 i18n 文案，
+     和 sound-toggle 共用同一套样式，视觉上天然一致。 */
+  function switchRow(props) {
+    if (props.id === undefined || String(props.id) === '') fail('switch-row 必须声明 id（游戏侧按它绑定与回填）');
+    var id = esc(String(props.id));
+    var label = props.label !== undefined ? esc(String(props.label)) : id;
+    /* 可选副说明：光一个名词说不清「关掉之后会少什么」，视觉评审把这一条列为最弱项。
+       文案同样由游戏侧按 id + 'Hint' 回填 i18n，配置里只放英文安全 fallback。 */
+    var hint = props.hint !== undefined ? String(props.hint) : '';
+    return '<div class="langrow">' +
+      '<span class="rowlb"><label for="' + id + '" id="' + id + 'Label">' + label + '</label>' +
+      (hint ? '<small class="rowhint" id="' + id + 'Hint">' + esc(hint) + '</small>' : '') +
+      '</span>' +
+      '<button id="' + id + '" class="sfxbtn" aria-pressed="true">On</button>' +
+      '</div>';
+  }
+
   function langSelect(props) {
     var label = props.label !== undefined ? esc(String(props.label)) : 'Language';
     return '<div class="langrow">' +
@@ -591,6 +609,7 @@
     'weekly-event-entry': weeklyEventEntry,
     'sound-toggle': soundToggle,
     'lang-select': langSelect,
+    'switch-row': switchRow,
     'hintline': hintline
   };
 

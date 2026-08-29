@@ -524,16 +524,24 @@
      注意顺序：这段必须在任何调用 t() 的代码之前跑完，否则会踩顶层 TDZ（整段 script 静默中断）。 */
   var I18n = LocaleCore.createI18n(CFG.i18n);
   var LANG_KEY = 'mine_lang';
-  var savedLang = null;
-  try { savedLang = window.localStorage.getItem(LANG_KEY); } catch (e) {}   // 隐私模式会抛
+  /* 两条通道：URL hash(#lang=xx) + localStorage 镜像。隐私模式 setItem 会抛，
+     内嵌 webview（coder webview 等）更狠——写得进读得回，一刷新却是一份全新的空存储，
+     写后读回自检测不出来，所以 hash 才是跨刷新一定还在的那一份。 */
+  var savedLangRead = LocaleCore.readSavedLang(window, LANG_KEY);
+  var savedLang = savedLangRead.local;
   var tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe
     && window.Telegram.WebApp.initDataUnsafe.user) || {};
   var LANG = LocaleCore.resolveLang({
     search: location.search,
+    hash: location.hash,
     saved: savedLang,
     tgLanguageCode: tgUser.language_code,
     navigatorLanguage: navigator.language
   }, I18n.locales(), CFG.i18n['default']);
+  // hash 带着手动选的语言、而本地镜像对不上（存储被清/被隔离）→ 顺手补回本地一份
+  if (savedLangRead.hash && savedLang !== LANG) {
+    try { window.localStorage.setItem(LANG_KEY, LANG); } catch (e) {}
+  }
 
   /* t(key, vars)：取词 + {占位符} 插值。缺 key 由 core 抛错（宁可炸也不显示空白）。 */
   function t(key, vars) {
@@ -1955,7 +1963,7 @@
     var hit = LocaleCore.matchLang(lang, I18n.locales());
     if (!hit) return;
     LANG = hit;
-    try { window.localStorage.setItem(LANG_KEY, LANG); } catch (e) {}
+    LocaleCore.persistLang(window, LANG_KEY, LANG);   // localStorage 镜像 + URL hash，两条都写、都读回验证
     /* 顺序要紧：先重建 DOM（buildHome）→ 再重绑事件（bindHome，否则按钮全死）
        → 再回填静态文案（applyStaticI18n 内含 fillLangOptions）→ 最后刷数值。 */
     buildHome(); bindHome(); applyStaticI18n(); renderHome();

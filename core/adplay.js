@@ -421,5 +421,82 @@
     };
   }
 
-  return { create: create, SOURCES: SOURCES, DEFAULTS: DEFAULTS };
+  /* ---- 反向阈值告警（本机纪律第 5 条 · issue #1）----
+     降级分支的设计意图就是"出错时不要声张"，所以它是 bug 最理想的藏身处：
+     100% 必败可以伪装成正常的偶发降级。常规告警只盯异常抛出，而这里的特征恰恰是
+     「没有异常、玩家点了、只是没拿到奖」。唯一能抓住它的是**反向阈值**：
+     某条降级路径的占比高到不正常，本身就是故障信号。
+
+     三条判据（阈值全部 config 可调，样本不足一律不报，避免开局两次失败就吓人）：
+       fail-rate        广告整体失败率过高 = 广告源坏了 / 判据过严
+       reason-dominant  某一个失败原因独占 = 系统性问题。最典型的就是
+                        directlink:no-leave 常态化 —— 说明这个 webview 压根不触发
+                        visibilitychange，我们正在误伤每一个诚实玩家
+       valued-rate      发了奖但广告商判定 valued 的比例极低 = 白发奖没赚到钱
+
+     纯函数，不碰 IO：宿主拿它的结论决定怎么喊（日志/诊断面板/上报）。 */
+  var HEALTH_DEFAULTS = Object.freeze({
+    minSamples: 10,        // 少于这么多次尝试不下结论
+    maxFailRate: 0.8,      // 失败率超过这个就报
+    maxReasonRate: 0.5,    // 单一失败原因占全部尝试的比例超过这个就报
+    minValuedRate: 0.05    // valued 占（valued+not_valued）的比例低于这个就报
+  });
+  function health(stats, cfg) {
+    var c = cfg && typeof cfg === 'object' ? cfg : {};
+    function pick(k) { return typeof c[k] === 'number' && isFinite(c[k]) ? c[k] : HEALTH_DEFAULTS[k]; }
+    var minSamples = pick('minSamples');
+    var s = stats && typeof stats === 'object' ? stats : {};
+    var attempts = +s.attempts || 0;
+    var out = { ok: true, samples: attempts, alerts: [] };
+    if (attempts < minSamples) return out;
+
+    var failRate = (+s.failed || 0) / attempts;
+    if (failRate > pick('maxFailRate')) {
+      out.alerts.push({ code: 'fail-rate', rate: failRate, threshold: pick('maxFailRate'), samples: attempts });
+    }
+    var reasons = s.reasons && typeof s.reasons === 'object' ? s.reasons : {};
+    Object.keys(reasons).forEach(function (k) {
+      var rate = reasons[k] / attempts;
+      if (rate > pick('maxReasonRate')) {
+        out.alerts.push({ code: 'reason-dominant', reason: k, rate: rate,
+          threshold: pick('maxReasonRate'), samples: attempts });
+      }
+    });
+    var rw = s.reward && typeof s.reward === 'object' ? s.reward : {};
+    var judged = (+rw.valued || 0) + (+rw.not_valued || 0);
+    if (judged >= minSamples) {
+      var valuedRate = (+rw.valued || 0) / judged;
+      if (valuedRate < pick('minValuedRate')) {
+        out.alerts.push({ code: 'valued-rate', rate: valuedRate, threshold: pick('minValuedRate'), samples: judged });
+      }
+    }
+    out.ok = out.alerts.length === 0;
+    return out;
+  }
+
+  /* 跨会话累计：单次会话的 stats 回答不了"最近是不是一直这样"。
+     宿主把上次存下来的累计值和本次会话的 stats 相加后落盘即可。 */
+  function mergeStats(a, b) {
+    function obj(x) { return x && typeof x === 'object' ? x : {}; }
+    var A = obj(a), B = obj(b);
+    var out = { attempts: (+A.attempts || 0) + (+B.attempts || 0),
+      ok: (+A.ok || 0) + (+B.ok || 0), failed: (+A.failed || 0) + (+B.failed || 0),
+      lastReason: B.lastReason || A.lastReason || null, reasons: {}, reward: {}, bySource: {} };
+    [obj(A.reasons), obj(B.reasons)].forEach(function (m) {
+      Object.keys(m).forEach(function (k) { out.reasons[k] = (out.reasons[k] || 0) + (+m[k] || 0); });
+    });
+    [obj(A.reward), obj(B.reward)].forEach(function (m) {
+      Object.keys(m).forEach(function (k) { out.reward[k] = (out.reward[k] || 0) + (+m[k] || 0); });
+    });
+    [obj(A.bySource), obj(B.bySource)].forEach(function (m) {
+      Object.keys(m).forEach(function (k) {
+        var d = out.bySource[k] || (out.bySource[k] = { ok: 0, failed: 0 });
+        d.ok += (+obj(m[k]).ok || 0); d.failed += (+obj(m[k]).failed || 0);
+      });
+    });
+    return out;
+  }
+
+  return { create: create, SOURCES: SOURCES, DEFAULTS: DEFAULTS,
+    health: health, mergeStats: mergeStats, HEALTH_DEFAULTS: HEALTH_DEFAULTS };
 });

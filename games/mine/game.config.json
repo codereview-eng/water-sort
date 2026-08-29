@@ -419,7 +419,12 @@
         "storyLockedStart": "Unlocks when you start level 1",
         "storyLockedAt": "Unlocks after you clear level {n}",
         "storyReplay": "Replay",
-        "storyEmpty": "No story scenes yet."
+        "storyEmpty": "No story scenes yet.",
+        "storyVolume": "Volume {n}",
+        "storyVolumeRange": "Levels {from}–{to}",
+        "storyVolumeProgress": "{n}/{total} unlocked",
+        "storyChapterRange": "Chapters {from}–{to}",
+        "storyLockedFrom": "Unlock from level {n}"
       },
       "zh": {
         "langName": "简体中文",
@@ -683,7 +688,12 @@
         "storyLockedStart": "开始第 1 关后解锁",
         "storyLockedAt": "通关第 {n} 关后解锁",
         "storyReplay": "重播",
-        "storyEmpty": "还没有任何剧情动画。"
+        "storyEmpty": "还没有任何剧情动画。",
+        "storyVolume": "第 {n} 卷",
+        "storyVolumeRange": "第 {from}–{to} 关",
+        "storyVolumeProgress": "已解锁 {n}/{total}",
+        "storyChapterRange": "第 {from}–{to} 章",
+        "storyLockedFrom": "通关第 {n} 关起陆续解锁"
       }
     }
   },

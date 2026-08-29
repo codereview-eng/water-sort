@@ -166,8 +166,12 @@
     if (!Array.isArray(available) || available.length === 0) fail('resolveLang: available 必须是非空数组');
     if (available.indexOf(def) === -1) fail('resolveLang: 默认语言 "' + def + '" 不在 available 里');
     var q = /[?&]lang=([A-Za-z-]+)/.exec(inputs.search || '');
-    // hash 排在 saved 之前：hash 是每次手动切换都会刷新的那一份，且存储被清掉时它还在
-    var chain = [q && q[1], hashLang(inputs.hash), inputs.saved, inputs.tgLanguageCode, inputs.navigatorLanguage];
+    /* 顺序要紧（2026-08-29 改）：**玩家手动选的语言压过 URL 参数**。
+       原来 ?lang= 排在最前，本意是调试参数；但宿主（内嵌 webview / 壳页面）
+       每次按固定地址装载游戏时会把它一并带上，于是玩家每次改完语言、重进又被顶回去——
+       表现就是「怎么改都不生效」。调试用途不受影响：干净环境里本来就没有已保存的选择。
+       hash 排在 local 之前：它是每次手动切换都会刷新的那一份，且本地存储被清掉时它还在。 */
+    var chain = [hashLang(inputs.hash), inputs.saved, q && q[1], inputs.tgLanguageCode, inputs.navigatorLanguage];
     for (var i = 0; i < chain.length; i++) {
       var hit = matchLang(chain[i], available);
       if (hit) return hit;

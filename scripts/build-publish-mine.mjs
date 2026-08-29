@@ -12,7 +12,7 @@
      → /tmp/cm-publish-dist（目录产物，publish_game 用这个）
      → /tmp/cm-publish-payload.json（文本 payload，旧通道兼容；不含封面）
    规则：改 core 后默认只发 color-mines，其它游戏需用户特别指定。 */
-import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
@@ -184,6 +184,32 @@ if (missing.length) {
 }
 console.log(`  CG 素材 ${cgNames.length} 件 ${(cgBytes / 1048576).toFixed(2)} MiB`
   + `（剧情表要求 ${uniq.length} 件，齐；单件上限 ${CG_FILE_CAP / 1024}KB）`);
+
+/* ── 门4 · 目录纯洁性（反向闸，2026-08-29）────────────────────────────────
+   前三道闸都是「白名单完整性」：只回答「我要的在不在」，不回答「不该在的在不在」。
+   2026-08-29 事故正是后者失守——12 个 *-raw.mp4 AI 母版（117MB）躺在 cg/ 里，
+   三道闸全绿、产物也只有 3.3MB，但**按源码树打包的发布路径**把它们一起卷走，
+   直接撞上发布侧体积上限。当时唯一的约束是 .gitignore 里一句注释，拦不住任何东西。
+
+   判据（通用，不特判文件名）：cg/ 下任何**不属于成品白名单**且**大于 1MB**的文件 = RED。
+   小文件（.bak、concat.txt 等）放行——它们不构成体积风险，不值得为此制造噪声。 */
+const STRAY_MAX_BYTES = 1024 * 1024;
+const strays = existsSync(CG_SRC)
+  ? readdirSync(CG_SRC)
+      .filter((f) => !CG_SHIPPED.test(f))
+      .map((f) => ({ name: f, bytes: statSync(join(CG_SRC, f)).size }))
+      .filter((x) => x.bytes > STRAY_MAX_BYTES)
+      .sort((a, b) => b.bytes - a.bytes)
+  : [];
+if (strays.length) {
+  const total = strays.reduce((s, x) => s + x.bytes, 0);
+  throw new Error(
+    `cg/ 里有 ${strays.length} 个非成品大文件（合计 ${(total / 1048576).toFixed(1)} MB）。\n`
+    + `  它们不进产物，但会被「按源码树打包」的发布路径卷走并撞上体积上限：\n`
+    + strays.map((x) => `    ${x.name}  ${(x.bytes / 1048576).toFixed(1)} MB`).join('\n')
+    + `\n  处置：母版/中间件移出游戏目录（保留不删），例如：\n`
+    + `    mkdir -p ~/cg-master-color-mines && mv ${CG_SRC}/*-raw.mp4 ~/cg-master-color-mines/`);
+}
 
 // 回读校验：写进产物的封面必须与源逐字节一致（防静默截断/编码污染）
 const coverBack = readFileSync(join(DIST, 'cover.webp'));

@@ -14,9 +14,14 @@ test('默认配置 = 无此系统（i18n 未配置取词即抛；geo 未配置�
 /* ---- 语言选择决策链（两个游戏共用，抽自 water.html 既有实现）---- */
 const AVAIL = ['zh', 'en'];
 
-test('resolveLang 优先级：?lang= > 已保存 > Telegram > 浏览器 > 默认', () => {
-  // ?lang= 调试参数最高，压过一切
-  assert.equal(L.resolveLang({ search: '?lang=en', saved: 'zh', tgLanguageCode: 'zh', navigatorLanguage: 'zh-CN' }, AVAIL, 'en'), 'en');
+test('resolveLang 优先级：已保存 > ?lang= > Telegram > 浏览器 > 默认', () => {
+  /* 2026-08-29 改序：玩家手动选的语言压过 URL 参数。
+     宿主（内嵌 webview / 壳页面）每次按固定地址装载游戏时会带上 ?lang=，
+     排在最前就会把玩家的选择每次顶掉——表现为「改完重进又变回去」。 */
+  assert.equal(L.resolveLang({ search: '?lang=en', saved: 'zh', tgLanguageCode: 'en', navigatorLanguage: 'en-US' }, AVAIL, 'en'), 'zh',
+    '手动选择必须压过 URL 参数');
+  // 没手动选过时，?lang= 照旧生效（调试/截图脚本跑在干净环境里，本来就没有已保存的选择）
+  assert.equal(L.resolveLang({ search: '?lang=en', tgLanguageCode: 'zh', navigatorLanguage: 'zh-CN' }, AVAIL, 'zh'), 'en');
   // 没有 ?lang= 时，用户手动选择（持久化）优先于自动检测
   assert.equal(L.resolveLang({ saved: 'en', tgLanguageCode: 'zh', navigatorLanguage: 'zh-CN' }, AVAIL, 'zh'), 'en');
   // 没保存过 → Telegram 客户端语言

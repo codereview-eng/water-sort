@@ -555,7 +555,11 @@
   };
   function langDiagText() {
     var r = LocaleCore.readSavedLang(window, LANG_KEY);
+    var q = /[?&]lang=([A-Za-z-]+)/.exec(location.search || '');
+    var framed = '-';
+    try { framed = window.top === window.self ? 'top' : 'iframe'; } catch (e) { framed = 'iframe-x'; }
     return 'now=' + LANG + ' local=' + (r.local || '-') + ' hash=' + (r.hash || '-')
+      + ' q=' + (q ? q[1] : '-') + ' in=' + framed
       + ' cloud=' + LANG_DIAG.cloudLang + ' sfx=' + LANG_DIAG.cloudSfx
       + ' merged=' + LANG_DIAG.merged + ' fresh=' + LANG_DIAG.localFresh
       + ' plat=' + LANG_DIAG.mode + '/' + LANG_DIAG.user
@@ -2514,8 +2518,10 @@
       ensureTempName(); persist(); renderHome();
       LANG_DIAG.merged = save.lang != null ? String(save.lang) : 'none';
       /* 云端语言是权威（跟账号走）：本地那两条通道在内嵌 webview 里可能一条都不剩，
-         云档回来后按它切过去。?lang= 调试参数在场时不夺权；相同值由 setLang 自己短路。 */
-      if (save.lang && !/[?&]lang=/.test(location.search)) setLang(save.lang);
+         云档回来后按它切过去。相同值由 setLang 自己短路。
+         2026-08-29：这里原先有个 ?lang= 守卫——宿主每次带着 ?lang= 装载游戏时，
+         它会让云端存着的玩家选择永远夺不回来，正是「改完重进又变回去」的一条路径，已去掉。 */
+      if (save.lang) setLang(save.lang);
       if (S && !S.done) renderHud();
     }).catch(function (err) {
       console.warn('[mine identity] 云存档载入失败：' + String(err && err.message || err));

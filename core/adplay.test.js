@@ -649,3 +649,50 @@ test('watchClock：拿不到 document（Node/异常宿主）时退回按真实�
   const c = AdPlay.createWatchClock(2, { doc: null, now: clk.now });
   assert.strictEqual(watchFor(c, clk, 2000).done, true);
 });
+
+/* ---- 秒退之后不许再掉进兜底卡（2026-08-29 线上真机首坏）----
+   玩家反馈：看 1 秒广告切回来，再等 5 秒就拿到奖励，其实根本没看广告。
+   根因不在判据，而在判据**之后**：too-short 被当成"这个广告源坏了"，于是降级到
+   队列最后的 house 兜底卡，5 秒本地倒计时照样发奖 —— 安全网把判据抵消掉了。
+   之前的 spike 之所以测出 0/25，是因为它把 sources 改成只剩 directlink，
+   恰好删掉了 house 这一环：那是假绿，测的是判据本身，不是线上那条真链。 */
+test('秒退：判定为没挣到，不再降级到兜底卡', async () => {
+  const doc = fakeDoc(); const clk = fakeClock();
+  let houseShown = 0;
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }, { type: 'house' }],
+    directDwellSec: 5
+  }, { env: {}, doc, now: clk.now, openUrl: () => true,
+    houseAd: (s, done) => { houseShown += 1; done(true); } });
+  const p = a.play();
+  doc.leave(); clk.advance(1000); doc.back();          // 看了 1 秒就回来
+  const r = await p;
+  assert.strictEqual(r.ok, false, '秒退绝不能拿到奖励');
+  assert.strictEqual(r.source, 'directlink');
+  assert.strictEqual(houseShown, 0, '兜底卡根本不该出现——它是给"没广告可放"准备的，不是给"没看够"准备的');
+});
+
+test('没切走过：同样不掉进兜底卡', async () => {
+  const doc = fakeDoc();
+  let houseShown = 0;
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }, { type: 'house' }],
+    directLeaveWaitSec: 0.05
+  }, { env: {}, doc, openUrl: () => true, houseAd: (s, done) => { houseShown += 1; done(true); } });
+  const r = await a.play();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.reason, 'directlink:no-leave');
+  assert.strictEqual(houseShown, 0);
+});
+
+test('广告源真的坏了（弹窗被拦）→ 仍然降级到兜底卡，不能连累玩家', async () => {
+  /* 这条是上面两条的反面：区分标准是"广告源坏了"还是"玩家没看够"。 */
+  let houseShown = 0;
+  const a = AdPlay.create({
+    sources: [{ type: 'directlink', url: 'https://a.com/1', env: 'web' }, { type: 'house' }]
+  }, { env: {}, openUrl: () => false, houseAd: (s, done) => { houseShown += 1; done(true); } });
+  const r = await a.play();
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.source, 'house');
+  assert.strictEqual(houseShown, 1);
+});

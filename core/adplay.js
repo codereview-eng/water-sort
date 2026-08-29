@@ -319,8 +319,12 @@
            再来一次，必须当场记账，否则认真看广告的人回来时我们判不出他离开过。 */
         var leftAt = doc.visibilityState === 'hidden' ? now() : 0;
         var settled = false;
+        /* terminal=true 的含义：这不是"广告源坏了"，是"玩家没挣到"。
+           两者绝不能混：非 terminal 的失败会继续降级到下一个源，而队列最后一个源是
+           house 兜底卡 —— 于是"秒退被拒"立刻变成"看 5 秒兜底卡照样拿奖"，判据等于没有。
+           2026-08-29 线上真机实测发现的首坏：玩家看 1 秒广告切回来，再等 5 秒就拿到奖励。 */
         var leaveTimer = leftAt ? null : setTimeout(function () {   // 已经走了就别再催
-          finish({ ok: false, reason: 'directlink:no-leave' });
+          finish({ ok: false, reason: 'directlink:no-leave', terminal: true });
         }, directLeaveWaitSec * 1000);
         function finish(r) {
           if (settled) return;
@@ -338,7 +342,8 @@
           if (!leftAt) return;                                          // 没走过就变可见 = 无事发生
           var dwell = now() - leftAt;
           if (dwell >= directDwellSec * 1000) return finish({ ok: true });
-          finish({ ok: false, reason: 'directlink:too-short:' + Math.round(dwell / 100) / 10 + 's' });
+          finish({ ok: false, terminal: true,
+            reason: 'directlink:too-short:' + Math.round(dwell / 100) / 10 + 's' });
         }
         doc.addEventListener('visibilitychange', onVis);
       });
@@ -380,8 +385,13 @@
             return { ok: true, source: source, zone: zoneOf(src) || null, ms: now() - t0, detail: detail };
           }
           bump(source, false, r.reason);
-          // 用户主动放弃 → 不再往下降级（他不是没广告可看，是不想看）
-          if (r.reason === 'skipped' || r.reason === 'declined') {
+          /* 不再往下降级的两类：用户主动放弃（skipped/declined），以及
+             terminal —— 判据已经给出「他没挣到」的结论。
+             后者是 2026-08-29 线上首坏的根因：秒退被拒之后又降级到 house 兜底卡，
+             玩家看 5 秒本地倒计时就拿到奖励，整条判据被自己的安全网抵消掉了。
+             区分标准：**广告源坏了**（拦弹窗/没 SDK/超时）才降级，
+             **玩家没看够**绝不降级。 */
+          if (r.terminal || r.reason === 'skipped' || r.reason === 'declined') {
             return { ok: false, source: source, reason: r.reason, ms: now() - t0 };
           }
           i += 1;

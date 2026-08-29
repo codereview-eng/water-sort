@@ -155,6 +155,26 @@ test('mine：设置页显示构建标记（分辨设备拿到的是哪一版）'
   const s = windowAfter(mine, 'function openSettings() {', 2600, 'mine openSettings');
   assert.ok(s.includes("getAttribute('data-build')"), '设置页要读 <html data-build>');
   assert.ok(s.includes("'buildLine'"), '构建标记行缺 id，验收脚本抓不到');
+  assert.ok(s.includes('langDiagText()'), '点构建号要能展开通道诊断');
+});
+
+test('mine：切语言立即冲刷云同步（不等 1.5s 防抖）', () => {
+  const set = windowAfter(mine, 'function setLang(lang) {', 1200, 'mine setLang');
+  assert.ok(/Plat\.flush\(/.test(set),
+    '显式偏好必须立即落云端：切完就退出时防抖窗口内的写入会整个丢掉');
+  assert.ok(set.indexOf('persist()') < set.indexOf('Plat.flush('), 'flush 必须在 persist 之后');
+});
+
+test('mine：三条通道与平台状态都进诊断（排障不靠猜）', () => {
+  const diag = windowAfter(mine, 'function langDiagText() {', 500, 'mine langDiagText');
+  for (const k of ['local=', 'hash=', 'cloud=', 'sfx=', 'merged=', 'plat=', 'err=']) {
+    assert.ok(diag.includes(k), `诊断行缺 ${k}`);
+  }
+  // 云端两类失败都要留下异常本体（禁静默）
+  assert.ok(mine.includes("LANG_DIAG.err = 'loadCloud:'"), '云档载入失败未记诊断');
+  assert.ok(mine.includes("LANG_DIAG.err = 'saveCloud#'"), '云档回写失败未记诊断');
+  // 对照字段：sfx 是老列，若 cloud=none 而 sfx 有值，就是新列没建，而不是没写
+  assert.ok(mine.includes('LANG_DIAG.cloudSfx'), '缺 sfx 对照，分不清「列没建」和「没写上」');
 });
 
 test('mine：切语言走 persistLang，首屏决策链吃 location.hash', () => {

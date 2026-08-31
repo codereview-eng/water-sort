@@ -20,7 +20,7 @@ export const SELFTEST_BLOCKS = 3;
    注意不要写成裸 /selftest/：core/story.js 里 `/shot|selftest/` 是「截图 lane 跳过剧情 CG」的判断，
    与充值面板无关，内联后仍会留在产物里，一刀切会误伤。 */
 export const SELFTEST_RESIDUE =
-  /grantCoins|GRANT_AMOUNT|syncSelfTestEntry|stGrant|stOut|id="selftest"|class="selftest"|\.selftest\b/;
+  /grantCoins|GRANT_AMOUNT|syncSelfTestEntry|stGrant|stOut|stCg|stPut\(|ST_SEEN_BAK|id="selftest"|class="selftest"|\.selftest\b/;
 
 /**
  * 删除 html 中所有 `selftest:begin` … `selftest:end` 标记块（含标记所在行）。

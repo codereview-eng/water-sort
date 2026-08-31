@@ -569,12 +569,15 @@ test('页面真的接了 i18n：走 core/locale.js，不自造第二套实现', 
   assert.ok(html.includes("render('settings'"), '设置窗口内容必须也走 config 声明渲染，不许手写 markup');
 });
 
-test('反回归：主脚本里不得再出现面向用户的中文字面量', () => {
+test('反回归：主脚本里不得再出现面向用户的中文字面量', async () => {
   const html = htmlSrc();
   let body = html.replace(/<script id="gameConfig"[\s\S]*?<\/script>/, '');
-  /* #selftest 调试面板（grantCoins 充值按钮）只有开发者看得到，不参与翻译：
-     按【整个函数体】排除，而不是逐行匹配关键字——函数内部多数行并不含 selftest 字样。 */
-  body = body.replace(/function grantCoins\(\)[\s\S]*?\n  \}\n/, '\n');
+  /* #selftest 调试面板只有开发者看得到，不参与翻译，整块排除。
+     判据与发布构建共用同一份实现（scripts/strip-selftest.mjs）——单一权威落点：
+     以前这里按 `function grantCoins` 单个函数体 replace，面板里新增任何函数都要来补一次，
+     漏补就是"门禁凭空变红"或"真漏了却不红"。 */
+  const { stripSelfTest } = await import('./scripts/strip-selftest.mjs');
+  body = stripSelfTest(body).html;
   const offenders = [];
   body.split('\n').forEach((line, i) => {
     if (/^\s*(\/\*|\*|\/\/)/.test(line)) return;                    // 注释不算

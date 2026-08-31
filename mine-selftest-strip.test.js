@@ -29,6 +29,19 @@ test('mine.html 的 selftest 标记成对，且三段面板代码都还在', asy
   // 本地调试能力仍在：删标记 ≠ 删功能，这条防的是「为了过门禁把面板整个删了」
   assert.ok(/function grantCoins\(/.test(HTML), 'mine.html 里应保留 grantCoins（本地调试用）');
   assert.ok(/id="selftest"/.test(HTML), 'mine.html 里应保留自检面板 DOM（本地调试用）');
+  assert.ok(/function stCgUnlockAll\(/.test(HTML), 'mine.html 里应保留 CG 全解锁（检查 CG 用）');
+  assert.ok(/function stCgRestore\(/.test(HTML), 'CG 解锁必须能还原，否则不叫「临时」');
+});
+
+test('CG 自检只写 seen 列表，绝不改存档进度', () => {
+  const body = HTML.slice(HTML.indexOf('function stCgUnlockAll('), HTML.indexOf('function syncSelfTestEntry('));
+  assert.ok(body.includes('St.seenKey'), '解锁必须走 core 暴露的 seenKey，不许自己拼 key');
+  assert.ok(!/save\.level\s*=/.test(body), '不许改 save.level（那不是「临时」，是污染存档）');
+  assert.ok(!/save\.clears\s*=/.test(body), '不许改 save.clears');
+  assert.ok(!/persist\(\)/.test(body), '不许写存档');
+  assert.ok(body.includes('ST_SEEN_BAK'), '必须先备份原 seen 列表才能还原');
+  // 只备份一次：连点两下不能把「已全解锁」的假状态当原始状态存进去
+  assert.ok(/getItem\(ST_SEEN_BAK\) === null/.test(body), '备份必须判空，只备份一次');
 });
 
 test('stripSelfTest 剔除后产物不残留任何自检面板记号', async () => {

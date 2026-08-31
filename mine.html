@@ -497,6 +497,9 @@
 <!-- selftest:begin 开发自检面板：发布构建整段剔除，线上产物里没有这段 DOM -->
 <div class="selftest" id="selftest" hidden>
   <button class="btn primary" id="stGrant" type="button">💰 充值 10000 金币（本账号）</button>
+  <button class="btn ghost" id="stCgAll" type="button">🎬 临时解锁全部 CG</button>
+  <button class="btn ghost" id="stCgBack" type="button">↩︎ 还原 CG 解锁状态</button>
+  <button class="btn ghost" id="stCgOpen" type="button">📖 打开剧情图鉴</button>
   <pre id="stOut">点上面的按钮开始。结果可长按复制。</pre>
 </div>
 <!-- selftest:end -->
@@ -1961,11 +1964,64 @@
       });
   }
 
+  /* ---- CG 自检：临时解锁全部剧情段，用来逐段检查画面 / 字幕 / 音频 ----
+     解锁判据的权威在 core/story.js 的 listOf()：`看过(seen) || 进度越过触发点`。
+     所以这里**只动 seen 列表**，save.level / clears 一个字节都不改 —— 真"临时"，随时还原。
+     正常进度要到第 1000 关才看得全 11 段（cadence 100），靠玩是检查不完的。
+
+     ⚠ 要真看到画面必须有 CG 素材，而素材不进 git（color-mines/cg 121MB）：
+     本地直接开 mine.html 时相对路径 cg/ 是空的，只能看到图鉴行、点开播不出画面。
+     检查 CG 的正确动线 = 出一份带面板的调试产物（素材就在产物根 cg/）：
+       MINE_SELFTEST=1 node scripts/build-publish-mine.mjs
+       open '/tmp/cm-publish-dist/index.html#selftest'
+     这份产物**禁止发布**（构建时会大声告警），线上产物照旧整块剔除本面板。 */
+  var ST_SEEN_BAK = 'cm.story.seen.stbak';
+  function stPut(out, k, v) { out.push(k + '：' + v); $('stOut').textContent = out.join('\n'); }
+  function stCgUnlockAll() {
+    var out = [], St = window.MineStory;
+    if (!St) { stPut(out, '结果', '剧情模块没加载（CFG.story 没配？）'); return; }
+    var ids = (St.CG || []).map(function (c) { return c.id; });
+    var before = (St.unlocked() || []).length;
+    try {
+      /* 只备份一次：连点两下不会把"已经全解锁"的假状态当成原始状态存进去，
+         否则还原按钮就把假状态还原回来了（这类自伤最难发现）。 */
+      if (localStorage.getItem(ST_SEEN_BAK) === null) {
+        localStorage.setItem(ST_SEEN_BAK, localStorage.getItem(St.seenKey) || '[]');
+      }
+      localStorage.setItem(St.seenKey, JSON.stringify(ids));
+    } catch (err) {
+      stPut(out, '结果', '写入失败：' + String((err && err.message) || err));
+      return;
+    }
+    stPut(out, 'CG 段数', ids.length + ' 段：' + ids.join(' '));
+    stPut(out, '解锁', before + ' → ' + (St.unlocked() || []).length + ' 段');
+    stPut(out, '存档', '未改动（只写 seen 列表，进度 level=' + save.level + ' 原样）');
+    stPut(out, '下一步', '点「打开剧情图鉴」逐段重播；检查完点「还原」');
+  }
+  function stCgRestore() {
+    var out = [], St = window.MineStory;
+    if (!St) { stPut(out, '结果', '剧情模块没加载'); return; }
+    var bak = null;
+    try { bak = localStorage.getItem(ST_SEEN_BAK); } catch (err) {}
+    if (bak === null) { stPut(out, '结果', '没有备份（本次会话没点过解锁）'); return; }
+    try {
+      localStorage.setItem(St.seenKey, bak);
+      localStorage.removeItem(ST_SEEN_BAK);
+    } catch (err) {
+      stPut(out, '结果', '还原失败：' + String((err && err.message) || err));
+      return;
+    }
+    stPut(out, '已还原', 'seen 列表回到解锁前：' + bak.slice(0, 120));
+    stPut(out, '当前解锁', (St.unlocked() || []).length + ' 段');
+  }
   function syncSelfTestEntry() {
     if (!/selftest/.test(location.hash) && !/selftest/.test(location.search)) return;
     if (!$('selftest').hidden) return;
     $('selftest').hidden = false;
     $('stGrant').addEventListener('click', grantCoins);
+    $('stCgAll').addEventListener('click', stCgUnlockAll);
+    $('stCgBack').addEventListener('click', stCgRestore);
+    $('stCgOpen').addEventListener('click', function () { openStory(); });
   }
   syncSelfTestEntry();
   window.addEventListener('hashchange', syncSelfTestEntry);

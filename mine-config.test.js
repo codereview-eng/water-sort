@@ -582,7 +582,8 @@ test('反回归：主脚本里不得再出现面向用户的中文字面量', as
   body.split('\n').forEach((line, i) => {
     if (/^\s*(\/\*|\*|\/\/)/.test(line)) return;                    // 注释不算
     if (/console\.(warn|error|log)/.test(line)) return;             // 控制台日志不面向用户
-    if (/selftest|stGrant|stOut|GRANT_AMOUNT|grantCoins/.test(line)) return;  // 内部调试面板不翻译
+    // 内部调试面板不翻译（CG 自检那几个函数随产物上线，但仍是开发者向的，不进字典）
+    if (/selftest|stGrant|stOut|stCg|stPut|GRANT_AMOUNT|grantCoins/.test(line)) return;
     if (/throw new Error\(/.test(line)) return;   // 开发者向的配置错误信息，不是给玩家看的文案
     for (const m of line.matchAll(/'([^']*[\u4e00-\u9fa5][^']*)'/g)) {
       offenders.push(`L${i + 1}: ${m[1].slice(0, 40)}`);

@@ -16,8 +16,10 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import { stripSelfTest, assertNoSelfTest, SELFTEST_BLOCKS } from './strip-selftest.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
 const label = process.argv[2] || '道具云端存档修复：道具改「获得数/消耗数」只增计数（用了一定减少，换设备/重登不复活）；'
   + '同步防抖加最长等待 5s（修首页每秒体力结算把云写无限推迟）；道具按钮 Set→数组修崩溃；云写失败可观测。';
 
@@ -37,6 +39,22 @@ for (const src of srcs) {
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 if (!/<html\b/.test(inlined)) throw new Error('找不到 <html> 标签，无法注入构建标记');
 inlined = inlined.replace(/<html\b/, `<html data-build="${stamp}"`);
+
+/* 1.6) 剔除开发自检面板（#selftest 充值 10000 金币）——默认不进线上产物。
+   顶层函数声明会挂到 window，光隐藏面板挡不住控制台直接调 grantCoins()，所以物理删代码。
+   MINE_SELFTEST=1 只用来出「本地调试产物」，带着这个环境变量出的产物不许发布。 */
+const keepSelfTest = process.env.MINE_SELFTEST === '1';
+if (keepSelfTest) {
+  console.warn('⚠ MINE_SELFTEST=1：保留自检面板（含充值按钮）。这份产物只能自己本地用，禁止发布上线。');
+} else {
+  const stripped = stripSelfTest(inlined);
+  if (stripped.removed !== SELFTEST_BLOCKS) {
+    throw new Error(`自检面板标记块应有 ${SELFTEST_BLOCKS} 段，实际剔除 ${stripped.removed} 段`
+      + '——mine.html 的 selftest:begin/end 标记被改动过，构建假设已失效');
+  }
+  inlined = stripped.html;
+  assertNoSelfTest(inlined, '发布产物 index.html');
+}
 
 /* 2) fail-closed 校验 */
 if (/<script src="\.\//.test(inlined)) throw new Error('内联后仍残留外链 script');

@@ -53,11 +53,28 @@ test('water.html：只有 dialog()/closeDialog() 能改 overlay 内容', () => {
   assert.strictEqual(writes, 2, 'overlay.innerHTML 只应在 dialog()（写入）与 closeDialog()（清空）各出现一次');
 });
 
+/* 按大括号配平取具名函数体；先剥块注释，免得注释里的括号/关键字干扰判定 */
+function fnBody(src, head) {
+  const clean = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const at = clean.indexOf(head);
+  assert.ok(at !== -1, `找不到 ${head}`);
+  const open = clean.indexOf('{', at);
+  assert.ok(open !== -1, `${head} 没有函数体`);
+  let depth = 0;
+  for (let i = open; i < clean.length; i++) {
+    if (clean[i] === '{') depth++;
+    else if (clean[i] === '}') { depth--; if (depth === 0) return clean.slice(open, i + 1); }
+  }
+  throw new Error(`${head} 大括号不配平`);
+}
+
 test('局面已结束的弹窗必须带 onDismiss（关掉后不能把人留在死局）', () => {
   const html = readFileSync(join(ROOT, 'mine.html'), 'utf8');
   for (const fn of ['function onWin', 'function onDead', 'function onTimeUp']) {
-    // 窗口放宽到 760：onWin 里新增了周活动碎片一行（2026-08-21），620 已截不到 onDismiss
-    const body = html.slice(html.indexOf(fn), html.indexOf(fn) + 760);
+    /* 取整个函数体（大括号配平），不再用固定字符窗口。
+       教训（2026-08-31）：窗口从 620 放宽到 760 之后又被一段新注释挤爆 —— 只要函数里
+       多写几行说明，门禁就凭空变红，而代码本身没有任何问题。按结构取才不会再犯。 */
+    const body = fnBody(html, fn);
     // 2026-08-24 双连胜：onDead/onTimeUp 的关窗回首页前先记一次断链（wsOnLose），
     // onDismiss 形态从裸 showHome 变成 function(){ wsOnLose(); showHome(); }。
     // 门禁意图不变：onDismiss 的终点必须是 showHome（关掉后不能把人留在死局）。

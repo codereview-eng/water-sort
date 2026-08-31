@@ -1424,7 +1424,11 @@
           S.done = false; S.lives = 1; renderHud(); if (S.remain != null) startTimer();
         });
       },
-      t('restart'), function () { wsOnLose(); wsGate(function () { startLevel(S.lv); }); },
+      /* 局内不判连胜（用户拍板 2026-08-31）：重开本关只记一次断链，**不在这里弹「连胜断了」**。
+         玩家超时/踩雷时想的是「怎么把这关过掉」，此刻插一个「再看一段广告保住连胜」是双重打扰。
+         连胜的断裂只在【开局门】问一次（startGame 首行 wsKeepDialog）。
+         带着未决断链重开并最终通关时，wsOnWin 视为「赢回来了」保住连胜（见那里的注释）。 */
+      t('restart'), function () { wsOnLose(); startLevel(S.lv); },
       function () { wsOnLose(); showHome(); });   // 关掉 = 回首页（局已结束）；双连胜记一次失败
   }
   function onTimeUp() {
@@ -1441,7 +1445,11 @@
           renderHud(); startTimer();
         });
       },
-      t('restart'), function () { wsOnLose(); wsGate(function () { startLevel(S.lv); }); },
+      /* 局内不判连胜（用户拍板 2026-08-31）：重开本关只记一次断链，**不在这里弹「连胜断了」**。
+         玩家超时/踩雷时想的是「怎么把这关过掉」，此刻插一个「再看一段广告保住连胜」是双重打扰。
+         连胜的断裂只在【开局门】问一次（startGame 首行 wsKeepDialog）。
+         带着未决断链重开并最终通关时，wsOnWin 视为「赢回来了」保住连胜（见那里的注释）。 */
+      t('restart'), function () { wsOnLose(); startLevel(S.lv); },
       function () { wsOnLose(); showHome(); });   // 关掉 = 回首页；双连胜记一次失败
   }
 
@@ -1624,7 +1632,14 @@
   }
   function wsOnWin() {
     if (!WinStreak.enabled) return;
-    var r = WinStreak.win(wsGet());
+    var st = wsGet();
+    /* 局内失败出口只记账不弹窗（用户拍板 2026-08-31），所以这里可能带着未决断链进来：
+       玩家超时/踩雷后重开本关、最终把这关过了 —— 本关他赢了，连胜按「赢回来」保住再 +1。
+       这也让两条加时路径语义一致：看广告 +60s 通关不算断链，重开后通关同样不算。
+       内核 WinStreak.win() 对 pend 是 fail-close 抛错（不许带未决断链结算），
+       所以必须在宿主这里先 keep 掉，不能把判断丢给内核。 */
+    if (st.pend) st = WinStreak.keep(st);
+    var r = WinStreak.win(st);
     wsSet(r.state);
     if (r.ticket) setTimeout(function () { toast(t('wsTicketToast', { n: WinStreak.every })); }, 600);
   }
@@ -1634,14 +1649,9 @@
     if (st.pend) return;               // 已有未决断链(防御:同一断链不重复记)
     wsSet(WinStreak.lose(st).state);   // B 周期立即清零;A 大连胜挂 pend/小连胜静默清零
   }
-  /* 断链未决时先问「看广告保持」再放行;普通开局零打扰(用户定案) */
-  function wsGate(proceed) {
-    if (WinStreak.enabled) {
-      var ws = wsGet();
-      if (ws.pend) { wsKeepDialog(ws, proceed); return; }
-    }
-    proceed();
-  }
+  /* 原 wsGate（"开局前先问看广告保持连胜"的通用门）已删除：它唯一的两个调用点是局内
+     超时/踩雷弹窗的「重开本关」，而局内不该判连胜（用户拍板 2026-08-31）。
+     开局门现在只有一处 —— startGame 首行直接判 pend + wsKeepDialog，别再加第二道。 */
   /* ✕/遮罩/Esc = 放弃连胜留在原页;两个按钮各自动线后都继续 proceed */
   function wsKeepDialog(st, proceed) {
     dialog(t('wsKeepTitle', { n: st.cur }), t('wsKeepBody', { n: st.cur }),
@@ -1904,9 +1914,10 @@
      浏览器只触发 hashchange、不会重载页面——只在启动时判一次的话面板永远不出现。 */
   /* selftest:begin —— 开发自检面板逻辑（充值 + 云端回读）。
      纪律（2026-08-31）：这段**不许进线上产物**。scripts/build-publish-mine.mjs 构建时按
-     本段首尾这对标记整段剔除，并对产物做 fail-close 断言；线上因此既没有面板 DOM，
-     也没有 grantCoins 这个全局函数（本页脚本是顶层 classic script，顶层函数声明会挂到 window，
-     光靠「隐藏面板」挡不住控制台直接调用——所以必须物理剔除，而不是加个开关）。
+     本段首尾这对标记整段剔除，并对产物做 fail-close 断言；线上因此没有面板 DOM、没有入口。
+     更正（2026-08-31 实测）：本页主脚本整体包在 IIFE 里，`grantCoins` 并不挂到 window，
+     控制台调不到它——所以「隐藏面板」原本也不是全无作用；剔除的理由是别让一个零门槛的
+     充值入口随产物上线（金币仍是客户端权威，能改 localStorage，但那是另一回事）。
      本地打开 mine.html 或用 MINE_SELFTEST=1 出的调试产物仍然可用。 */
   /* 充值 10000 金币（自检面板专用，普通玩家看不到入口）。
      走生产同一条发放路径 Stock.grant → coinsEarned 累加；该字段在云端是 merge:"max"，

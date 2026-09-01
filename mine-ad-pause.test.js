@@ -44,6 +44,7 @@ function makeCtx(overrides) {
     renderTime() { ctx.rendered = (ctx.rendered || 0) + 1; },
     setInterval: () => 'TICK',
     document: { hidden: false },
+    trace: function () {},          // 埋点在别的门禁里验，这里只关心时钟闸门
     warns
   }, overrides || {});
   vm.createContext(ctx);

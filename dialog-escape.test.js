@@ -78,6 +78,11 @@ test('局面已结束的弹窗必须带 onDismiss（关掉后不能把人留在�
     // 2026-08-24 双连胜：onDead/onTimeUp 的关窗回首页前先记一次断链（wsOnLose），
     // onDismiss 形态从裸 showHome 变成 function(){ wsOnLose(); showHome(); }。
     // 门禁意图不变：onDismiss 的终点必须是 showHome（关掉后不能把人留在死局）。
-    assert.ok(/showHome(\(\); \})?\);/.test(body), `${fn} 的 dialog 调用必须以 showHome 收尾作为 onDismiss`);
+    /* 2026-09-01 埋点：onDismiss 里的 showHome 现在必须带 reason（'win-dismiss' / 'dead-dismiss'
+       / 'timeup-dismiss'）。原因是用户实报「胜利窗没弹出来、直接回首页」，而日志里分不清
+       「玩家自己关的窗」和「别处把人送回首页」——带 reason 才追得动。门禁意图不变：
+       关掉结束局面的窗，终点必须是回首页。 */
+    assert.ok(/showHome\('[a-z]+-dismiss'\)/.test(body),
+      `${fn} 的 dialog 必须带 onDismiss，且终点是 showHome('<场景>-dismiss')（关掉后不能把人留在死局，且日志要能区分来源）`);
   }
 });

@@ -846,25 +846,38 @@
      PV ref（强，官方文档）：Google H5 Games Ad Placement API 的 adBreak() 契约——
      beforeAd「Mute and pause the game flow」/ afterAd「Resume the game and un-mute」，
      奖励在真看完之后发放。倒水已按此落地（adPauseGame/adResumeGame），这里补上彩雷。 */
-  var clockPause = { depth: 0, wasTicking: false, remain: -1, muted: false };
+  /* 时钟闸门有两条独立通道，缺任一条都会漏时间（用户实报 2026-09-01：
+     「开始关卡时弹看广告保连胜，看完广告切回来只剩很短时间，开始时间不对」）：
+       ① ad 通道（pauseClock/resumeClock，可重入计数）——包住广告 promise 期间；
+       ② hidden 通道（页面不可见）——directlink 在 openUrl() 打开新标签的那一刻就
+          resolve，广告 promise 已经结束、奖励已发、开局流程继续往下走并建出新的一关，
+          而玩家此刻还在广告页上。只有 hidden 通道能按住这段。
+     hidden 通道**不能依赖 S**：开局门的广告是在首页点的，页面转 hidden 的那一刻当前局
+     还不存在（旧写法 `if (!S) return` 让这次 hidden 什么都没按住），等玩家切回来时表
+     早已在后台走了十几秒。所以闸门只看「有没有通道按着」，与有没有局无关。 */
+  var clockPause = { depth: 0, hidden: false, held: false, wasTicking: false, remain: -1, muted: false };
+  function clockBlocked() { return clockPause.depth > 0 || clockPause.hidden; }
 
-  function pauseClock() {
-    if (clockPause.depth++ > 0) return;
+  /* 进闸：第一条通道按下时拍快照并停表；已在闸内则保留最早那份快照 */
+  function holdClock() {
+    if (clockPause.held) return;
+    clockPause.held = true;
     clockPause.wasTicking = !!(S && S.timerId);
     clockPause.remain = (S && typeof S.remain === 'number') ? S.remain : -1;
     stopTimer();
-    clockPause.muted = true;          // 契约要求 mute：广告有自己的声音，别叠在一起
   }
 
-  function resumeClock() {
-    if (clockPause.depth <= 0) return;
-    if (--clockPause.depth > 0) return;
-    clockPause.muted = false;
-    /* 兜底：暂停期间一秒都不该流失。少了就按快照补回并大声打日志——
-        说明有路径绕过了 pauseClock（同页 iframe 广告、别处又开了一个 tick 等）。 */
+  /* 出闸：还有别的通道按着就继续停（广告播完但玩家还没切回来 = 典型情形） */
+  function releaseClock() {
+    if (!clockPause.held || clockBlocked()) return;
+    clockPause.held = false;
+    /* 兜底：闸内一秒都不该流失。少了就按快照补回并大声打日志——
+        说明有路径绕过了闸门（同页 iframe 广告、别处又开了一个 tick 等）。
+        闸内换了局时，startTimer 已把快照重绑到新局的 remain，所以不会拿旧局的
+        剩余秒数凭空给新局补时间。 */
     if (clockPause.remain >= 0 && S && typeof S.remain === 'number' && S.remain < clockPause.remain) {
       console.warn('[mine ads] clock lost ' + (clockPause.remain - S.remain) +
-        's while paused; restored from snapshot (should not happen: some path bypassed pauseClock)');
+        's while gated; restored from snapshot (should not happen: some path bypassed the clock gate)');
       S.remain = clockPause.remain;
       renderTime();
     }
@@ -874,11 +887,29 @@
     if (resume && S && !S.done) startTimer();
   }
 
+  function pauseClock() {
+    clockPause.depth++;
+    clockPause.muted = true;          // 契约要求 mute：广告有自己的声音，别叠在一起
+    holdClock();
+  }
+
+  function resumeClock() {
+    if (clockPause.depth <= 0) return;
+    if (--clockPause.depth === 0) clockPause.muted = false;
+    releaseClock();
+  }
+
   function startTimer() {
     stopTimer();
-    /* 暂停期间不许真的开表：directlink 那条路会在玩家还没回来时就发奖并调用本函数，
-       此时页面仍不可见，开表等于继续吃玩家的时间。记下「本该在跑」，恢复时再开。 */
-    if (clockPause.depth > 0) { clockPause.wasTicking = true; return; }
+    /* 闸内不许真的开表：directlink 那条路会在玩家还没回来时就发奖、甚至把下一关都开出来，
+       此时页面仍不可见，开表等于用广告时间吃玩家的关卡时间。记下「本该在跑」并把快照
+       重绑到当前这一局（换局了就以新局的 remain 为准），闸门抬起时再真开。 */
+    if (clockBlocked()) {
+      clockPause.held = true;
+      clockPause.wasTicking = true;
+      clockPause.remain = (S && typeof S.remain === 'number') ? S.remain : -1;
+      return;
+    }
     S.timerId = setInterval(function () {
       if (S.done) return stopTimer();
       S.remain -= 1; renderTime();
@@ -887,13 +918,17 @@
   }
   function stopTimer(){ if (S && S.timerId) { clearInterval(S.timerId); S.timerId = null; } }
 
-  /* 页面不可见就停表：既护住「广告开在新标签」（directlink 按访问计费，玩家真的会离开页面），
-     也顺手修掉「切后台接个电话回来时间没了」——限时关卡里这同样是差体验。 */
-  document.addEventListener('visibilitychange', function () {
-    if (!S || S.done) return;
-    if (document.hidden) pauseClock();
-    else resumeClock();
-  });
+  /* 页面不可见就按住表：既护住「广告开在新标签」（directlink 按访问计费，玩家真的会离开
+     页面），也顺手修掉「切后台接个电话回来时间没了」——限时关卡里这同样是差体验。
+     刻意不判 `if (!S) return`：开局门的广告在首页点，转 hidden 时还没有当前局，早退会让
+     这次不可见完全没被按住，玩家回来时表已经在后台走了（用户实报 2026-09-01 的根因）。
+     具名而不是匿名函数：门禁测试要能真跑这条接线，不是重抄一份实现。 */
+  function onClockVisibility() {
+    clockPause.hidden = !!document.hidden;
+    if (clockPause.hidden) holdClock();
+    else releaseClock();
+  }
+  document.addEventListener('visibilitychange', onClockVisibility);
 
   /* ============ 渲染 ============ */
   function renderBoard() {

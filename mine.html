@@ -833,6 +833,7 @@
           clue: null };                     // 道具「找线索」当前高亮的那一条
     $('clueBar').hidden = true;
     renderBoard(); renderHud();
+    resetDragDiag();                 // 拖动手感诊断按关统计
     if (S.remain != null) startTimer();
   }
 
@@ -968,27 +969,52 @@
   }
 
   /* ============ 点击：单击标记 / 双击挖开 / 拖动批量标记 ============ */
-  var drag = null;   // {pointerId,startIdx,lastIdx,mode:'mark'|'erase',moved}
+  var drag = null;   // {pointerId,startIdx,lastIdx,lastX,lastY,mode:'mark'|'erase',moved,painted}
+
+  /* 拖动手感诊断（门禁与线上排障都读它；「降级分支必须可观测」——本机纪律第 5 条）：
+       coalesced 取到了浏览器原始采样点的 pointermove 次数
+       fallback  浏览器不给 getCoalescedEvents，只能用合并后的那一个点
+       filled    靠几何插值补出来的格子数（>0 = 真的发生过「两帧之间跨了好几格」）
+       painted   本关一共刷了多少格 */
+  var DRAG_DIAG = { coalesced: 0, fallback: 0, filled: 0, painted: 0 };
+  function resetDragDiag() { DRAG_DIAG.coalesced = 0; DRAG_DIAG.fallback = 0; DRAG_DIAG.filled = 0; DRAG_DIAG.painted = 0; }
 
   function canPaint(idx) { return !(S.found.has(idx) || S.opened.has(idx)); }
 
   // 拖动涂抹：mark 只标记未标记的；erase 只取消已标记的；雷/已挖开一律跳过
+  // 返回值 = 这一格是否真的被改动（拖动路径要靠它计数与给反馈，别改成无返回）
   function applyMark(idx, mode) {
-    if (!canPaint(idx)) return;
+    if (!canPaint(idx)) return false;
     var el = cellEl(idx);
     if (mode === 'mark') {
-      if (S.marks.has(idx)) return;
+      if (S.marks.has(idx)) return false;
       S.marks.add(idx); el.classList.add('safe');
     } else {
-      if (!S.marks.has(idx)) return;
+      if (!S.marks.has(idx)) return false;
       S.marks.delete(idx); el.classList.remove('safe', 'hintsafe');
     }
+    return true;
   }
 
-  function cellIdxFromPoint(ev) {
-    var t = document.elementFromPoint(ev.clientX, ev.clientY);
-    var cell = t && t.closest ? t.closest('.cell') : null;
-    return (cell && boardEl.contains(cell)) ? Number(cell.dataset.idx) : -1;
+  /* 命中判定走几何换算，不再 document.elementFromPoint：
+     ① 快得多 —— 插值一次要连算几十个点，逐点 hit-test 会在低端机上掉帧；
+     ② 落在格间 gap 上也归到最近的那一格。手机上格子边长约 40px（低于 Apple HIG 的
+        44pt / Material 48dp 推荐值），把 gap 一并算进有效命中区能实质减少漏格，
+        且不必改动棋盘布局；
+     ③ 边缘留 6px 宽容：手指滑到棋盘边界外一两像素仍算最靠边那一格。 */
+  function cellIdxFromXY(x, y) {
+    if (!S || !S.size) return -1;
+    var rect = boardEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return -1;
+    var slack = 6;
+    if (x < rect.left - slack || x > rect.right + slack ||
+        y < rect.top - slack || y > rect.bottom + slack) return -1;
+    var n = S.size;
+    var c = Math.floor((x - rect.left) / (rect.width / n));
+    var r = Math.floor((y - rect.top) / (rect.height / n));
+    c = Math.max(0, Math.min(n - 1, c));
+    r = Math.max(0, Math.min(n - 1, r));
+    return r * n + c;
   }
 
   function resetTapChain() {
@@ -1022,18 +1048,84 @@
     }, DBL_MS);
   }
 
-  function onDragMove(ev) {
-    if (!drag || S.done || !samePointer(ev, drag)) return;
-    var idx = cellIdxFromPoint(ev);
-    if (!drag.moved && idx !== drag.startIdx) {
+  /* 每刷到一格给一次轻反馈：手机上手指正盖着那一格，靠「看」确认不可靠，触觉 + 短音
+     才是即时确认（业界通行做法：拖动类交互配 haptic 确认）。节流 45ms —— 一口气刷
+     20 格不能变成一串嗡嗡声和叠在一起的音。 */
+  var lastDragTick = 0;
+  function dragTick() {
+    var now = Date.now();
+    if (now - lastDragTick < 45) return;
+    lastDragTick = now;
+    buzz(8);
+    blip(720, .03);
+  }
+
+  function paintDragCell(idx) {
+    if (idx < 0 || idx === drag.lastIdx) return false;
+    drag.lastIdx = idx;
+    if (!applyMark(idx, drag.mode)) return false;
+    drag.painted++; DRAG_DIAG.painted++;
+    dragTick();
+    return true;
+  }
+
+  /* 把「上一个采样点 → 这一个采样点」的连线经过的格子全部刷上。
+     为什么光有 getCoalescedEvents 不够：它只保证不丢浏览器收到的采样，而手指划得快时
+     相邻两个采样之间本身就跨了好几格（W3C Pointer Events §9.1 明说 coalesce 会降低
+     快速大幅移动的粒度）。按半格步长细分连线（线段光栅化），一格都不落下。 */
+  function paintSegment(x0, y0, x1, y1) {
+    var rect = boardEl.getBoundingClientRect();
+    if (!rect.width || !rect.height || !S || !S.size) return;
+    var step = Math.max(2, Math.min(rect.width, rect.height) / S.size / 2);   // 半格一采样
+    var dx = x1 - x0, dy = y1 - y0;
+    var steps = Math.min(240, Math.max(1, Math.ceil(Math.sqrt(dx * dx + dy * dy) / step)));
+    for (var i = 1; i <= steps; i++) {
+      var idx = cellIdxFromXY(x0 + dx * (i / steps), y0 + dy * (i / steps));
+      if (idx < 0) continue;
+      var isFill = (i < steps && idx !== drag.lastIdx);   // 中间那些格 = 插值补出来的
+      if (paintDragCell(idx) && isFill) DRAG_DIAG.filled++;
+    }
+  }
+
+  /* W3C Pointer Events §9.1 / MDN 官方绘图示例：pointermove 是合并后的事件，
+     getCoalescedEvents() 才拿得到全部原始采样点。不支持或抛错就退回单点，
+     并把降级记成计数 + 带异常本体的日志（不留裸 catch）。 */
+  function coalescedPoints(ev) {
+    if (typeof ev.getCoalescedEvents === 'function') {
+      try {
+        var raw = ev.getCoalescedEvents();
+        if (raw && raw.length) { DRAG_DIAG.coalesced++; return raw; }
+      } catch (err) {
+        console.warn('[mine drag] getCoalescedEvents failed: ' + (err && err.name) + ' ' +
+          String((err && err.message) || err).slice(0, 120));
+      }
+    }
+    DRAG_DIAG.fallback++;
+    return [ev];
+  }
+
+  function handleDragPoint(x, y) {
+    var idx = cellIdxFromXY(x, y);
+    if (!drag.moved) {
+      if (idx < 0 || idx === drag.startIdx) { drag.lastX = x; drag.lastY = y; return; }
       drag.moved = true;                       // 进入拖动：取消单击/双击判定
       if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
       resetTapChain();
-      applyMark(drag.startIdx, drag.mode);     // 起点按拖动模式生效
+      drag.lastIdx = -1;
+      paintDragCell(drag.startIdx);            // 起点按拖动模式生效
     }
-    if (idx < 0 || !drag.moved || idx === drag.lastIdx) return;
-    drag.lastIdx = idx;
-    applyMark(idx, drag.mode);
+    paintSegment(drag.lastX, drag.lastY, x, y);
+    drag.lastX = x; drag.lastY = y;
+  }
+
+  function onDragMove(ev) {
+    if (!drag || S.done || !samePointer(ev, drag)) return;
+    var pts = coalescedPoints(ev);
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      if (typeof p.clientX !== 'number') continue;
+      handleDragPoint(p.clientX, p.clientY);
+    }
   }
 
   function onDragEnd(ev) {
@@ -1046,7 +1138,7 @@
       return;
     }
     if (S.done || press.moved) return;
-    var idx = cellIdxFromPoint(ev);
+    var idx = cellIdxFromXY(ev.clientX, ev.clientY);
     if (idx !== press.startIdx) {
       resetGestureState();   // 在别的格子抬手＝放弃这次点击，pending 计时器同样要清掉
       return;
@@ -1070,9 +1162,18 @@
       pointerId: ev.pointerId,
       startIdx: idx,
       lastIdx: idx,
+      lastX: ev.clientX,
+      lastY: ev.clientY,
       mode: S.marks.has(idx) ? 'erase' : 'mark',
-      moved: false
+      moved: false,
+      painted: 0
     };
+    /* 捕获这个指针（MDN / javascript.info：setPointerCapture 把后续事件锁定到该元素，
+       pointerup / pointercancel 时自动释放）：手指滑出棋盘、滑到 HUD 上、甚至滑到屏幕
+       边缘之外时，这一串拖动仍然连续，不会中途「断手」少标几格。 */
+    try { boardEl.setPointerCapture(ev.pointerId); } catch (err) {
+      console.warn('[mine drag] setPointerCapture failed: ' + (err && err.name));
+    }
   }
 
   function toggleMark(idx) {
@@ -2081,6 +2182,10 @@
         pending: (S.clue.hint && S.clue.hint.pending || []).slice() } : null,
       lives: S.lives, remain: S.remain, done: S.done }; },
     dig: dig, mark: toggleMark,
+    /* 拖动手感的 ground truth（门禁与线上排障读它，别靠截图猜）：
+       filled>0 = 插值真的补上了「两帧之间跨过的格子」；fallback>0 = 这台浏览器没给原始采样点 */
+    dragDiag: function () { return { coalesced: DRAG_DIAG.coalesced, fallback: DRAG_DIAG.fallback,
+      filled: DRAG_DIAG.filled, painted: DRAG_DIAG.painted, marks: S ? S.marks.size : 0 }; },
     solve: function () { S.mines.forEach(function (i) { if (!S.found.has(i)) dig(i); }); },
     home: function () { showHome(); }, start: function () { startGame(); }
   };

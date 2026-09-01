@@ -440,7 +440,13 @@
         "storyVolumeRange": "Levels {from}–{to}",
         "storyVolumeProgress": "{n}/{total} unlocked",
         "storyChapterRange": "Chapters {from}–{to}",
-        "storyLockedFrom": "Unlock from level {n}"
+        "storyLockedFrom": "Unlock from level {n}",
+        "traceShow": "Diagnostics log",
+        "traceCopy": "Copy log",
+        "traceClear": "Clear log",
+        "traceCopied": "Copied — paste it to the developer",
+        "traceCopyFail": "Copy failed — long-press to select the text",
+        "traceEmpty": "No events yet"
       },
       "zh": {
         "langName": "简体中文",
@@ -717,7 +723,13 @@
         "storyVolumeRange": "第 {from}–{to} 关",
         "storyVolumeProgress": "已解锁 {n}/{total}",
         "storyChapterRange": "第 {from}–{to} 章",
-        "storyLockedFrom": "通关第 {n} 关起陆续解锁"
+        "storyLockedFrom": "通关第 {n} 关起陆续解锁",
+        "traceShow": "诊断日志",
+        "traceCopy": "复制日志",
+        "traceClear": "清空日志",
+        "traceCopied": "已复制，粘贴给开发者即可",
+        "traceCopyFail": "复制失败，长按选中文字再复制",
+        "traceEmpty": "暂无记录"
       }
     }
   },

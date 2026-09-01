@@ -43,11 +43,18 @@ function makeCtx(overrides) {
     stopTimer() { if (ctx.S) ctx.S.timerId = null; },
     renderTime() { ctx.rendered = (ctx.rendered || 0) + 1; },
     setInterval: () => 'TICK',
+    document: { hidden: false },
     warns
   }, overrides || {});
   vm.createContext(ctx);
-  vm.runInContext(CLOCK_DECL + '\n' + slice('function pauseClock') + '\n'
-    + slice('function resumeClock') + '\n' + slice('function startTimer'), ctx);
+  vm.runInContext(CLOCK_DECL + '\n'
+    + slice('function clockBlocked') + '\n'
+    + slice('function holdClock') + '\n'
+    + slice('function releaseClock') + '\n'
+    + slice('function pauseClock') + '\n'
+    + slice('function resumeClock') + '\n'
+    + slice('function startTimer') + '\n'
+    + slice('function onClockVisibility'), ctx);
   return ctx;
 }
 
@@ -67,7 +74,7 @@ test('暂停 → 恢复：时间一秒都不许流失；被扣了要按快照补
   ctx.S.remain = 70;                                  // 模拟有路径绕过暂停偷走了 30 秒
   vm.runInContext('resumeClock()', ctx);
   assert.strictEqual(ctx.S.remain, 100, '必须补回暂停快照');
-  assert.ok(ctx.warns.some((w) => /clock lost \d+s while paused/.test(w)),
+  assert.ok(ctx.warns.some((w) => /clock lost \d+s while gated/.test(w)),
     '静默补回不行，必须留下可查的日志（日志本身用英文：主脚本反回归门禁不许中文字面量）');
 });
 
@@ -111,11 +118,48 @@ test('接线：广告包装层负责暂停/恢复，且发奖前已恢复', () =
 });
 
 test('页面不可见时停表：directlink 广告开在新标签，玩家真的会离开页面', () => {
-  assert.ok(/visibilitychange/.test(html), '缺 visibilitychange 监听');
-  const i = html.indexOf("addEventListener('visibilitychange'");
-  const seg = html.slice(i, i + 320);
-  assert.ok(/document\.hidden.*pauseClock\(\)/s.test(seg), '不可见要暂停');
-  assert.ok(/resumeClock\(\)/.test(seg), '回来要恢复');
+  assert.ok(/addEventListener\('visibilitychange', onClockVisibility\)/.test(html),
+    'visibilitychange 必须接到具名的 onClockVisibility（测试要能真跑这条接线）');
+  const ctx = makeCtx({ S: { remain: 100, timerId: 'TICK', done: false } });
+  ctx.document.hidden = true;
+  vm.runInContext('onClockVisibility()', ctx);
+  assert.strictEqual(ctx.S.timerId, null, '不可见要停表');
+  ctx.document.hidden = false;
+  vm.runInContext('onClockVisibility()', ctx);
+  assert.strictEqual(ctx.S.timerId, 'TICK', '回来要恢复');
+  assert.strictEqual(ctx.S.remain, 100, '不可见期间一秒都不许流失');
+});
+
+/* 用户实报（2026-09-01）：「出现开始关卡，需要看广告继续保持连胜，看了广告，切回游戏，
+   发现只剩下很短时间了，开始时间不对了」。
+   这条路的特殊之处：广告是在首页点的，转 hidden 那一刻**还没有当前局**——旧写法的
+   visibilitychange 里 `if (!S) return` 让这次不可见完全没被按住；而 directlink 在打开新
+   标签的瞬间就 resolve，于是 startGame 继续往下走，把新的一关开出来并开表，玩家还在广告页。 */
+test('开局门（连胜保持）：广告提前 resolve 后开出的新关，玩家没回来前一秒都不许走', () => {
+  const ctx = makeCtx({ S: null });
+  vm.runInContext('pauseClock()', ctx);              // 广告通道进闸（首页，还没有局）
+  ctx.document.hidden = true;
+  vm.runInContext('onClockVisibility()', ctx);       // 新标签打开 → 页面不可见
+  vm.runInContext('resumeClock()', ctx);             // directlink 立刻 resolve，广告通道出闸
+  assert.strictEqual(vm.runInContext('clockBlocked()', ctx), true,
+    '玩家还在广告页，hidden 通道必须继续按着表');
+  ctx.S = { remain: 300, timerId: null, done: false };   // startGame 继续：开出新的一关
+  vm.runInContext('startTimer()', ctx);
+  assert.strictEqual(ctx.S.timerId, null, '玩家还没回来，新关的表不许开');
+  ctx.document.hidden = false;                       // 玩家看完广告切回游戏
+  vm.runInContext('onClockVisibility()', ctx);
+  assert.strictEqual(ctx.S.timerId, 'TICK', '回来必须真的把新关的表开起来');
+  assert.strictEqual(ctx.S.remain, 300, '新关必须还是满时间（这就是用户实报的症状）');
+});
+
+test('闸内换了局：不许拿旧关的剩余秒数给新关补时间', () => {
+  const ctx = makeCtx({ S: { remain: 600, timerId: 'TICK', done: false } });
+  vm.runInContext('pauseClock()', ctx);                    // 快照 = 旧关的 600s
+  ctx.S = { remain: 120, timerId: null, done: false };     // 闸内换成 120s 的新关
+  vm.runInContext('startTimer()', ctx);
+  vm.runInContext('resumeClock()', ctx);
+  assert.strictEqual(ctx.S.remain, 120, '新关不许被旧关快照回填成 600s');
+  assert.strictEqual(ctx.S.timerId, 'TICK', '新关的表要开起来');
 });
 
 test('加时是累加不是覆盖（覆盖会吞掉广告前的剩余时间）', () => {

@@ -1263,29 +1263,60 @@ function loadMultitag() {
    现在收进 showRewardedAd()：任何广告位自动暂停倒计时 + 静音，广告关掉再恢复。
    另加一道兜底：记下暂停瞬间的剩余秒数，恢复时若发现变少（某个源在同页 iframe 里播、
    页面没 hidden、别处又把 tick 打开了），一律补回快照——广告花掉的时间绝不算进关卡。 */
+/* 时钟闸门有两条独立通道，缺任一条都会漏时间（用户实报 2026-09-01：
+   「开始关卡时弹看广告保连胜，看完广告切回来只剩很短时间，开始时间不对」）：
+     ① ad 通道（adPauseGame/adResumeGame，可重入计数）——包住广告 promise 期间；
+     ② hidden 通道（页面不可见）——core/adplay.js 的 directlink 源在 openUrl() 打开新标签
+        的那一刻就 resolve，广告 promise 已经结束、连胜已保住、开局流程继续往下走把新的一关
+        开出来并开表，而玩家此刻还在广告页上。只有 hidden 通道能按住这一段。
+   hidden 通道**不能依赖「当前在游戏页」**：开局门的广告是在首页点的，转 hidden 那一刻还没
+   进关（旧写法 `if (!pages.game.hidden)` 让这次不可见什么都没按住）。 */
 let adPauseDepth = 0, adPauseWasTicking = false, adPauseRemain = -1, adPauseSfx = null;
-function adPauseGame() {
-  if (adPauseDepth++ > 0) return;
-  adPauseWasTicking = !!S.timerId;
-  adPauseRemain = typeof S.remain === 'number' ? S.remain : -1;
+let clockHidden = false, clockHeld = false;
+function clockBlocked() { return adPauseDepth > 0 || clockHidden; }
+/* 进闸：第一条通道按下时拍快照并停表；已在闸内则保留最早那份快照 */
+function holdClock() {
+  if (clockHeld) return;
+  clockHeld = true;
+  adPauseWasTicking = !!(S && S.timerId);
+  adPauseRemain = (S && typeof S.remain === 'number') ? S.remain : -1;
   stopTimer();
-  adPauseSfx = WaterAudio.isEnabled();
-  WaterAudio.setEnabled(false);   // 契约要求 mute：广告有自己的声音，别和游戏音效叠在一起
 }
-function adResumeGame() {
-  if (adPauseDepth <= 0) return;
-  if (--adPauseDepth > 0) return;
-  if (adPauseSfx !== null) { WaterAudio.setEnabled(adPauseSfx); adPauseSfx = null; }
-  // 兜底：广告期间不该流失一秒。少了就补回去（多了不动——奖励是在这之后才发的）
-  if (adPauseRemain >= 0 && typeof S.remain === 'number' && S.remain < adPauseRemain) {
-    console.warn('[water ads] 广告期间倒计时被扣掉了 ' + (adPauseRemain - S.remain) +
-      's，已按暂停快照补回（不该发生，说明有路径绕过了 adPauseGame）');
+/* 出闸：还有别的通道按着就继续停（广告播完但玩家还没切回来 = 典型情形） */
+function releaseClock() {
+  if (!clockHeld || clockBlocked()) return;
+  clockHeld = false;
+  // 兜底：闸内不该流失一秒。少了就补回去（多了不动——奖励是在这之后才发的）。
+  // 闸内换了局时 startTimer 已把快照重绑到新局的 remain，不会拿旧局秒数给新局凭空补时间。
+  if (adPauseRemain >= 0 && S && typeof S.remain === 'number' && S.remain < adPauseRemain) {
+    console.warn('[water ads] 闸内倒计时被扣掉了 ' + (adPauseRemain - S.remain) +
+      's，已按快照补回（不该发生，说明有路径绕过了时钟闸门）');
     S.remain = adPauseRemain;
     renderTimer();
   }
   adPauseRemain = -1;
-  if (adPauseWasTicking && !S.finished) startTimer();
+  const resume = adPauseWasTicking;
   adPauseWasTicking = false;
+  if (resume && S && !S.finished) startTimer();
+}
+function adPauseGame() {
+  adPauseDepth++;
+  if (adPauseSfx === null) {
+    adPauseSfx = WaterAudio.isEnabled();
+    WaterAudio.setEnabled(false); // 契约要求 mute：广告有自己的声音，别和游戏音效叠在一起
+  }
+  holdClock();
+}
+function adResumeGame() {
+  if (adPauseDepth <= 0) return;
+  if (--adPauseDepth === 0 && adPauseSfx !== null) { WaterAudio.setEnabled(adPauseSfx); adPauseSfx = null; }
+  releaseClock();
+}
+/* 页面可见性 → hidden 通道。具名而不是写在监听器里：门禁测试要能真跑这条接线。 */
+function onClockVisibility() {
+  clockHidden = !!document.hidden;
+  if (clockHidden) holdClock();
+  else releaseClock();
 }
 
 function showRewardedAd(placementId) {
@@ -2223,7 +2254,19 @@ function tick() {
   renderTimer();
   if (S.remain <= 0) { stopTimer(); timeUp(); }
 }
-function startTimer() { stopTimer(); S.timerId = setInterval(tick, 1000); }
+function startTimer() {
+  stopTimer();
+  /* 闸内不许真的开表：directlink 那条路会在玩家还没回来时就发奖、甚至把这一关都开出来，
+     此时页面仍不可见，开表等于用广告时间吃玩家的关卡时间。记下「本该在跑」并把快照重绑到
+     当前这一局（换局了就以新局的 remain 为准），闸门抬起时再真开。 */
+  if (clockBlocked()) {
+    clockHeld = true;
+    adPauseWasTicking = true;
+    adPauseRemain = (S && typeof S.remain === 'number') ? S.remain : -1;
+    return;
+  }
+  S.timerId = setInterval(tick, 1000);
+}
 function stopTimer() { if (S.timerId) { clearInterval(S.timerId); S.timerId = null; } }
 function grantTimeBonus(seconds) {
   S.timeBudget += seconds;
@@ -2939,13 +2982,12 @@ function boot() {
   });
 }
 document.addEventListener('visibilitychange', () => {
+  onClockVisibility();          // 时钟闸门（hidden 通道）：与「在不在游戏页」无关，见 holdClock 上方注释
   if (document.hidden) {
-    if (!pages.game.hidden) { stopTimer(); }
     if (Plat && Plat.mode === 'online') Plat.flush(() => Object.assign({}, Profile.state));
   }
   else {
     Profile.settle();
-    if (!pages.game.hidden && S.tubes && !S.finished && overlay.hidden) startTimer();
     if (!pages.home.hidden) renderHome();
   }
 });

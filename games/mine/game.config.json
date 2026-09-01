@@ -446,7 +446,8 @@
         "traceClear": "Clear log",
         "traceCopied": "Copied — paste it to the developer",
         "traceCopyFail": "Copy failed — long-press to select the text",
-        "traceEmpty": "No events yet"
+        "traceEmpty": "No events yet",
+        "coinsSynced": "Synced with your other device — {n} coins"
       },
       "zh": {
         "langName": "简体中文",
@@ -729,7 +730,8 @@
         "traceClear": "清空日志",
         "traceCopied": "已复制，粘贴给开发者即可",
         "traceCopyFail": "复制失败，长按选中文字再复制",
-        "traceEmpty": "暂无记录"
+        "traceEmpty": "暂无记录",
+        "coinsSynced": "已与其它设备同步，当前金币 {n}"
       }
     }
   },

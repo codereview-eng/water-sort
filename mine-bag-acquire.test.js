@@ -69,6 +69,9 @@ function makeCtx(opts) {
     },
     persist: function () { ctx.persisted += 1; },
     renderHome: function () { ctx.rendered += 1; },
+    /* 2026-09-01：背包/购买入口会顺手跟服务器对一次账（多端金币同步），
+       这里只关心背包本身的行为，同步规则由 mine-coin-sync.test.js 与 core/cloudsync.test.js 覆盖。 */
+    syncNow: function (reason) { (ctx.synced = ctx.synced || []).push(reason); },
     toast: function (m) { ctx.toasts.push(m); },
     dialog: function (title, body, mainText, onMain, subText, onSub, onDismiss) {
       ctx.dialogs.push({ title, body, mainText, onMain, subText, onSub, onDismiss });

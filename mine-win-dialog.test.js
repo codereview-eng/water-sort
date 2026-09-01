@@ -51,6 +51,7 @@ function makeCtx() {
     setTimeout: (fn) => { ctx.timers.push(fn); return 1; },
     timers: [],
     lastPointerUpAt: 0,
+    sinceTapMs: () => 0,     // 「距玩家上次抬手多久」由埋点层提供，这里只验静默期
     Date: { now: () => now },
     advance: (ms) => { now += ms; },
     nowRef: () => now,

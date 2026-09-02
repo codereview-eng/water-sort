@@ -87,6 +87,18 @@ for (const marker of MARKERS) {
 }
 console.log('产物自检通过：' + MARKERS.join(' / ') + ' 均在');
 
+/* 4.5) 语法门禁：逐块把 <script> 解析一遍（#57）。
+   MARKERS 只验「该有的字符串在不在」，验不出「代码还能不能跑」——
+   #57 那次线上白屏，产物里每个 marker 都在、HTML 结构也完整，
+   但 5 块 script 已经不是合法 JS/JSON 了。字节合法 ≠ 能跑，必须真解析。
+   这道是构建期的保险（防我们自己发坏包）；发布之后被改写的情况另有 verify-live。 */
+{
+  const { verifyArtifact, report } = await import('./verify-artifact.mjs');
+  if (!report(verifyArtifact(inlined), '构建产物 index.html')) {
+    throw new Error('产物里有 script 解析不了，拒绝出包');
+  }
+}
+
 /* 5) 广场资产门禁 + 目录产物（唯一能承载二进制的形态） */
 const DIST = process.env.CM_DIST || '/tmp/cm-publish-dist';
 const COVER_SRC = join(ROOT, 'assets/cover/cover.webp');

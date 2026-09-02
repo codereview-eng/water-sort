@@ -166,6 +166,22 @@ writeFileSync(join(DIST, 'game.meta.json'), metaRaw);
    所以 payload/checkpoint 那条路没有 CG 时游戏照常可玩，只是不放 CG。
    逐件回读校验 + 合计体积上限，防静默截断与产物膨胀。 */
 const CG_SRC = join(ROOT, 'color-mines/cg');
+
+/* 素材身份对账（#57 seams S1）：素材不在仓里，所以"缺素材"这件事本来是**静默**的
+   ——构建照常成功，只是产物里少了几段 CG。清单把 200 件的 sha256 锁进仓，
+   缺 / 多 / 内容变了都当场报出来。清单本身只有 26KB。 */
+{
+  const m = await import('./cg-manifest.mjs');
+  if (existsSync(m.MANIFEST)) {
+    const actual = m.scanAssets();
+    if (!actual) throw new Error(`找不到素材目录 ${CG_SRC}`);
+    if (!m.report(m.checkAssets(JSON.parse(readFileSync(m.MANIFEST, 'utf8')), actual))) {
+      throw new Error('CG 素材与清单对不上，拒绝出包');
+    }
+  } else {
+    console.warn('⚠️  没有 color-mines/cg-manifest.json，跳过素材身份对账（跑 node scripts/cg-manifest.mjs --write 生成）');
+  }
+}
 /* 只发成品：cgN.mp4 / bgmN.opus。中间件（cg0a/cg0b 拼接源、*-raw.mp4 原始素材）一律不进产物。
    白名单而非黑名单——新加一种中间件不会因为忘了排除就被静默打包进去。 */
 const CG_SHIPPED = /^(cg\d+\.mp4|bgm\d+\.opus)$/;
@@ -270,3 +286,13 @@ console.log(`目录产物 → ${DIST}`);
 console.log(`  cover.webp ${dim.w}x${dim.h} ${(coverBuf.byteLength / 1024).toFixed(1)} KB`);
 console.log(`  game.meta.json title="${meta.title}" tagline="${meta.tagline ?? ''}"`);
 console.log(`  文件 ${Object.keys(files).length + 2} 个（含封面与 meta）`);
+
+/* 发布后那一步的交接（#57 seams S2）：发布走的是外部工具，脚本管不到，
+   所以「构建 → 发布 → 验证」是断开的，只能靠人记得回来验一下——#57 就是没验到位。
+   这里把下一步命令连同本次的 data-build 戳直接打出来，照着贴即可，
+   不用自己去产物里翻戳。戳的用处：线上戳与它对不上，说明服的不是你刚发的那份。 */
+const stampOut = (/<html[^>]*data-build="([^"]*)"/.exec(inlined) || [])[1] || '';
+console.log('');
+console.log('下一步 —— 发布后请立刻验一次线上（#57 的白屏就是漏了这步）：');
+console.log(`  node scripts/verify-live.mjs --url https://play-color-mines.run.ceo/ \\`);
+console.log(`    --root '#home' --expect-build ${stampOut}`);

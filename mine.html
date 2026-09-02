@@ -385,7 +385,10 @@
      它盖住了右上角的格子，而每一格都是玩家要点的（盖住棋盘比没有角标更糟）。
      棋盘是正方形、按宽度铺满，竖屏下底部总有余量，右下角还顺手在拇指区。 */
   .wsfloat{position:fixed; right:calc(10px + env(safe-area-inset-right, 0px));
-    bottom:calc(16px + env(safe-area-inset-bottom, 0px)); z-index:60;
+    /* 84px 不是随手取的：play 平台会在页面底部叠一条自己的点赞/评论条（❤ / 💬），
+       本地 file:// 打开时它不存在，所以只有线上截图才看得见碰撞——第一版 bottom:16px
+       正好压住评论按钮。留出这条 bar 的高度，别去盖宿主的控件。 */
+    bottom:calc(84px + env(safe-area-inset-bottom, 0px)); z-index:60;
     display:flex; flex-direction:column; align-items:center; gap:3px;
     width:56px; padding:8px 0 8px; border-radius:14px;
     background:var(--surface); border:1px solid var(--edge-strong, rgba(255,255,255,.18)); color:var(--ink);

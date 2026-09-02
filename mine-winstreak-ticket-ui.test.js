@@ -206,7 +206,9 @@ function runOnWin(hasTicket) {
     WeeklyCtl: { addFrags: () => [] },
     Coins: { rewardClear: () => null, earnPerClear: 1, balance: () => 10 },
     wsOnWin() {}, sinceTapMs: () => 999,
-    WinStreak: { enabled: true, every: 10, hasTicket: () => hasTicket },
+    WinStreak: { enabled: true, every: 10, hasTicket: () => hasTicket,
+      rewards: () => ({ energy: 60, coins: 10, frags: 10 }) },
+    wsRewardText: (rw) => `⚡+${rw.energy} · 🪙+${rw.coins}`,
     wsGet: () => ({}),
     wsClaimTicket(onDone) { calls.claim.push(onDone); },
     startLevel() {}, showHome() {},
@@ -214,7 +216,7 @@ function runOnWin(hasTicket) {
     cheer() {},
     t: (k, p) => k + (p && p.n != null ? ':' + p.n : ''),
     dialog(title, body, mainText, onMain, subText, onSub, onDismiss, kind, extra) {
-      calls.dialogs.push({ title, mainText, subText, kind, extra });
+      calls.dialogs.push({ title, body, mainText, subText, kind, extra });
     }
   };
   vm.createContext(ctx);
@@ -238,6 +240,23 @@ test('结算窗：满 10 连胜时给「看广告领 10 连胜奖励」，主/�
   assert.strictEqual(d.extra.text, 'wsWinClaim:10', '文案走 i18n 键 wsWinClaim，并带上 every');
   assert.strictEqual(d.mainText, 'nextLevel');
   assert.strictEqual(d.subText, 'toHome');
+  assert.match(d.body, /wsWinClaimHint/,
+    '窗里要写出奖励是什么：只说"领奖励"不说内容，玩家没法判断这段广告值不值得看');
+});
+
+test('结算窗：没票时不写奖励预告（免得说了个不存在的奖）', () => {
+  const { calls } = runOnWin(false);
+  assert.ok(!/wsWinClaimHint/.test(calls.dialogs[0].body));
+});
+
+test('奖励数值取内核 rewards()，不各读一份配置', () => {
+  const body = slice('function onWin');
+  assert.match(body, /WinStreak\.rewards\(\)/,
+    '要用内核校验/归一后的数值；页面自己读原始配置迟早与内核对不上');
+  assert.ok(!/CFG\.winstreak/.test(body), 'onWin 里不许绕过内核直读配置');
+  const core = WinStreakCore.create(config.winstreak).rewards();
+  assert.deepStrictEqual(core, { energy: 60, coins: 10, frags: 10 },
+    '内核暴露的奖励数值应与配置一致（配置变了这里要跟着改，别让门禁静默漂移）');
 });
 
 test('结算窗：领奖走完要把结算窗放回来（不把人扣在死棋盘上）', () => {

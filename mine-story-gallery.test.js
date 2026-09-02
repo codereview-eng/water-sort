@@ -137,9 +137,19 @@ test('P1 分卷：彩雷这份配置真的分出卷、合并锁段、并定位�
   assert.ok(view.html.includes('storyChapterRange:3-10'),
     '第 3–10 章应合并成一行（第 250 关时它们连续锁着）');
   assert.strictEqual(view.current, 1, '第 250 关的玩家还在第 1 卷');
-  /* 今天彩雷只有 11 段、一卷装得下 ⇒ 不画卷头（段数还少时不多一层壳）。
-     卷头要等剧情铺到第二卷才出现，这里用规模化实例验它确实会出现。 */
-  assert.ok(!view.html.includes('data-vol='), '只有一卷时不该画卷头');
+  /* 卷头出现的条件是「一卷装不下」，卷数 = ceil((count-1) / volume)（序章不占章位）。
+     期望值由当前配置算出，不写死段数：上一版把「今天只有 11 段、一卷装得下」固化成
+     `!includes('data-vol=')`，剧情铺到 100 段后这条就红了——红的是断言的前提失效，
+     不是分卷坏了。改成两种规模都断言，加卷不再误红。 */
+  const { count, volume } = Story.plan();
+  const expectVols = Math.ceil((count - 1) / volume);
+  const vols = [...view.html.matchAll(/data-vol="(\d+)"/g)].map((m) => Number(m[1]));
+  if (expectVols > 1) {
+    assert.deepStrictEqual(vols, Array.from({ length: expectVols }, (_, i) => i + 1),
+      `${count} 段应分出 ${expectVols} 卷，且卷号连续从 1 起`);
+  } else {
+    assert.deepStrictEqual(vols, [], '只有一卷时不该画卷头（段数还少时不多一层壳）');
+  }
   const before = Story.plan();
   try {
     Story.setPlan({ count: 101 });
@@ -182,7 +192,8 @@ test('P2 规模：加关卡只改一个数字，1 万关的表由规则生成', 
     assert.strictEqual(rows[100].caption, '', '没写字幕的段应安静地没有字幕，而不是报错');
   } finally {
     Story.setPlan(before);
-    assert.strictEqual(Story.CG.length, 11, '测试后必须还原成当前真实节奏');
+    assert.strictEqual(Story.CG.length, before.count,
+      '测试后必须还原成改动前的节奏（断言还原到 before，不写死当时的段数）');
   }
 });
 

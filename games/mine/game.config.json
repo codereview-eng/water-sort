@@ -740,7 +740,7 @@
   },
   "story": {
     "cadence": 100,
-    "count": 11,
+    "count": 100,
     "volume": 10,
     "seenKey": "cm.story.seen",
     "media": {
@@ -829,6 +829,362 @@
       "cg10": {
         "zh": "灯落镇亮了。可地平线那头，还有一片黑着的地方。",
         "en": "Lumen Hollow shines. But out past the horizon, somewhere is still dark."
+      },
+      "cg11": {
+        "zh": "信封上的名字不是你的。是海对岸一个镇子。",
+        "en": "The name on it isn't yours. It's a town across the water."
+      },
+      "cg12": {
+        "zh": "十年没有船出海了。老船夫还留着桨。",
+        "en": "No boat has sailed in ten years. The ferryman kept his oars."
+      },
+      "cg13": {
+        "zh": "海风里灯芯会返潮。这里的手艺和山里不一样。",
+        "en": "Sea air damps the wick. The craft here isn't the craft at home."
+      },
+      "cg14": {
+        "zh": "雾里有灯，但没有人应门。",
+        "en": "There are lamps in the fog. Nobody answers the door."
+      },
+      "cg15": {
+        "zh": "锈铁在这边用的是另一个名字。",
+        "en": "On this shore, Rustiron went by another name."
+      },
+      "cg16": {
+        "zh": "抽光那年，有人拿孩子换了一冬的灯油。",
+        "en": "The year they drained it, someone traded a child for a winter of oil."
+      },
+      "cg17": {
+        "zh": "她宁可黑着。亮起来就会被再抢一次。",
+        "en": "She'd rather stay dark. Lit means worth taking again."
+      },
+      "cg18": {
+        "zh": "塔灯只在退潮时亮。它在等一条船。",
+        "en": "The tower only lights at low tide. It is waiting for a boat."
+      },
+      "cg19": {
+        "zh": "十年前出海的那条船，空着漂了回来。",
+        "en": "The boat that sailed ten years ago drifted back. Empty."
+      },
+      "cg20": {
+        "zh": "两岸的灯第一次同时亮着。",
+        "en": "For the first time, both shores are lit at once."
+      },
+      "cg21": {
+        "zh": "她学得比你快，也比你狠。",
+        "en": "She learns faster than you did. And harder."
+      },
+      "cg22": {
+        "zh": "光要养。养光先得有人肯等。",
+        "en": "Light has to be grown. Growing it needs someone willing to wait."
+      },
+      "cg23": {
+        "zh": "有人不肯等，夜里又开始抽。",
+        "en": "Someone would not wait. The draining started again at night."
+      },
+      "cg24": {
+        "zh": "你写下第一条规矩，手一直在抖。",
+        "en": "You wrote the first rule down. Your hand would not stop shaking."
+      },
+      "cg25": {
+        "zh": "第一个违规的人，是跟你一起下过矿的。",
+        "en": "The first to break it had been down the mine with you."
+      },
+      "cg26": {
+        "zh": "光可以借。借了要还。",
+        "en": "Light can be lent. Lent light gets paid back."
+      },
+      "cg27": {
+        "zh": "七个镇子连成一条脉。",
+        "en": "Seven towns, strung onto one vein."
+      },
+      "cg28": {
+        "zh": "中间那个镇子的灯又灭了。",
+        "en": "The town in the middle went dark again."
+      },
+      "cg29": {
+        "zh": "补上一环，要六个镇子同时松手。",
+        "en": "To mend one link, six towns must let go at once."
+      },
+      "cg30": {
+        "zh": "从山上看下去，像有人把星星按在了地上。",
+        "en": "From the ridge it looks like stars pressed into the ground."
+      },
+      "cg31": {
+        "zh": "抽光机的声音，你一辈子忘不了。",
+        "en": "The sound of a drain engine. You never forget it."
+      },
+      "cg32": {
+        "zh": "锈铁没有死。它换了块招牌。",
+        "en": "Rustiron did not die. It changed its sign."
+      },
+      "cg33": {
+        "zh": "上一回是抢。这一回是签。",
+        "en": "Last time they took it. This time they ask you to sign."
+      },
+      "cg34": {
+        "zh": "他不是坏人。他只是想先亮。",
+        "en": "He is not a bad man. He just wanted to be lit first."
+      },
+      "cg35": {
+        "zh": "一条街亮着，对面那条黑着。",
+        "en": "One street lit. The street facing it, dark."
+      },
+      "cg36": {
+        "zh": "他在里面。他说这次他不跑。",
+        "en": "Tinny is on the inside. He says this time he will not run."
+      },
+      "cg37": {
+        "zh": "这一回，名字里有你认识的人。",
+        "en": "This time the ledger has names you know."
+      },
+      "cg38": {
+        "zh": "你没有拉闸。你把它拆了。",
+        "en": "You did not throw the switch. You took it apart."
+      },
+      "cg39": {
+        "zh": "没有人被处死。所有人都被点亮。",
+        "en": "No one was put to death. Everyone was put under light."
+      },
+      "cg40": {
+        "zh": "锈铁最后一块招牌，被熔成了灯座。",
+        "en": "Their last sign was melted down into a lamp base."
+      },
+      "cg41": {
+        "zh": "麻烦不是缺光。是分光。",
+        "en": "The trouble was never scarcity. It is who gets it."
+      },
+      "cg42": {
+        "zh": "医馆和学堂，今晚只能亮一个。",
+        "en": "The clinic or the school. Tonight only one can be lit."
+      },
+      "cg43": {
+        "zh": "队伍从矿口一直排到镇口。",
+        "en": "The queue runs from the mine mouth to the town gate."
+      },
+      "cg44": {
+        "zh": "有人拿钱买先后。",
+        "en": "Someone paid to stand further forward."
+      },
+      "cg45": {
+        "zh": "你把价钱刻在墙上，让所有人都看得见。",
+        "en": "You cut the price into the wall where everyone can see it."
+      },
+      "cg46": {
+        "zh": "总有人站在那堵墙外面。",
+        "en": "There is always someone standing outside that wall."
+      },
+      "cg47": {
+        "zh": "镇中心那盏，谁都能用，谁都不能拿走。",
+        "en": "The lamp in the square: anyone may use it, no one may take it."
+      },
+      "cg48": {
+        "zh": "抓到了。是个孩子。",
+        "en": "They caught the thief. It was a child."
+      },
+      "cg49": {
+        "zh": "规矩改了。孩子留下了。",
+        "en": "The rule changed. The child stayed."
+      },
+      "cg50": {
+        "zh": "一百个镇子亮了。地图上还有一半是黑的。",
+        "en": "A hundred towns lit. Half the map is still dark."
+      },
+      "cg51": {
+        "zh": "有一盏灯，八种光都对不上它。",
+        "en": "There is a light that matches none of the eight."
+      },
+      "cg52": {
+        "zh": "祖父画过它，画完打了个问号。",
+        "en": "Grandfather drew it once, and left a question mark beside it."
+      },
+      "cg53": {
+        "zh": "它照不亮任何东西，却让人看清自己。",
+        "en": "It lights nothing. It only shows you yourself."
+      },
+      "cg54": {
+        "zh": "你在它面前看见了十年前的自己。",
+        "en": "In front of it you saw who you were ten years ago."
+      },
+      "cg55": {
+        "zh": "有人看过一次，之后再没开口。",
+        "en": "Some who looked once never spoke again."
+      },
+      "cg56": {
+        "zh": "你决定先把它封住。",
+        "en": "You decided to seal it. For now."
+      },
+      "cg57": {
+        "zh": "有人挖开了。",
+        "en": "Someone tore the seal and dug it open."
+      },
+      "cg58": {
+        "zh": "看过的人都在想同一件事。",
+        "en": "Everyone who looked is thinking the same thing."
+      },
+      "cg59": {
+        "zh": "第九种光不是给人用的。",
+        "en": "The ninth light was never meant for us."
+      },
+      "cg60": {
+        "zh": "你亲手把它送回脉里。",
+        "en": "You carried it back into the vein yourself."
+      },
+      "cg61": {
+        "zh": "退潮那天，海底在发光。",
+        "en": "The day the tide went out, the seabed was glowing."
+      },
+      "cg62": {
+        "zh": "灯要防水，人要屏息。",
+        "en": "Seal the lamp. Hold your breath."
+      },
+      "cg63": {
+        "zh": "山里那条脉，在这里只是根须。",
+        "en": "The vein under our mountain is a root hair down here."
+      },
+      "cg64": {
+        "zh": "十年前那条船，装满了没运走的光。",
+        "en": "The sunken boat is full of light that never shipped."
+      },
+      "cg65": {
+        "zh": "他没有卖。他把船凿沉了。",
+        "en": "He didn't sell it. He scuttled his own boat."
+      },
+      "cg66": {
+        "zh": "海底有一座镇子。",
+        "en": "There are rooftops beneath the light. A town."
+      },
+      "cg67": {
+        "zh": "有人比矿灯师更早在养脉。",
+        "en": "Someone was growing veins long before the lampwrights."
+      },
+      "cg68": {
+        "zh": "他们的灯不用灯芯。",
+        "en": "Their lamps have no wick at all."
+      },
+      "cg69": {
+        "zh": "你带不走它，只能记住。",
+        "en": "You can't carry it home. You can only remember it."
+      },
+      "cg70": {
+        "zh": "你只带回一句话：光比人老。",
+        "en": "You surfaced with one sentence: light is older than us."
+      },
+      "cg71": {
+        "zh": "那盏灯今晚有声音。",
+        "en": "The eighth lamp is making a sound tonight."
+      },
+      "cg72": {
+        "zh": "只有你听得出来那是什么。",
+        "en": "Only you can tell what that sound is."
+      },
+      "cg73": {
+        "zh": "脉里有一条被走过很多次的路。",
+        "en": "There's a path in the vein, worn by many crossings."
+      },
+      "cg74": {
+        "zh": "每隔一段就有一个灯形的记号。",
+        "en": "Every so often, a lamp-shaped mark cut into the rock."
+      },
+      "cg75": {
+        "zh": "到这里就没有了。",
+        "en": "The marks stop here."
+      },
+      "cg76": {
+        "zh": "不是尸骨。是一盏还亮着的灯。",
+        "en": "Not bones. A lamp, still lit."
+      },
+      "cg77": {
+        "zh": "光尘拼出三个字：别学我。",
+        "en": "The dust spelled three words: don't follow me."
+      },
+      "cg78": {
+        "zh": "这是它第一次没有接话。",
+        "en": "For the first time, Pip had nothing to say."
+      },
+      "cg79": {
+        "zh": "灯罩上那个「O」，快被磨平了。",
+        "en": "The engraved O on the glass is nearly worn away."
+      },
+      "cg80": {
+        "zh": "第八盏从此有了名字。",
+        "en": "From tonight the eighth lamp has a name."
+      },
+      "cg81": {
+        "zh": "有人发现星星在变少。",
+        "en": "Someone noticed the stars are thinning out."
+      },
+      "cg82": {
+        "zh": "镇民说，那跟灯没关系。",
+        "en": "The townsfolk say it has nothing to do with lamps."
+      },
+      "cg83": {
+        "zh": "你造了一座只朝天上看的塔。",
+        "en": "You built a tower that only looks upward."
+      },
+      "cg84": {
+        "zh": "星星熄灭的样子，和被抽干的镇子一模一样。",
+        "en": "Stars go out exactly the way a drained town does."
+      },
+      "cg85": {
+        "zh": "这个问题，没有人敢往下想。",
+        "en": "Nobody dares finish that question."
+      },
+      "cg86": {
+        "zh": "远处的天上，有一点回应的光。",
+        "en": "Far up there, one point of light answered."
+      },
+      "cg87": {
+        "zh": "你把八种光按次序点了三夜。",
+        "en": "Three nights you lit the eight lights in order."
+      },
+      "cg88": {
+        "zh": "那不是巧合。",
+        "en": "It blinked twice. That was not chance."
+      },
+      "cg89": {
+        "zh": "世界不止这里。",
+        "en": "The map now runs off the top of the page."
+      },
+      "cg90": {
+        "zh": "够不着，也要举着。",
+        "en": "Out of reach. Hold it up anyway."
+      },
+      "cg91": {
+        "zh": "你收拾了行李。镇子已经不需要你了。",
+        "en": "You packed. The town does not need you any more."
+      },
+      "cg92": {
+        "zh": "有人已经在教别人了。",
+        "en": "Your student has a student now."
+      },
+      "cg93": {
+        "zh": "你只教了一句：光是会长的。",
+        "en": "You taught them one sentence: light grows back."
+      },
+      "cg94": {
+        "zh": "十年前你点亮的第一盏，还亮着。",
+        "en": "The first lamp you ever lit is still burning."
+      },
+      "cg95": {
+        "zh": "豆丁说它还想再撑一阵。",
+        "en": "Pip says it would like to last a while longer."
+      },
+      "cg96": {
+        "zh": "一个歪扭的字，和当年那个「O」并排。",
+        "en": "A crooked letter, cut beside the old O."
+      },
+      "cg97": {
+        "zh": "玛塔烤了最后一炉，让你路上吃。",
+        "en": "Marta baked one last batch for the road."
+      },
+      "cg98": {
+        "zh": "整座山谷都亮着。",
+        "en": "You turned on the mountain road. The whole valley was lit."
+      },
+      "cg99": {
+        "zh": "你朝黑的方向走。灯举在手里。",
+        "en": "You walk toward the dark, lamp raised."
       }
     },
     "ui": {

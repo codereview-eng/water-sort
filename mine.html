@@ -540,6 +540,7 @@
 <script src="./core/story.js"></script>
 <script src="./core/trace.js"></script>
 <script src="./core/cloudsync.js"></script>
+<script src="./core/tickalarm.js"></script>
 <script>
 (function () {
   'use strict';
@@ -831,6 +832,17 @@
     withAudio(function (ac) { playNotes(ac, CHEER_NOTES); });
   }
 
+  /* 倒计时告警滴答（core/tickalarm.js）：时间进红色告警区后每秒一声，末 10 秒加急。
+     颜色与声音同一判据：renderTime 的 'low' 类读的就是 TickAlarm.lowSec，
+     不许在这里另写一个 30 —— 两处字面量迟早漂移成「红了不响」或「响了不红」。
+     走宿主的 withAudio/masterIn：音效开关、iOS 的 resume 解锁、共享压缩器都在那条路上。 */
+  var TickAlarm = TickAlarmCore.create({
+    withAudio: withAudio,
+    masterIn: masterIn,
+    isMuted: function () { return !!clockPause.muted; },
+    onEvent: function (evt, data) { trace(evt, data); }
+  });
+
   /* ============ 运行时状态 ============ */
   var S = null;        // 当前关：{lv,size,board,mines:Set,found:Set,marks:Set,opened:Set,lives,remain,timerId,done}
 
@@ -952,6 +964,9 @@
     S.timerId = setInterval(function () {
       if (S.done) return stopTimer();
       S.remain -= 1; renderTime();
+      /* 滴答挂在真实的一秒上，而不是 renderTime 里：renderHud 会因为道具数、生命值等
+         各种原因重绘，挂在渲染上会一秒响好几声。归零那一声让给超时结算，不再滴答。 */
+      if (S.remain > 0) TickAlarm.tick(S.remain);
       if (S.remain <= 0) { stopTimer(); onTimeUp(); }
     }, 1000);
   }
@@ -1004,7 +1019,7 @@
     if (S.remain == null) { el.textContent = '∞'; el.classList.remove('low'); return; }
     var s = Math.max(0, S.remain);
     el.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-    el.classList.toggle('low', s <= 30);
+    el.classList.toggle('low', s <= TickAlarm.lowSec);   // 阈值只有一份：变红与滴答同一瞬间
   }
 
   /* ============ 点击：单击标记 / 双击挖开 / 拖动批量标记 ============ */
@@ -2291,6 +2306,11 @@
     trace: function (n) { return Trace.text(n || 60); },
     events: function () { return Trace.list(); },
     traceClear: function () { Trace.clear(); },
+    /* 滴答的 ground truth（真机验收与排障读它，别靠耳朵猜）：
+       played = 真的用素材响了几声；fallback = 素材没解出来、靠合成音顶了几声；
+       lastReason/lastError = 这一声为什么没响（sfx-off / muted / off-range / 解码失败） */
+    tickAlarm: function () { return TickAlarm.stats(); },
+    tick: function (sec) { return TickAlarm.tick(sec); },
     dragDiag: function () { return { coalesced: DRAG_DIAG.coalesced, fallback: DRAG_DIAG.fallback,
       filled: DRAG_DIAG.filled, painted: DRAG_DIAG.painted, marks: S ? S.marks.size : 0 }; },
     solve: function () { S.mines.forEach(function (i) { if (!S.found.has(i)) dig(i); }); },

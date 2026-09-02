@@ -645,13 +645,179 @@ document.addEventListener('keydown', cgUnlock);
 
 ---
 
-## 续写协议 · 章节储备（L1001+，只留标题）
+---
 
-| 章 | 关卡 | 暂定标题 | 一句话 |
+# 第三部起 · L1001–9900（2026-09-01 扩写，cg11–cg99 共 89 段）
+
+**扩到 100 段 CG 的总账**：`cadence = 100` 不变 ⇒ cg11 挂 L1100、cg99 挂 L9900，覆盖到 **9900 关**。
+实测单段（视频+配乐）约 221KB ⇒ 100 段合计 **≈21.5 MB / 200 个文件**，
+仍走**独立静态文件随包发布**（play 面 nginx 直供、按需拉取，玩家单次只下 221KB）。
+体积闸已从 4 MiB 放宽到 32 MiB；`count` 恒等于**已完成段数**，可以一段一段发。
+
+## 总弧线：从「点亮我的镇子」到「成为举灯走进黑暗的那个人」
+
+第一、二部已经把主角从「回家的人」写成「把光还回去的人」。
+第三部起尺度继续放大，但**每一部的落点都必须是一件具体的、看得见的事**，不许滑向抽象宏大叙事。
+终局是回环：**主角最终活成了开场那个提灯走进黑暗的祖父**——
+而第 77 段祖父留下的「别学我」，正是在最后一段被主角亲手推翻。
+
+| 部 | CG | 关卡 | 主题 | 这一部要解决的问题 |
+|---|---|---|---|---|
+| 三 | cg11–20 | 1100–2000 | **越海** | 那封不是写给你的信，收信人在海对岸 |
+| 四 | cg21–30 | 2100–3000 | **养脉** | 把「光会长」教出去，连成第一张网 |
+| 五 | cg31–40 | 3100–4000 | **余烬** | 锈铁换了招牌卷土重来，这次带着合同 |
+| 六 | cg41–50 | 4100–5000 | **光价** | 光够了之后的新麻烦：怎么分 |
+| 七 | cg51–60 | 5100–6000 | **第九种光** | 有一种光不是给人用的 |
+| 八 | cg61–70 | 6100–7000 | **海脉** | 比矿灯师更早养脉的人 |
+| 九 | cg71–80 | 7100–8000 | **回音** | 奥兰线收束 |
+| 十 | cg81–90 | 8100–9000 | **熄星** | 天上的光也在灭 |
+| 十一 | cg91–99 | 9100–9900 | **归灯者** | 主角成为传承本身，走向下一片黑 |
+
+## 第三部 · 越海（cg11–cg20）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
 |---|---|---|---|
-| 11 | 1001–1100 | 《不是写给你的信》 | 收信人是海那边另一座黑镇 |
-| 12 | 1101–1200 | 《养脉人》 | 把「光会长」这件事教出去 |
-| 13 | 1201–1300 | 《第一个学会的人》 | 徒弟比师父走得更远 |
+| 11 | 1100 | 不是写给你的信 | 信封上的名字不是你的。是海对岸一个镇子。<br>*The name on it isn't yours. It's a town across the water.* |
+| 12 | 1200 | 渡口 | 十年没有船出海了。老船夫还留着桨。<br>*No boat has sailed in ten years. The ferryman kept his oars.* |
+| 13 | 1300 | 咸掉的灯 | 海风里灯芯会返潮。这里的手艺和山里不一样。<br>*Sea air damps the wick. The craft here isn't the craft at home.* |
+| 14 | 1400 | 雾镇 | 雾里有灯，但没有人应门。<br>*There are lamps in the fog. Nobody answers the door.* |
+| 15 | 1500 | 第二本账 | 锈铁在这边用的是另一个名字。<br>*On this shore, Rustiron went by another name.* |
+| 16 | 1600 | 换灯油的孩子 | 抽光那年，有人拿孩子换了一冬的灯油。<br>*The year they drained it, someone traded a child for a winter of oil.* |
+| 17 | 1700 | 拒绝点灯的人 | 她宁可黑着。亮起来就会被再抢一次。<br>*She'd rather stay dark. Lit means worth taking again.* |
+| 18 | 1800 | 潮汐灯塔 | 塔灯只在退潮时亮。它在等一条船。<br>*The tower only lights at low tide. It is waiting for a boat.* |
+| 19 | 1900 | 船回来了 | 十年前出海的那条船，空着漂了回来。<br>*The boat that sailed ten years ago drifted back. Empty.* |
+| 20 | 2000 | 海这边也亮了 | 两岸的灯第一次同时亮着。<br>*For the first time, both shores are lit at once.* |
+
+## 第四部 · 养脉（cg21–cg30）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 21 | 2100 | 第一个学生 | 她学得比你快，也比你狠。<br>*She learns faster than you did. And harder.* |
+| 22 | 2200 | 脉苗 | 光要养。养光先得有人肯等。<br>*Light has to be grown. Growing it needs someone willing to wait.* |
+| 23 | 2300 | 等不了的人 | 有人不肯等，夜里又开始抽。<br>*Someone wouldn't wait. The draining started again at night.* |
+| 24 | 2400 | 第一条规矩 | 你写下第一条规矩，手一直在抖。<br>*You wrote the first rule down. Your hand would not stop shaking.* |
+| 25 | 2500 | 破规矩的是自己人 | 第一个违规的人，是跟你一起下过矿的。<br>*The first to break it had been down the mine with you.* |
+| 26 | 2600 | 借光 | 光可以借。借了要还。<br>*Light can be lent. Lent light gets paid back.* |
+| 27 | 2700 | 第一张网 | 七个镇子连成一条脉。<br>*Seven towns, strung onto one vein.* |
+| 28 | 2800 | 断了一环 | 中间那个镇子的灯又灭了。<br>*The town in the middle went dark again.* |
+| 29 | 2900 | 补 | 补上一环，要六个镇子同时松手。<br>*To mend one link, six towns must let go at once.* |
+| 30 | 3000 | 网亮了 | 从山上看下去，像有人把星星按在了地上。<br>*From the ridge it looks like stars pressed into the ground.* |
+
+## 第五部 · 余烬（cg31–cg40）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 31 | 3100 | 旧机器的响动 | 抽光机的声音，你一辈子忘不了。<br>*The sound of a drain engine. You never forget it.* |
+| 32 | 3200 | 穿新衣的旧人 | 锈铁没有死。它换了块招牌。<br>*Rustiron didn't die. It changed its sign.* |
+| 33 | 3300 | 这次他们带着合同 | 上一回是抢。这一回是签。<br>*Last time they took it. This time they ask you to sign.* |
+| 34 | 3400 | 签字的镇长 | 他不是坏人。他只是想先亮。<br>*He isn't a bad man. He just wanted to be lit first.* |
+| 35 | 3500 | 一半黑的镇 | 一条街亮着，对面那条黑着。<br>*One street lit. The street facing it, dark.* |
+| 36 | 3600 | 铁勺的信 | 他在里面。他说这次他不跑。<br>*Tinny is on the inside. He says this time he won't run.* |
+| 37 | 3700 | 账本第二次翻开 | 这一回，名字里有你认识的人。<br>*This time the ledger has names you know.* |
+| 38 | 3800 | 关掉那台机器 | 你没有拉闸。你把它拆了。<br>*You didn't throw the switch. You took it apart.* |
+| 39 | 3900 | 在灯下审 | 没有人被处死。所有人都被点亮。<br>*No one was put to death. Everyone was put under light.* |
+| 40 | 4000 | 余烬熄了 | 锈铁最后一块招牌，被熔成了灯座。<br>*Their last sign was melted down into a lamp base.* |
+
+## 第六部 · 光价（cg41–cg50）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 41 | 4100 | 光够了以后 | 麻烦不是缺光。是分光。<br>*The trouble was never scarcity. It's who gets it.* |
+| 42 | 4200 | 先给谁 | 医馆和学堂，今晚只能亮一个。<br>*The clinic or the school. Tonight only one can be lit.* |
+| 43 | 4300 | 队伍 | 队伍从矿口一直排到镇口。<br>*The queue runs from the mine mouth to the town gate.* |
+| 44 | 4400 | 插队的手 | 有人拿钱买先后。<br>*Someone paid to stand further forward.* |
+| 45 | 4500 | 明码 | 你把价钱刻在墙上，让所有人都看得见。<br>*You cut the price into the wall where everyone can see it.* |
+| 46 | 4600 | 墙外面的人 | 总有人站在那堵墙外面。<br>*There is always someone standing outside that wall.* |
+| 47 | 4700 | 公灯 | 镇中心那盏，谁都能用，谁都不能拿走。<br>*The lamp in the square: anyone may use it, no one may take it.* |
+| 48 | 4800 | 偷公灯的人 | 抓到了。是个孩子。<br>*They caught the thief. It was a child.* |
+| 49 | 4900 | 改规矩 | 规矩改了。孩子留下了。<br>*The rule changed. The child stayed.* |
+| 50 | 5000 | 一半的地图 | 一百个镇子亮了。地图上还有一半是黑的。<br>*A hundred towns lit. Half the map is still dark.* |
+
+## 第七部 · 第九种光（cg51–cg60）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 51 | 5100 | 对不上的颜色 | 有一盏灯，八种光都对不上它。<br>*There is a light that matches none of the eight.* |
+| 52 | 5200 | 笔记上的问号 | 祖父画过它，画完打了个问号。<br>*Grandfather drew it once, and left a question mark beside it.* |
+| 53 | 5300 | 不照东西的光 | 它照不亮任何东西，却让人看清自己。<br>*It lights nothing. It only shows you yourself.* |
+| 54 | 5400 | 第一次看见 | 你在它面前看见了十年前的自己。<br>*In front of it you saw who you were ten years ago.* |
+| 55 | 5500 | 看完就不说话的人 | 有人看过一次，之后再没开口。<br>*Some who looked once never spoke again.* |
+| 56 | 5600 | 封起来 | 你决定先把它封住。<br>*You decided to seal it. For now.* |
+| 57 | 5700 | 封条被撕了 | 有人挖开了。<br>*Someone tore the seal and dug it open.* |
+| 58 | 5800 | 静了三天 | 看过的人都在想同一件事。<br>*Everyone who looked is thinking the same thing.* |
+| 59 | 5900 | 它不是灯 | 第九种光不是给人用的。<br>*The ninth light was never meant for us.* |
+| 60 | 6000 | 把门关上 | 你亲手把它送回脉里。<br>*You carried it back into the vein yourself.* |
+
+## 第八部 · 海脉（cg61–cg70）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 61 | 6100 | 海床是亮的 | 退潮那天，海底在发光。<br>*The day the tide went out, the seabed was glowing.* |
+| 62 | 6200 | 下潜 | 灯要防水，人要屏息。<br>*Seal the lamp. Hold your breath.* |
+| 63 | 6300 | 巨脉 | 山里那条脉，在这里只是根须。<br>*The vein under our mountain is a root hair down here.* |
+| 64 | 6400 | 沉船里的灯 | 十年前那条船，装满了没运走的光。<br>*The sunken boat is full of light that never shipped.* |
+| 65 | 6500 | 船长凿的洞 | 他没有卖。他把船凿沉了。<br>*He didn't sell it. He scuttled his own boat.* |
+| 66 | 6600 | 光下面有屋顶 | 海底有一座镇子。<br>*There are rooftops beneath the light. A town.* |
+| 67 | 6700 | 比我们更早的人 | 有人比矿灯师更早在养脉。<br>*Someone was growing veins long before the lampwrights.* |
+| 68 | 6800 | 没有芯的灯 | 他们的灯不用灯芯。<br>*Their lamps have no wick at all.* |
+| 69 | 6900 | 学不会的一课 | 你带不走它，只能记住。<br>*You can't carry it home. You can only remember it.* |
+| 70 | 7000 | 浮上来 | 你只带回一句话：光比人老。<br>*You surfaced with one sentence: light is older than us.* |
+
+## 第九部 · 回音（cg71–cg80）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 71 | 7100 | 第八盏在响 | 那盏灯今晚有声音。<br>*The eighth lamp is making a sound tonight.* |
+| 72 | 7200 | 像他的咳嗽 | 只有你听得出来那是什么。<br>*Only you can tell what that sound is.* |
+| 73 | 7300 | 顺着响声往下 | 脉里有一条被走过很多次的路。<br>*There's a path in the vein, worn by many crossings.* |
+| 74 | 7400 | 一路的刻痕 | 每隔一段就有一个灯形的记号。<br>*Every so often, a lamp-shaped mark cut into the rock.* |
+| 75 | 7500 | 记号断了 | 到这里就没有了。<br>*The marks stop here.* |
+| 76 | 7600 | 他坐着 | 不是尸骨。是一盏还亮着的灯。<br>*Not bones. A lamp, still lit.* |
+| 77 | 7700 | 他说了什么 | 光尘拼出三个字：别学我。<br>*The dust spelled three words: don't follow me.* |
+| 78 | 7800 | 豆丁没有说话 | 这是它第一次没有接话。<br>*For the first time, Pip had nothing to say.* |
+| 79 | 7900 | 带他回家 | 灯罩上那个「O」，快被磨平了。<br>*The engraved O on the glass is nearly worn away.* |
+| 80 | 8000 | 葬在灯环里 | 第八盏从此有了名字。<br>*From tonight the eighth lamp has a name.* |
+
+## 第十部 · 熄星（cg81–cg90）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 81 | 8100 | 天上少了一颗 | 有人发现星星在变少。<br>*Someone noticed the stars are thinning out.* |
+| 82 | 8200 | 没人当回事 | 镇民说，那跟灯没关系。<br>*The townsfolk say it has nothing to do with lamps.* |
+| 83 | 8300 | 望灯台 | 你造了一座只朝天上看的塔。<br>*You built a tower that only looks upward.* |
+| 84 | 8400 | 同一种熄法 | 星星熄灭的样子，和被抽干的镇子一模一样。<br>*Stars go out exactly the way a drained town does.* |
+| 85 | 8500 | 谁在上面抽 | 这个问题，没有人敢往下想。<br>*Nobody dares finish that question.* |
+| 86 | 8600 | 不止我们在举灯 | 远处的天上，有一点回应的光。<br>*Far up there, one point of light answered.* |
+| 87 | 8700 | 回信 | 你把八种光按次序点了三夜。<br>*Three nights you lit the eight lights in order.* |
+| 88 | 8800 | 它亮了两次 | 那不是巧合。<br>*It blinked twice. That was not chance.* |
+| 89 | 8900 | 地图画到了天上 | 世界不止这里。<br>*The map now runs off the top of the page.* |
+| 90 | 9000 | 举高一点 | 够不着，也要举着。<br>*Out of reach. Hold it up anyway.* |
+
+## 第十一部 · 归灯者（cg91–cg99）
+
+| CG | 关 | 章标题 | 字幕 zh / *en* |
+|---|---|---|---|
+| 91 | 9100 | 该走的人 | 你收拾了行李。镇子已经不需要你了。<br>*You packed. The town does not need you any more.* |
+| 92 | 9200 | 徒弟的徒弟 | 有人已经在教别人了。<br>*Your student has a student now.* |
+| 93 | 9300 | 最后一课 | 你只教了一句：光是会长的。<br>*You taught them one sentence: light grows back.* |
+| 94 | 9400 | 镇口那盏 | 十年前你点亮的第一盏，还亮着。<br>*The first lamp you ever lit is still burning.* |
+| 95 | 9500 | 换个新芯 | 豆丁说它还想再撑一阵。<br>*Pip says it would like to last a while longer.* |
+| 96 | 9600 | 灯座上多了个字 | 一个歪扭的字，和当年那个「O」并排。<br>*A crooked letter, cut beside the old O.* |
+| 97 | 9700 | 最后一炉 | 玛塔烤了最后一炉，让你路上吃。<br>*Marta baked one last batch for the road.* |
+| 98 | 9800 | 山路上回头 | 整座山谷都亮着。<br>*You turned on the mountain road. The whole valley was lit.* |
+| 99 | 9900 | 下一片黑着的地方 | 你朝黑的方向走。灯举在手里。<br>*You walk toward the dark, lamp raised.* |
+
+> **回环**：cg99 的画面与 cg0 是同一个构图——提灯的人走向漆黑的山谷。
+> 区别只有一个：cg0 里那盏灯是别人留给你的，cg99 里这盏是你自己点的。
+> 祖父在 cg77 说「别学我」，而主角在 cg99 做了同一件事——**这是全作唯一一次刻意不听劝**。
+
+## 生产纪律（扩到 100 段时必须守住）
+
+- **`count` = 已完成段数**。做到第 30 段就写 30，门3 会核对资产齐不齐；写 100 而资产不齐 = 构建当场红。
+- **单段仍 5 秒单句字幕**，只有 cg0 是 10 秒四句（`overrides` 里特殊待遇）。
+- **风格锁不许改**（§5.0 那段 prompt 前缀），89 段跨很多批次生成，锁一旦松动整部就花了。
+- **prompt 里禁止出现带字的物体**（路牌/招牌/信纸/账本正文），必出乱码假字——实测 27% 返工里这是头号原因。
+- **画面主体不超过 3 个**：竖屏裁切会砍掉两侧，构图必须能在中间 1/3 里读懂。
 
 ---
 

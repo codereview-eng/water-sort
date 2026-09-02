@@ -162,7 +162,16 @@ const CG_SHIPPED = /^(cg\d+\.mp4|bgm\d+\.opus)$/;
 /* 384KB ≈ 开场 CG（双镜头 10 秒）的实际大小；章节 CG 单镜 5 秒普遍在 80–280KB。
    这个数字管的是「玩家一次要等多久」，不是总盘子大小。 */
 const CG_FILE_CAP = 384 * 1024;
-const CG_BUDGET = 4 * 1048576;
+/* 总量闸（2026-09-01 由 4 MiB 放宽到 32 MiB，为扩到 100 段 CG）：
+   实测单段（视频+配乐）约 221KB ⇒ 100 段 ≈ 21.5 MB，200 段 ≈ 43 MB。
+   32 MiB 的位置是刻意的：够 100 段有余量，又在 publish 工具那条 ~40MB 闸之前先红，
+   让「体积失控」在本地构建时暴露，而不是发布时才撞墙。
+   真要超过 ~180 段，才需要动远端媒体包方案（MEDIA 映射表那个 seam 还在，改一处即可）。
+
+   注意 count 语义：core/story.js 按 `count` 生成剧情表，门3 逐件核对资产存在性
+   ⇒ **`count` 必须等于「已完成段数」，不是「规划段数」**，否则做到一半构建就红。
+   加一段 = 放一对 cgN.mp4/bgmN.opus + count++，可以一段一段发。 */
+const CG_BUDGET = 32 * 1048576;
 const cgNames = existsSync(CG_SRC)
   ? readdirSync(CG_SRC).filter((f) => CG_SHIPPED.test(f)).sort()
   : [];
@@ -212,12 +221,23 @@ console.log(`  CG 素材 ${cgNames.length} 件 ${(cgBytes / 1048576).toFixed(2)}
    判据（通用，不特判文件名）：cg/ 下任何**不属于成品白名单**且**大于 1MB**的文件 = RED。
    小文件（.bak、concat.txt 等）放行——它们不构成体积风险，不值得为此制造噪声。 */
 const STRAY_MAX_BYTES = 1024 * 1024;
+/* 递归扫（2026-09-01 补漏）：上一版只扫一层，往 cg/ 下建个子目录就能把大文件藏进去，
+   而「按源码树打包」的发布路径照样会把它卷走——跟 117MB 母版是同一类后门。
+   成品判据只认**根目录下的裸文件名**：嵌套的 rejects/cg11.mp4 带着目录前缀，
+   匹配不上 CG_SHIPPED ⇒ 自动算 stray，正是我们要的。 */
+function collectStrays(dir, rel) {
+  const out = [];
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    const name = rel ? `${rel}/${ent.name}` : ent.name;
+    if (ent.isDirectory()) { out.push(...collectStrays(join(dir, ent.name), name)); continue; }
+    if (CG_SHIPPED.test(name)) continue;
+    const bytes = statSync(join(dir, ent.name)).size;
+    if (bytes > STRAY_MAX_BYTES) out.push({ name, bytes });
+  }
+  return out;
+}
 const strays = existsSync(CG_SRC)
-  ? readdirSync(CG_SRC)
-      .filter((f) => !CG_SHIPPED.test(f))
-      .map((f) => ({ name: f, bytes: statSync(join(CG_SRC, f)).size }))
-      .filter((x) => x.bytes > STRAY_MAX_BYTES)
-      .sort((a, b) => b.bytes - a.bytes)
+  ? collectStrays(CG_SRC, '').sort((a, b) => b.bytes - a.bytes)
   : [];
 if (strays.length) {
   const total = strays.reduce((s, x) => s + x.bytes, 0);

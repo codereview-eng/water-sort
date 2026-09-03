@@ -24,6 +24,11 @@
     --bg:#141a24; --surface:#1e2735; --ink:#f2f5f9; --ink-2:#9fb0c3; --ink-3:#6b7a8d;
     --edge:rgba(255,255,255,.09); --accent:#ffb454; --ok:#43d17c; --bad:#ff5d5d;
     --cell-gap:3px;
+    /* 首页顶部零预留（配合下面 .wrap 顶边不加基数）：HUD 条直接贴盒顶。
+       --hm-home-reserve = .wrap 上下 padding 的固定基数之和 = 0(top) + 18(bottom) + 6(HUD 与内容的呼吸)，
+       改小它是为了让首页高度跟着 .wrap 一起收，底部按钮与浮标坞的距离保持原样。 */
+    --hm-home-pad-top:0px;
+    --hm-home-reserve:24px;
     /* 明确声明深色：告诉内核这页本来就是暗的，别再用 Android WebView 的
        algorithmic darkening（force-dark）反色一遍，也让 UA 默认画布跟着变暗。 */
     color-scheme:dark;
@@ -35,9 +40,19 @@
   body{display:flex; flex-direction:column; align-items:center; min-height:100%;
     background:radial-gradient(circle at 50% -10%, #22304a 0%, #141a24 62%);}
   /* 四边都让位：有了 viewport-fit=cover，页面画到物理屏边缘，
-     内容必须自己躲开刘海/挖孔（top）、曲面边与横屏挖孔（left/right）、手势条（bottom）。 */
+     内容必须自己躲开刘海/挖孔（top）、曲面边与横屏挖孔（left/right）、手势条（bottom）。
+
+     顶边只让 env()，不加固定基数（2026-09-03）：
+     play 面（宿主沉浸全屏 + 网关 box 模式）下顶边那个 env 值被钉成 0px，
+     此时任何固定基数都变成**作品自己**在内容前多留的一段空白 —— 玩家看到的就是
+     「顶部一条空白把整页往下推」。原来的 10px 基数正是那段空白的大头
+     （10px .wrap + 4px .home = 14px，再加身份 chip 自己的 4px 内边距 ≈ 19px，
+     与真机逐行扫描量到的 19.3 CSS px 对得上）。
+     去掉基数后：box 模式下顶边贴齐盒顶（状态栏由宿主沉浸隐藏，压不到内容）；
+     普通浏览器/有挖孔的宿主上 env() 仍是真值，让位照旧。
+     ⚠️ 不要改成读 --solo-safe-top：那条变量在 box 模式下恒为 0px，写了也拿不到真实挖孔高度。 */
   .wrap{width:100%; max-width:560px;
-    padding:calc(10px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    padding:env(safe-area-inset-top, 0px) calc(12px + env(safe-area-inset-right, 0px))
             calc(18px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
     display:flex; flex-direction:column; gap:10px;}
 

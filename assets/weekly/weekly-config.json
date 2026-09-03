@@ -1,13 +1,13 @@
 {
-  "_note": "按当前 UTC ISO 周 key 取当周条目；banner 为该周专属活动图；未命中周 key 时客户端回退内置主题轮换。",
-  "2026-W34": { "theme": "starry", "title": "星空周", "titleEn": "Starry Week", "banner": "assets/weekly/banners/2026-W34.webp" },
-  "2026-W35": { "theme": "deepsea", "title": "深海周", "titleEn": "Deep Sea Week", "banner": "assets/weekly/banners/2026-W35.webp" },
-  "2026-W36": { "theme": "forest", "title": "森林周", "titleEn": "Forest Week", "banner": "assets/weekly/banners/2026-W36.webp" },
-  "2026-W37": { "theme": "lantern", "title": "灯火周", "titleEn": "Lantern Week", "banner": "assets/weekly/banners/2026-W37.webp" },
-  "2026-W38": { "theme": "desert", "title": "沙漠周", "titleEn": "Desert Week", "banner": "assets/weekly/banners/2026-W38.webp" },
-  "2026-W39": { "theme": "aurora", "title": "极光周", "titleEn": "Aurora Week", "banner": "assets/weekly/banners/2026-W39.webp" },
-  "2026-W40": { "theme": "sakura", "title": "樱花周", "titleEn": "Sakura Week", "banner": "assets/weekly/banners/2026-W40.webp" },
-  "2026-W41": { "theme": "candy", "title": "糖果周", "titleEn": "Candy Week", "banner": "assets/weekly/banners/2026-W41.webp" },
-  "2026-W42": { "theme": "volcano", "title": "火山周", "titleEn": "Volcano Week", "banner": "assets/weekly/banners/2026-W42.webp" },
-  "2026-W43": { "theme": "ice", "title": "冰雪周", "titleEn": "Ice Week", "banner": "assets/weekly/banners/2026-W43.webp" }
+  "_note": "按当前 UTC ISO 周 key 取当周条目；banner 为该周专属主题图（静态缩略图），anim 为同一幅画的动画版（领奖时播放）；pics/picsEn 是这幅画拆成的三块的名字（与画对应，别用内置轮换的名字）；未命中周 key 时客户端回退内置主题轮换。",
+  "2026-W34": { "theme": "starry", "title": "星空周", "titleEn": "Starry Week", "banner": "assets/weekly/banners/2026-W34.webp", "anim": "assets/weekly/anim/2026-W34.gif", "pics": ["银河", "流星", "夜丘"], "picsEn": ["Milky Way", "Shooting Star", "Night Hills"] },
+  "2026-W35": { "theme": "deepsea", "title": "深海周", "titleEn": "Deep Sea Week", "banner": "assets/weekly/banners/2026-W35.webp", "anim": "assets/weekly/anim/2026-W35.gif", "pics": ["珊瑚", "水母", "深渊"], "picsEn": ["Coral", "Jellyfish", "Abyss"] },
+  "2026-W36": { "theme": "forest", "title": "森林周", "titleEn": "Forest Week", "banner": "assets/weekly/banners/2026-W36.webp", "anim": "assets/weekly/anim/2026-W36.gif", "pics": ["晨光", "林间", "远山"], "picsEn": ["Morning Light", "Deep Woods", "Far Ridge"] },
+  "2026-W37": { "theme": "lantern", "title": "灯火周", "titleEn": "Lantern Week", "banner": "assets/weekly/banners/2026-W37.webp", "anim": "assets/weekly/anim/2026-W37.gif", "pics": ["初灯", "灯河", "夜归"], "picsEn": ["First Lantern", "River of Lights", "Homeward"] },
+  "2026-W38": { "theme": "desert", "title": "沙漠周", "titleEn": "Desert Week", "banner": "assets/weekly/banners/2026-W38.webp", "anim": "assets/weekly/anim/2026-W38.gif", "pics": ["沙丘", "风纹", "绿洲"], "picsEn": ["Dunes", "Wind Marks", "Oasis"] },
+  "2026-W39": { "theme": "aurora", "title": "极光周", "titleEn": "Aurora Week", "banner": "assets/weekly/banners/2026-W39.webp", "anim": "assets/weekly/anim/2026-W39.gif", "pics": ["极夜", "极光", "雪峰"], "picsEn": ["Polar Night", "Aurora", "Snow Peak"] },
+  "2026-W40": { "theme": "sakura", "title": "樱花周", "titleEn": "Sakura Week", "banner": "assets/weekly/banners/2026-W40.webp", "anim": "assets/weekly/anim/2026-W40.gif", "pics": ["初绽", "花雨", "落樱"], "picsEn": ["First Bloom", "Petal Rain", "Fallen Blossoms"] },
+  "2026-W41": { "theme": "candy", "title": "糖果周", "titleEn": "Candy Week", "banner": "assets/weekly/banners/2026-W41.webp", "anim": "assets/weekly/anim/2026-W41.gif", "pics": ["软糖", "棒棒糖", "糖霜"], "picsEn": ["Gumdrops", "Lollipops", "Frosting"] },
+  "2026-W42": { "theme": "volcano", "title": "火山周", "titleEn": "Volcano Week", "banner": "assets/weekly/banners/2026-W42.webp", "anim": "assets/weekly/anim/2026-W42.gif", "pics": ["熔流", "火星", "焦岩"], "picsEn": ["Lava Flow", "Embers", "Scorched Rock"] },
+  "2026-W43": { "theme": "ice", "title": "冰雪周", "titleEn": "Ice Week", "banner": "assets/weekly/banners/2026-W43.webp", "anim": "assets/weekly/anim/2026-W43.gif", "pics": ["初雪", "冰晶", "极寒"], "picsEn": ["First Snow", "Ice Crystals", "Deep Frost"] }
 }

@@ -277,6 +277,44 @@ if (strays.length) {
     + `    mkdir -p ~/cg-master-color-mines && mv ${CG_SRC}/*-raw.mp4 ~/cg-master-color-mines/`);
 }
 
+/* 每周活动素材（assets/weekly/**）：主题图 webp + 领奖动图 gif，与 CG 同理只进目录产物。
+   fail-close 的理由：这两个文件是**页面运行时按配置里的路径 fetch/加载**的，
+   漏进产物不会让构建红、不会让页面崩，只会在玩家点开活动页时静默 404 ——
+   正是「静默降级」最爱藏的地方。所以这里逐周核对配置里声明的每一条路径都真的落进了产物。 */
+const WEEKLY_CFG_REL = 'assets/weekly/weekly-config.json';
+const WEEKLY_FILE_CAP = 1.5 * 1048576;     // 单件上限：动图别失控（当前最大 ~1.1MB）
+let weeklyBytes = 0, weeklyCount = 0;
+{
+  const cfgPath = join(ROOT, WEEKLY_CFG_REL);
+  if (!existsSync(cfgPath)) throw new Error(`缺少 ${WEEKLY_CFG_REL}，活动页会没有任何图`);
+  const cfgRaw = readFileSync(cfgPath, 'utf8');
+  const cfg = JSON.parse(cfgRaw);
+  const weeks = Object.keys(cfg).filter((k) => !k.startsWith('_'));
+  if (!weeks.length) throw new Error('weekly-config.json 里一周都没配');
+  const wanted = new Set([WEEKLY_CFG_REL]);
+  for (const wk of weeks) {
+    for (const field of ['banner', 'anim']) {
+      const rel = cfg[wk][field];
+      if (!rel) throw new Error(`weekly-config.json ${wk} 缺 ${field}：那一周活动页会缺图/缺动画`);
+      if (!existsSync(join(ROOT, rel))) throw new Error(`${wk} 的 ${field} 指向 ${rel}，但文件不存在`);
+      wanted.add(rel);
+    }
+  }
+  for (const rel of wanted) {
+    const buf = readFileSync(join(ROOT, rel));
+    if (buf.byteLength > WEEKLY_FILE_CAP) {
+      throw new Error(`${rel} ${(buf.byteLength / 1024).toFixed(0)}KB 超单件上限 ${WEEKLY_FILE_CAP / 1024}KB`);
+    }
+    const dest = join(DIST, rel);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, buf);
+    if (!readFileSync(dest).equals(buf)) throw new Error(`${rel} 写入产物后回读不一致`);
+    weeklyBytes += buf.byteLength; weeklyCount++;
+  }
+  console.log(`✅ 每周活动素材：${weeks.length} 周，${weeklyCount} 个文件 `
+    + `${(weeklyBytes / 1048576).toFixed(2)} MiB（每周主题图 + 领奖动图，逐条按配置核对）`);
+}
+
 // 回读校验：写进产物的封面必须与源逐字节一致（防静默截断/编码污染）
 const coverBack = readFileSync(join(DIST, 'cover.webp'));
 if (!coverBack.equals(coverBuf)) throw new Error('产物 cover.webp 与源文件不一致（写入被污染）');

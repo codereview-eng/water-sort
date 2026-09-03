@@ -76,12 +76,37 @@ test('弹窗高度上限要扣掉安全区，否则按钮会被顶出屏幕', ()
 });
 
 test('首页 min-height 要扣掉安全区，否则首页凭空多出可滚的一截', () => {
-  const hits = homeJs.match(/min-height:calc\(100d?vh[^)]*\)[^']*/g) || [];
+  /* 非贪婪匹配到分号：calc 里现在嵌了 var(...)，用 [^)]* 会在第一个右括号处断掉，
+     那样这条门禁会对着半截声明做断言 —— 看起来在守，其实守的是空气。 */
+  const hits = homeJs.match(/min-height:calc\(100d?vh.*?\);/g) || [];
   assert.ok(hits.length >= 2, 'core/home.js 里 .home 的 min-height 规则不见了，门禁假设已失效');
   for (const h of hits) {
     assert.ok(h.includes('env(safe-area-inset-top') && h.includes('env(safe-area-inset-bottom'),
       '.home 的 min-height 必须减去上下安全区：' + h);
   }
+});
+
+/* 顶部零预留门禁（2026-09-03，issue：play 面顶部一条空白把整页往下推）。
+   首坏现场：Redmi 真机从广场进彩雷，顶部多出一段空白。宿主没下发任何 inset
+   （logcat: safearea SKIPPED t=0 ct=0，data-runai-safe-box=0,0,0,0），
+   空白全是作品自己叠的固定基数：.wrap 10px + .home 4px。
+   box 模式下 env(safe-area-inset-top) 恒为 0px，所以顶边**只许**由 env() 决定；
+   谁再往顶边加固定基数，谁就在 play 面上凭空推走一截页面。 */
+test('顶边不许有固定基数：.wrap 的 padding-top 只由 env() 决定', () => {
+  const body = ruleBody(html, '.wrap');
+  const padding = (body.match(/padding:([^;]+);/) || [])[1];
+  assert.ok(padding, '.wrap 找不到 padding 简写声明，门禁假设已失效');
+  const top = padding.trim().split(/\s+(?![^(]*\))/)[0];
+  assert.strictEqual(top, 'env(safe-area-inset-top, 0px)',
+    '.wrap 顶边只能是裸 env(safe-area-inset-top, 0px)：加了固定基数，'
+    + 'play 面（env 恒为 0）就会在内容前多出等量空白。当前写法：' + top);
+});
+
+test('首页顶部零预留：--hm-home-pad-top 必须是 0px', () => {
+  assert.match(html, /--hm-home-pad-top:\s*0px/,
+    'mine.html 要把 core/home.js 的 .home padding-top 覆盖成 0px，否则顶部又多 4px');
+  assert.match(homeJs, /padding-top:var\(--hm-home-pad-top,/,
+    'core/home.js 的 .home padding-top 不再走变量，mine.html 的覆盖就失效了（静默失效，页面上才看得见）');
 });
 
 test('env() 一律带 0px 兜底，缺省值缺失会让整条 calc 失效', () => {

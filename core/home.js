@@ -475,9 +475,13 @@
       /* 减去安全区：页面若开了 viewport-fit=cover，视口高度含刘海/手势条那两条，
          而 .home 外面的 .wrap 已经把它们做成 padding 让位了。这里不减就会多出
          「刘海高 + 手势条高」的溢出，首页凭空可滚一截。没开 cover 的页 env() 恒为 0，取值不变。 */
-      '.home{display:flex;flex-direction:column;gap:12px;padding-top:4px;flex:1 1 auto;' +
-        'min-height:calc(100vh - 34px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));}',
-      '@supports (height:100dvh){.home{min-height:calc(100dvh - 34px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));}}',
+      /* 两个数字做成变量，让每个游戏按自己 .wrap 的实际留白改（默认值 = 原来的写死值，不改就等于没变）：
+         --hm-home-pad-top   首页在 HUD 条之前自己留的顶部空间；
+         --hm-home-reserve   .wrap 上下 padding 的固定基数之和，用来把首页高度收回视口之内。
+         两者必须一起改：只改 padding 会让首页比可用高度短一截，底部按钮跟着往上跳。 */
+      '.home{display:flex;flex-direction:column;gap:12px;padding-top:var(--hm-home-pad-top, 4px);flex:1 1 auto;' +
+        'min-height:calc(100vh - var(--hm-home-reserve, 34px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));}',
+      '@supports (height:100dvh){.home{min-height:calc(100dvh - var(--hm-home-reserve, 34px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));}}',
       /* HUD 条 */
       '.hudbar{display:flex;align-items:center;gap:8px;}',
       '.hudright{margin-left:auto;display:flex;gap:8px;align-items:stretch;}',

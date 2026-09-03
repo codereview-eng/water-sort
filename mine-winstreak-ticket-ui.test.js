@@ -62,17 +62,42 @@ function renderFloatCtx(saveObj, opts) {
   const o = opts || {};
   const dom = domCtx(['wsFloatLb']);
   const WinStreak = WinStreakCore.create(Object.assign({}, config.winstreak, o.cfg || {}));
+  /* 角标现在还负责「按存过的位置吸边」和「第一次出现时提示可拖动」（2026-09-03），
+     所以桩里要有这三样。桩记录调用，让下面能断言"渲染时确实去应用了位置"。 */
+  const calls = { apply: 0, toast: [] };
+  const store = o.store || {};
   const ctx = {
-    $: dom.$, nodes: dom.nodes, Math,
+    $: dom.$, nodes: dom.nodes, Math, calls, setTimeout: (fn) => fn(),
     WinStreak: o.disabled ? Object.assign({}, WinStreak, { enabled: false }) : WinStreak,
     wsGet: () => saveObj,
+    wsfApply: () => { calls.apply++; },
+    toast: (s) => calls.toast.push(s),
+    WSF_HINT_KEY: 'mine_ws_float_hint_v1',
+    localStorage: {
+      getItem: (k) => (k in store ? store[k] : null),
+      setItem: (k, v) => { store[k] = String(v); }
+    },
     t: (k, p) => k + (p && p.n != null ? ':' + p.n : '')
   };
   vm.createContext(ctx);
   vm.runInContext(slice('function renderWsFloat'), ctx);
   vm.runInContext('renderWsFloat()', ctx);
-  return { ctx, dom };
+  return { ctx, dom, calls, store };
 }
+
+/* 位置记忆与「可拖」提示同属角标渲染的一部分：写在这里是因为它们只有渲染时才发生。 */
+test('局内角标：每次渲染都去应用一次记住的位置（否则重进关卡跳回原位）', () => {
+  const r = renderFloatCtx(fresh());
+  assert.strictEqual(r.calls.apply, 1, 'renderWsFloat 没有调用 wsfApply');
+});
+
+test('局内角标：可拖动提示只提示一次', () => {
+  const store = {};
+  const a = renderFloatCtx(fresh(), { store });
+  assert.deepStrictEqual(a.calls.toast, ['wsFloatDragHint'], '第一次进关卡要告诉玩家它能拖');
+  const b = renderFloatCtx(fresh(), { store });
+  assert.deepStrictEqual(b.calls.toast, [], '提示过了就不许再打扰');
+});
 
 const fresh = () => WinStreakCore.create(config.winstreak).from({});
 

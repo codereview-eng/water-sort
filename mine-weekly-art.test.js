@@ -102,3 +102,83 @@ test('构建产物必须带上每周活动素材（漏了只会在玩家点开�
   assert.match(build, /for \(const field of \['banner', 'anim'\]\)/, '构建没逐周核对两类素材');
   assert.match(build, /但文件不存在/, '构建对缺素材应当 fail-close，而不是出一个少图的包');
 });
+
+/* ============ 已领取也能重看动画（2026-09-07 用户实报） ============
+   首坏现场：领取那一下会弹出这周的动图，但那是**唯一**一次机会——
+   关掉之后已领取的行按钮变灰写「已领取」，怎么点都再看不到那幅画的动画版。
+   收集类奖励的价值恰恰在「收藏后能反复看」，所以判据落在三件事上：
+     ① 已领取的图行可点（按钮不灰、整行都是热区），点了走同一个放映函数；
+     ② 已领的大奖同口径（按钮改「重看」且可点，只有未达标才灰）；
+     ③ 重看**只放映不入账**——不许借重看再发一份奖励或改存档。 */
+const vm = require('node:vm');
+
+/* 按大括号配平抽函数体（不能切到「下一个 function」，会把后面的顶层代码算进来） */
+function sliceFn(head) {
+  const i = html.indexOf(head);
+  assert.ok(i > 0, `找不到 ${head}`);
+  let depth = 0, started = false;
+  for (let j = html.indexOf('{', i); j < html.length; j++) {
+    const c = html[j];
+    if (c === '{') { depth++; started = true; }
+    else if (c === '}') { depth--; if (started && depth === 0) return html.slice(i, j + 1); }
+  }
+  throw new Error('大括号不配平: ' + head);
+}
+
+test('已领取的图：按钮不灰、整行可点，点了重看动画', () => {
+  assert.match(html, /data-replay="' \+ i \+ '"/, '已领取的行没给重看入口（data-replay）');
+  assert.ok(!/data-replay="' \+ i \+ '"[^']*disabled/.test(html), '重看按钮不许是 disabled');
+  assert.match(html, /querySelectorAll\('\.wkpic\.claimed'\)[\s\S]{0,200}?wkReplayPic\(/,
+    '整行没绑重看：只有按钮能点的话，玩家点画面本身会没反应');
+  assert.match(html, /\.wkpic\.claimed\{cursor:pointer/, '已领取的行要有可点的手型提示');
+});
+
+test('已领的大奖：按钮改「重看」且保持可点，只有未达标才灰', () => {
+  assert.match(html, /gb\.textContent = gs === 'claimed' \? t\('wkReplay'\)/,
+    '大奖领完后按钮仍写「已领取」，玩家不知道还能重看');
+  assert.match(html, /gb\.disabled = gs === 'locked'/, '已领取的大奖按钮不许灰掉');
+  assert.match(html, /wkReplayGrand\(/, '大奖没接重看函数');
+});
+
+test('「重看」在两种语言里都有文案（占位符漂移会静默显示 key）', () => {
+  for (const lang of ['en', 'zh']) {
+    const dict = JSON.parse(readFileSync(join(ROOT, 'games/mine/game.config.json'), 'utf8')).i18n.locales[lang];
+    assert.ok(dict.wkReplay, `${lang} 缺 wkReplay`);
+  }
+  assert.match(html, /"wkReplay"/, '内嵌配置副本没同步 wkReplay（页面读的是内嵌那份）');
+});
+
+/* 只放映不入账：把 wkReplayPic / wkReplayGrand 真跑一遍，
+   任何入账函数被碰到就红——静态 grep 看不出「重看顺手又发了一份奖」。 */
+test('重看只放映，不再发奖、不改存档', () => {
+  const shown = [];
+  const traced = [];
+  const sandbox = {
+    WeeklyCtl: { state: { r0: { type: 'coins', n: 30 }, claimed: [true, false, false], frags: 999 },
+      load() { throw new Error('重看不该重新加载/覆写存档'); },
+      claim() { throw new Error('重看不许走领取'); },
+      claimGrand() { throw new Error('重看不许走领大奖'); },
+      flush() { throw new Error('重看不许写存档'); } },
+    Weekly: { grand: { coins: 500 } },
+    grantWeeklyReward() { throw new Error('重看不许入账'); },
+    Stock: { grant() { throw new Error('重看不许动只增账本'); } },
+    showWeeklyArt: (pic, txt) => shown.push([pic, txt]),
+    trace: (ev, d) => traced.push([ev, d]),
+    wkPicName: (i) => 'pic' + i,
+    wkThemeName: () => '本周主题',
+    rewardText: (type, n) => type + '×' + n,
+    t: (k, p) => k + (p ? ':' + JSON.stringify(p) : '')
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(sliceFn('function wkReplayPic('), sandbox);
+  vm.runInContext(sliceFn('function wkReplayGrand('), sandbox);
+  vm.runInContext('wkReplayPic(0); wkReplayGrand();', sandbox);
+
+  assert.strictEqual(shown.length, 2, '两条重看路径都应当放映一次');
+  assert.strictEqual(shown[0][0], 'pic0', '重看单张图要用这张图的名字');
+  assert.match(shown[0][1], /coins×30/, '重看应当写清当时领到了什么');
+  assert.strictEqual(shown[1][0], '本周主题', '重看大奖用整幅周图的主题名');
+  assert.deepStrictEqual(traced.map((x) => x[0]), ['weekly_art_replay', 'weekly_art_replay'],
+    '两条重看路径都要留痕，否则算不出「有多少人回头看」');
+  assert.deepStrictEqual(traced.map((x) => x[1].kind), ['pic', 'grand'], '重看事件要能分辨图/大奖');
+});

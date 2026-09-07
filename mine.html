@@ -757,9 +757,11 @@
       console.warn('[mine stock] ledger-audit skipped reason=unknown-age' +
         ' totals checked/clamped/unknownAge=' + STOCK_AUDIT.checked + '/' +
         STOCK_AUDIT.clamped + '/' + STOCK_AUDIT.unknownAge);
-      return;
+      return false;
     }
-    if (!res.anomalies.length) return;
+    if (!res.anomalies.length) return false;
+    /* patch 里是**反向记账**（spent += 超出量），不是把 granted 改小 —— 见 core/stock.js
+       audit() 的注释：改小 granted 的回写会被云端 merge:"max" 吃掉，削平永远不落地。 */
     Object.assign(save, res.patch);
     persist();
     STOCK_AUDIT.clamped += 1;
@@ -767,6 +769,7 @@
     console.warn('[mine stock] ledger-anomaly clamped=' + JSON.stringify(res.anomalies) +
       ' totals checked/clamped/unknownAge=' + STOCK_AUDIT.checked + '/' +
       STOCK_AUDIT.clamped + '/' + STOCK_AUDIT.unknownAge);
+    return true;
   }
   /* 金币：通关攒、可直接买道具（不用看广告）。彩雷这边【故意不写 coins 配置】，
      走 core/coins.js 的默认值——通关 +1、200 金币换 1 个道具；
@@ -3327,6 +3330,10 @@
     });
     // 云端老行只有旧「库存数」列时按它推导 granted/spent；已有账本则原样保留（migrate 幂等）
     Object.assign(save, Stock.migrate(save));
+    /* 账本审计也收进这条唯一入口：原先只在初始化那一次审，于是定时 pull 把云端的离谱
+       累计值拉进来后没人管，要等玩家下次刷新才削 —— 而削平本就是为了治「刷新一次涨一次」。
+       幂等：削平后持有量正好落在 cap 上，后续每次 pull 都不会再产生 anomaly。 */
+    if (auditStock(row)) changed = true;
     var after = Coins.balance(save);
     if (changed) {
       persist();
@@ -3536,7 +3543,7 @@
       LANG_DIAG.localFresh = localFresh ? 'yes' : 'no';
       // 合并走 applyCloudRow：初始化这一次与后面每一次定期同步共用同一份口径（2026-09-01）
       applyCloudRow(row, { localFresh: localFresh });
-      auditStock(row);          // 合并完立刻查一次离谱累计值（issue #1）
+      // 账本审计已收进 applyCloudRow（初始化这次与后续每次定期 pull 共用同一份口径）
       ensureTempName(); persist(); renderHome();
       LANG_DIAG.merged = save.lang != null ? String(save.lang) : 'none';
       /* 云端语言是权威（跟账号走）：本地那两条通道在内嵌 webview 里可能一条都不剩，

@@ -36,6 +36,14 @@ fi
 line "门禁 3/3 · 多语言运行时 gate（英文模式逐屏扫残留中文）"
 node scripts/i18n-cjk-scan.mjs
 rc=$?
+# rc=2 = 没有现成的 Chrome 调试端口。这不该是「跳过」的理由：自己起一个**独立**
+# headless Chrome（不碰 chrome-cu-1/2/3）再真跑一次。包装器起不来时同样退 2，
+# 于是「这台机器没装 Chrome」仍然落回 SKIP，不会被误判成「门禁发现了问题」。
+if [ "$rc" -eq 2 ]; then
+  echo "· 没有现成的 Chrome 调试端口 —— 起一个独立 headless Chrome 再真跑一次"
+  node scripts/with-headless-chrome.mjs node scripts/i18n-cjk-scan.mjs
+  rc=$?
+fi
 if [ "$rc" -eq 0 ]; then
   echo "OK 运行时 gate 通过"
 elif [ "$rc" -eq 2 ]; then

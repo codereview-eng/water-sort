@@ -100,3 +100,20 @@ test('清单本身格式正确、且只锁身份不含内容', async () => {
       `${name} 只该有 bytes/sha256——清单是锁身份的，不该塞内容进来`);
   }
 });
+
+/* 素材目录本身**不许**进 git 索引（2026-09-07 实际炸过一次）。
+   首坏现场：`color-mines/cg` 曾以一条 symlink 的形式被提交进仓，而它的目标
+   是**它自己的绝对路径**（`color-mines/cg -> /Users/zkf/work/water-sort/color-mines/cg`）。
+   后果是「对齐 main」这个最日常的动作就会把本机那份 16.66 MiB 真素材目录换成
+   一条自指的坏链接：构建当场找不到素材，而且素材已经被 checkout 覆盖掉了
+   （本次靠旧发布产物里的 200 件原样恢复，sha256 逐件相符）。
+   .gitignore 里写了 `color-mines/cg/` 也挡不住——已被跟踪的路径 gitignore 不管。 */
+test('素材目录不许被 git 跟踪（自指 symlink 会在对齐 main 时吃掉本机素材）', () => {
+  const { execFileSync } = require('node:child_process');
+  const tracked = execFileSync('git', ['ls-files', '--', 'color-mines/cg', 'color-mines/cg/**'],
+    { cwd: ROOT, encoding: 'utf8' }).trim();
+  assert.strictEqual(tracked, '',
+    '这些路径被 git 跟踪了，clone/reset 会覆盖本机素材：\n' + tracked);
+  assert.match(readFileSync(join(ROOT, '.gitignore'), 'utf8'), /^color-mines\/cg\/$/m,
+    '.gitignore 应当继续把素材目录挡在仓外');
+});

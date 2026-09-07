@@ -49,10 +49,14 @@ const rowAged = (days) => ({ created_date: new Date(Date.now() - days * DAY).toI
 test('接线：云档里 99999 的道具被削平并落盘，异常明细进日志', () => {
   const save = { toolMineGranted: 99999, toolMineSpent: 3 };
   const ctx = sandbox(save);
-  ctx.auditStock(rowAged(3));
+  assert.strictEqual(ctx.auditStock(rowAged(3)), true, '削平了就要如实返回，调用方靠它决定重渲染');
   const cap = ctx.Stock.ceiling('toolMine', 3);
   assert.ok(cap > 0 && cap < 99999, '上限要落在正常量级');
-  assert.strictEqual(save.toolMineGranted, cap, '削平后的值必须真的写回 save');
+  /* 削平写的是 spent（反向记账），不是把 granted 改小：granted 改小的回写会被云端
+     merge:"max" 原样吃掉，削平活不过下一次 pull（2026-09-07 实测的空转根因）。 */
+  assert.strictEqual(save.toolMineGranted, 99999, 'granted 不许被改小');
+  assert.strictEqual(save.toolMineSpent, 99999 - cap, '超出量记进 spent 才能真正上云');
+  assert.strictEqual(ctx.Stock.stock(save, 'toolMine'), cap, '持有量落在物理上限上');
   assert.strictEqual(ctx.persisted, 1, '削平之后必须落盘，否则下次同步又被顶回去');
   assert.strictEqual(ctx.STOCK_AUDIT.clamped, 1);
   assert.match(ctx.warns.join('\n'), /ledger-anomaly/, '异常必须可查（不是静默降级）');

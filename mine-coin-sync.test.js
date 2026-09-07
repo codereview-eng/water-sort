@@ -54,9 +54,17 @@ function makeCtx(local) {
     renderHome: () => { ctx.rendered++; },
     renderHud: () => { ctx.rendered++; },
     $: () => ({ hidden: false }),
+    warns: [],
   };
+  ctx.console = { warn: (m) => ctx.warns.push(String(m)), log: () => {} };
   vm.createContext(ctx);
-  vm.runInContext(slice('function applyCloudRow') + '\n' + slice('function onSyncApplied'), ctx);
+  /* 账本审计也用页面原文真跑（不打桩）：本次修的正是「审计接在哪、削平往哪写」，
+     打了桩就只能证明桩被调用过，测不出削平到底能不能落地。 */
+  const auditState = html.match(/var STOCK_AUDIT = \{[^}]*\};/);
+  assert.ok(auditState, '找不到 STOCK_AUDIT 初始化');
+  vm.runInContext(auditState[0] + '\n' + slice('function accountAgeDays') + '\n' +
+    slice('function auditStock') + '\n' +
+    slice('function applyCloudRow') + '\n' + slice('function onSyncApplied'), ctx);
   return ctx;
 }
 const row = (o) => Object.assign({ updated_ms: 9_000_000, level: 3, clears: 5 }, o);
@@ -127,4 +135,80 @@ test('同步事件进埋点：失败/跳过/生效都查得到', () => {
   assert.ok(/onEvent: function \(name, data\) \{ trace\(name, data\)/.test(html),
     'cloudsync 的事件必须接进 trace（手机上排查全靠它）');
   assert.ok(/trace\('sync_off'/.test(html), '未登录/本地模式下「没有同步」这件事本身也要留痕');
+});
+
+/* ============ 削平必须能上云收敛（2026-09-07 用户实报的「刷新一次多一万」） ============
+   实报：coder 里显示 2 万多，本机 chrome 刷新后变 3 万多，差值正好是之前 selftest 充的 10000。
+   定位到两件事：① 金币从来不是「服务端为准」，coinsEarned/coinsSpent 在云端都是 merge:"max"，
+   本地注入的量会被推上云端且不可撤销；② 安全网 audit 原先把 **granted 改小** 来削平，
+   这个方向的回写被云端 max 原样吃掉 —— 削平只活一瞬，下次 pull 整值涨回去。
+   所以这里必须用「本地存档 → toRow → 云端 max → 再 mergeSave 回来」的真链断言，
+   两侧各自跑自己的字面量会双绿却互不相通（正是原实现的假绿）。 */
+const AGED_DAYS = 3;
+const agedRow = (o) => row(Object.assign({
+  created_date: new Date(Date.now() - AGED_DAYS * 86400000).toISOString()
+}, o));
+// 云端 max 合并的服务端语义（账目列取大，其余按行覆盖）
+function cloudMerge(cloudRow, pushed) {
+  const out = Object.assign({}, cloudRow, pushed);
+  ['coins_earned', 'coins_spent', 'tool_mine_granted', 'tool_mine_spent',
+    'tool_safe_granted', 'tool_safe_spent', 'level', 'clears'].forEach((c) => {
+    out[c] = Math.max(Number(cloudRow[c]) || 0, Number(pushed[c]) || 0);
+  });
+  return out;
+}
+
+test('云端注入的离谱金币：削平走反向记账，写 coinsSpent 而不是把 coinsEarned 改小', () => {
+  const cap = Stock.ceiling('coins', AGED_DAYS);
+  const ctx = makeCtx({ coinsEarned: 20500, coinsSpent: 0 });
+  const out = vm.runInContext(
+    `applyCloudRow(${JSON.stringify(agedRow({ coins_earned: 30500, coins_spent: 0 }))}, {})`, ctx);
+  assert.strictEqual(ctx.save.coinsEarned, 30500, 'granted 不许被改小（改了也会被云端 max 吃掉）');
+  assert.strictEqual(ctx.save.coinsSpent, 30500 - cap, '超出量必须记成 spent 才能上云生效');
+  assert.strictEqual(out.balance, cap, '余额落在物理上限上');
+  assert.strictEqual(ctx.STOCK_AUDIT.clamped, 1);
+  assert.match(ctx.warns.join('\n'), /ledger-anomaly/, '削平这件事必须留下可查日志');
+});
+
+test('削平后回写云端能真正生效：max 合并再拉回来，余额不会涨回去', () => {
+  const cap = Stock.ceiling('coins', AGED_DAYS);
+  const ctx = makeCtx({ coinsEarned: 20500, coinsSpent: 0 });
+  let cloud = agedRow({ coins_earned: 30500, coins_spent: 0 });
+  vm.runInContext(`applyCloudRow(${JSON.stringify(cloud)}, {})`, ctx);
+
+  // 本地削平结果按真实回写路径推上云端，服务端按 max 合并
+  cloud = cloudMerge(cloud, P.toRow(ctx.save, Date.now()));
+  assert.strictEqual(cloud.coins_spent, 30500 - cap, '抵扣量必须被云端接受（这一步是原实现失败的地方）');
+
+  // 另一端（或本端刷新）再拉一次
+  const other = makeCtx({ coinsEarned: 20500, coinsSpent: 0 });
+  const back = vm.runInContext(`applyCloudRow(${JSON.stringify(cloud)}, {})`, other);
+  assert.strictEqual(back.balance, cap, '刷新后仍是 cap —— 不再「刷新一次涨一万」');
+});
+
+test('削平是幂等的：连续 pull 不会把玩家一路扣到 0', () => {
+  const cap = Stock.ceiling('coins', AGED_DAYS);
+  const ctx = makeCtx({ coinsEarned: 20500, coinsSpent: 0 });
+  const cloud = agedRow({ coins_earned: 30500, coins_spent: 0 });
+  vm.runInContext(`applyCloudRow(${JSON.stringify(cloud)}, {})`, ctx);
+  const afterFirst = ctx.save.coinsSpent;
+  for (let i = 0; i < 3; i++) vm.runInContext(`applyCloudRow(${JSON.stringify(cloud)}, {})`, ctx);
+  assert.strictEqual(ctx.save.coinsSpent, afterFirst, '第二次起不许再扣（判据看持有量，不看 granted）');
+  assert.strictEqual(ctx.STOCK_AUDIT.clamped, 1, '只应产生一次 anomaly，否则日志会被常态化削平淹掉');
+  assert.strictEqual(Coins.balance(ctx.save), cap);
+});
+
+test('正常玩家的账不受审计影响（天数不可信时也不许削）', () => {
+  const ctx = makeCtx({ coinsEarned: 100, coinsSpent: 20 });
+  const out = vm.runInContext(
+    `applyCloudRow(${JSON.stringify(agedRow({ coins_earned: 160, coins_spent: 20 }))}, {})`, ctx);
+  assert.strictEqual(out.balance, 140);
+  assert.strictEqual(ctx.STOCK_AUDIT.clamped, 0);
+
+  // created_date 缺失 = 天数不可信：宁可不削，也不能凭玩家自己的时钟削真玩家
+  const noAge = makeCtx({ coinsEarned: 20500, coinsSpent: 0 });
+  const r = vm.runInContext(`applyCloudRow(${JSON.stringify(row({ coins_earned: 30500 }))}, {})`, noAge);
+  assert.strictEqual(r.balance, 30500);
+  assert.strictEqual(noAge.STOCK_AUDIT.unknownAge, 1);
+  assert.strictEqual(noAge.STOCK_AUDIT.clamped, 0);
 });

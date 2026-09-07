@@ -239,8 +239,26 @@ test('audit：控制台改出来的 99999 被削平，并留下能追查的明�
   const S = Stock.create(ceilCfg);
   const r = S.audit({ g: 99999, s: 3 }, 3);
   const cap = 2 + 4 * 60 * 3;
-  assert.deepStrictEqual(r.patch, { g: cap });
-  assert.deepStrictEqual(r.anomalies, [{ key: 'toolMine', field: 'g', claimed: 99999, cap: cap, ageDays: 3 }]);
+  /* 削平必须记成 spent（反向记账）：granted 与 spent 在云端都是 merge:"max"，
+     把 granted 改小的回写会被云端 max 原样吃掉 —— 削平活不过下一次 pull。
+     方向与 max 同向的 spent 才能真正上云，跨端一起收敛。 */
+  assert.deepStrictEqual(r.patch, { s: 99996 - cap + 3 });
+  assert.strictEqual(r.patch.g, undefined, 'granted 不许出现在削平 patch 里');
+  assert.deepStrictEqual(r.anomalies, [{
+    key: 'toolMine', field: 's', claimed: 99999, held: 99996,
+    cap: cap, offset: 99996 - cap, ageDays: 3
+  }]);
+  // 削平后持有量正好落在 cap 上，且再审一次不会重复扣（判据看持有量，不看 granted）
+  const after = Object.assign({ g: 99999, s: 3 }, r.patch);
+  assert.strictEqual(S.stock(after, 'toolMine'), cap);
+  assert.deepStrictEqual(S.audit(after, 3).anomalies, []);
+});
+
+test('audit：granted 超标但已经花掉了的，不算异常（宁可放过，不误伤）', () => {
+  const S = Stock.create(ceilCfg);
+  /* 反向记账只压得动持有量：注入后已消费的部分追不回来，也不该再扣第二遍。 */
+  const cap = 2 + 4 * 60 * 3;
+  assert.deepStrictEqual(S.audit({ g: 99999, s: 99999 - cap }, 3).anomalies, []);
 });
 
 test('audit：天数不可信时不 clamp，但要把这条路走了多少次标出来', () => {

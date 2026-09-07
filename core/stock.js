@@ -139,10 +139,20 @@
       return Math.round(num(it.initial) + (days + 1) * ceilingCfg.perDay[key] * safety);
     }
 
-    /* 检查一份存档（通常是刚跟云端/别的标签页合并完的那份）里有没有离谱的累计值。
+    /* 检查一份存档（通常是刚跟云端/别的标签页合并完的那份）里有没有离谱的持有量。
        返回 { patch, anomalies }：patch 是要削平的字段（空对象 = 没问题），
        anomalies 是给日志/告警用的明细。ageDays 传 null/undefined = 天数不可信，
        此时不做任何 clamp，只把 unknownAge 标出来让上层能看见这条路走了多少次。 */
+    /* ⚠️ 削平必须写 spent，不许写 granted（2026-09-07 实测，这是原实现空转的根因）：
+       granted 与 spent 在云端都是 merge:"max"，把 granted 改**小**的回写会被云端的 max
+       原样吃掉 —— 削平只在本地存活一瞬，下一次 pull 就整值涨回去；表现为两端数字长期
+       不一致、日志里 clamped 计数一路递增（正是「常态化降级」的样子）。
+       反向记账（spent += 超出量）与 max 同向，所以能真正上云、跨端收敛。
+
+       判据也必须从「granted > cap」改成「持有量 > cap」，这是反向记账的必然要求：
+       spent 抵扣只压得动持有量，压不动 granted；判据若仍看 granted，抵扣后 granted
+       依然超标 → 每次 pull 再扣一遍，能把玩家一路扣到 0。
+       代价是「注入后已经花掉的那部分」不再追溯 —— 宁可放过，也不误伤诚实玩家。 */
     function audit(save, ageDays) {
       var out = { patch: {}, anomalies: [], unknownAge: false };
       if (!ceilingCfg) return out;
@@ -153,11 +163,17 @@
       keys.forEach(function (key) {
         var cap = ceiling(key, ageDays);
         if (cap === null) return;
-        var have = num(save && save[item(key).granted]);
-        if (have > cap) {
-          out.patch[item(key).granted] = cap;
-          out.anomalies.push({ key: key, field: item(key).granted, claimed: have, cap: cap, ageDays: ageDays });
-        }
+        var it = item(key);
+        var granted = num(save && save[it.granted]);
+        var spentNow = num(save && save[it.spent]);
+        var held = Math.max(0, granted - spentNow);
+        if (held <= cap) return;
+        var offset = held - cap;
+        out.patch[it.spent] = spentNow + offset;
+        out.anomalies.push({
+          key: key, field: it.spent, claimed: granted, held: held,
+          cap: cap, offset: offset, ageDays: ageDays
+        });
       });
       return out;
     }

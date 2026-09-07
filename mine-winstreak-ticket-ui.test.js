@@ -217,9 +217,10 @@ test('第三槽不许串味：上一个窗有 extra，下一个窗没有就必�
 });
 
 /* ============ ④ 结算窗：有票才给领奖入口，领完把窗放回来 ============ */
-function runOnWin(hasTicket) {
+function runOnWin(hasTicket, bonus) {
+  bonus = bonus || null;
   const dom = domCtx(['hudLv']);
-  const calls = { dialogs: [], claim: [] };
+  const calls = { dialogs: [], claim: [], bonus: [] };
   const ctx = {
     $: dom.$, Math, Object, JSON, Date,
     setTimeout: (fn) => { (ctx.timers = ctx.timers || []).push(fn); return 1; },
@@ -236,6 +237,10 @@ function runOnWin(hasTicket) {
     wsRewardText: (rw) => `⚡+${rw.energy} · 🪙+${rw.coins}`,
     wsGet: () => ({}),
     wsClaimTicket(onDone) { calls.claim.push(onDone); },
+    /* 「看视频领 N 倍金币」与连胜票抢同一个第三槽（2026-09-07）：这里按参数给桩，
+       让「有票时给票、无票时才给翻倍」这条优先级在真跑的 onWin 上被验到。 */
+    settleBonusOffer: () => bonus,
+    claimSettleBonus(base, onDone) { calls.bonus.push(base); if (onDone) onDone(); },
     startLevel() {}, showHome() {},
     maybeStory(at, cb) { cb(); },
     cheer() {},
@@ -376,4 +381,23 @@ test('新文案两种语言都有，且都带 {n} 占位符', () => {
     assert.match(txt, /\{n\}/, `${lang} 的 wsWinClaim 必须用 {n} 承载连胜盘数`);
   }
   assert.ok(html.includes('wsWinClaim'), '内嵌配置副本要同步（node scripts/sync-embedded-config.mjs）');
+});
+
+/* 第三槽的归属（2026-09-07）：连胜票与「看视频领 N 倍金币」抢同一个位置。
+   一个结算窗只放一个广告按钮 —— 按钮数量不是流量杠杆，误触才是代价。 */
+test('第三槽优先级：有连胜票时给票，没票才给翻倍金币', () => {
+  const withTicket = runOnWin(true, { mult: 5, base: 1, gain: 4 });
+  const ex1 = withTicket.calls.dialogs.pop().extra;
+  assert.match(ex1.text, /wsWinClaim/, '有票时第三槽必须是连胜领奖（它值钱得多）');
+
+  const noTicket = runOnWin(false, { mult: 5, base: 1, gain: 4 });
+  const ex2 = noTicket.calls.dialogs.pop().extra;
+  assert.match(ex2.text, /winAdBonus/, '没票且可翻倍时，第三槽给「看视频领 N 倍金币」');
+  ex2.onClick();
+  assert.deepStrictEqual(noTicket.calls.bonus, [1], '点击要把本关基础金币传进领取流程');
+});
+
+test('翻倍不可用（日上限/冷却）时第三槽就空着，不画不能用的按钮', () => {
+  const { calls } = runOnWin(false, null);
+  assert.strictEqual(calls.dialogs.pop().extra, null);
 });

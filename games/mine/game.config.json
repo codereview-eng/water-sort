@@ -12,7 +12,7 @@
     "firstClearMult": 3,
     "adBonus": {
       "enabled": true,
-      "multiplier": 2,
+      "multiplier": 5,
       "dailyCap": 10,
       "cooldownMs": 60000
     }
@@ -89,6 +89,13 @@
         "onFail": "grant",
         "capping": {
           "maxPerDay": 3
+        }
+      },
+      "settle-bonus": {
+        "format": "rewarded",
+        "onFail": "deny",
+        "capping": {
+          "maxPerDay": 10
         }
       }
     },
@@ -298,6 +305,9 @@
         "toolEmptyAd": "Watch an ad for {n}× \"{name}\".",
         "toolEmptySave": "You have {balance} coins. Reach {price} to buy items without watching ads.",
         "winCoins": "+{n} coins — {total} total.",
+        "winAdBonus": "📺 Watch ad · {mult}× coins (+{n})",
+        "adBonusGot": "{mult}× coins! +{n} — {total} total",
+        "adBonusUsedUp": "Today's coin boosts are used up — come back tomorrow",
         "toHome": "Back to home",
         "adRevive": "Watch ad · revive",
         "quitTitle": "Quit this level?",
@@ -591,6 +601,9 @@
         "toolEmptyAd": "看一段广告，补 {n} 个「{name}」道具。",
         "toolEmptySave": "当前金币 {balance} 枚，攒到 {price} 就能直接买、不用看广告。",
         "winCoins": "金币 +{n}，共 {total} 枚。",
+        "winAdBonus": "📺 看视频领 {mult} 倍金币（+{n}）",
+        "adBonusGot": "{mult} 倍金币到手！+{n}，共 {total} 枚",
+        "adBonusUsedUp": "今天的翻倍次数用完啦，明天再来",
         "toHome": "返回首页",
         "adRevive": "看广告复活",
         "quitTitle": "退出本关？",
